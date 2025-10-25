@@ -5,15 +5,26 @@ import { useState, useEffect } from 'react';
 interface ChatMessageProps {
     role: 'user' | 'assistant' | 'system';
     content: string;
+    delay?: number;
   }
   
-  export function ChatMessage({ role, content }: ChatMessageProps) {
+  export function ChatMessage({ role, content, delay = 0 }: ChatMessageProps) {
     const isUser = role === 'user';
     const [visibleWords, setVisibleWords] = useState<number[]>([]);
+    const [isVisible, setIsVisible] = useState(false);
+    
+    // Message bubble fade-in with delay
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        setIsVisible(true);
+      }, delay);
+      
+      return () => clearTimeout(timer);
+    }, [delay]);
     
     // Word-by-word fade-in for assistant messages
     useEffect(() => {
-      if (isUser) {
+      if (isUser || !isVisible) {
         return;
       }
       
@@ -25,7 +36,7 @@ interface ChatMessageProps {
           setVisibleWords(prev => [...prev, index]);
         }, index * 50); // 50ms delay between each word
       });
-    }, [content, isUser]);
+    }, [content, isUser, isVisible]);
     
     // Handle "Pro tip:" styling with word fade-in
     const formatContent = (text: string) => {
@@ -50,7 +61,6 @@ interface ChatMessageProps {
         if (line.includes('Pro tip:')) {
           const parts = line.split('Pro tip:');
           const words = parts[0].split(' ');
-          const tipWords = ['Pro', 'tip:'];
           const afterWords = parts[1].split(' ');
           
           return (
@@ -93,7 +103,7 @@ interface ChatMessageProps {
     };
     
     return (
-      <div className={`message ${isUser ? 'user-message' : 'assistant-message'}`}>
+      <div className={`message ${isUser ? 'user-message' : 'assistant-message'} ${isVisible ? 'visible' : ''}`}>
         <div className={`message-bubble ${isUser ? 'user-bubble' : 'assistant-bubble'}`}>
           {formatContent(content)}
         </div>

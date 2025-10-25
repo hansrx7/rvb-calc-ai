@@ -1257,11 +1257,12 @@ Restart
       </div>
       
       <div className="messages-container">
-        {messages.map(message => (
+        {messages.map((message, index) => (
           <div key={message.id} data-message-id={message.id}>
             <ChatMessage
               role={message.role}
               content={message.content}
+              delay={message.role === 'assistant' ? index * 200 : 0}
             />
             {/* Render chart right after message if it has one - uses message's snapshot data */}
             {message.chartToShow && renderChart(message.chartToShow, message.snapshotData)}
