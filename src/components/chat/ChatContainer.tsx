@@ -320,7 +320,7 @@ const [chartsReady, setChartsReady] = useState(false);
     const changeMessage: Message = {
       id: Date.now().toString(),
       role: 'assistant',
-      content: "Perfect! I've updated your scenario with the new values. The charts have been recalculated to reflect your changes. Feel free to explore how the different scenarios compare!"
+      content: "Perfect! I've updated your scenario with the new values. The charts have been recalculated to reflect your changes. Check out the chart buttons above to explore different views!"
     };
     setMessages(prev => [...prev, changeMessage]);
   };
@@ -366,7 +366,7 @@ const [chartsReady, setChartsReady] = useState(false);
       const aiMessage: Message = {
         id: Date.now().toString(),
         role: 'assistant',
-        content: `Got it! For reference, the default assumptions are shown in the box on the top right. Now, what home price and monthly rent are you working with?`
+        content: `Got it! You can use your own values instead. The default assumptions are shown in the box on the top right. What home price and monthly rent are you working with?`
       };
       setMessages(prev => [...prev, aiMessage]);
     }
