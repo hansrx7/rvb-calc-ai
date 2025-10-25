@@ -395,13 +395,18 @@ const [chartsReady, setChartsReady] = useState(false);
   const handleUseLocalData = () => {
     if (locationData) {
       // Add user message showing the choice
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        role: 'user',
         content: `Use this data`
-    };
-    setMessages(prev => [...prev, userMessage]);
-    
+      };
+      setMessages(prev => [...prev, userMessage]);
+      
+      // Debug logging
+      console.log('DEBUG handleUseLocalData:');
+      console.log('userData.homePrice:', userData.homePrice);
+      console.log('locationData.medianHomePrice:', locationData.medianHomePrice);
+      
       // Set the ZIP data immediately, but preserve user's custom home price if they provided one
       const newUserData: UserData = {
         homePrice: userData.homePrice || locationData.medianHomePrice, // Use user's price if provided, otherwise use ZIP median
@@ -409,6 +414,8 @@ const [chartsReady, setChartsReady] = useState(false);
         downPaymentPercent: userData.downPaymentPercent,
         timeHorizonYears: userData.timeHorizonYears
       };
+      
+      console.log('newUserData.homePrice:', newUserData.homePrice);
       
     setUserData(newUserData);
       setIsLocationLocked(true);
@@ -1534,9 +1541,14 @@ If you can't find a value, use null. Only extract numbers that make sense for ea
 
     const extractedData = JSON.parse(response.choices[0].message.content || '{}');
     
+    console.log('DEBUG AI extraction:');
+    console.log('Original message:', message);
+    console.log('Extracted data:', extractedData);
+    
     // Update newData with extracted values (only if they exist)
     if (extractedData.homePrice && extractedData.homePrice > 0) {
       newData.homePrice = extractedData.homePrice;
+      console.log('Set newData.homePrice to:', newData.homePrice);
     }
     if (extractedData.monthlyRent && extractedData.monthlyRent > 0) {
       newData.monthlyRent = extractedData.monthlyRent;
