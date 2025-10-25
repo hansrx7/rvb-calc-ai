@@ -395,18 +395,13 @@ const [chartsReady, setChartsReady] = useState(false);
   const handleUseLocalData = () => {
     if (locationData) {
       // Add user message showing the choice
-      const userMessage: Message = {
-        id: Date.now().toString(),
-        role: 'user',
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
         content: `Use this data`
-      };
-      setMessages(prev => [...prev, userMessage]);
-      
-      // Debug logging
-      console.log('DEBUG handleUseLocalData:');
-      console.log('userData.homePrice:', userData.homePrice);
-      console.log('locationData.medianHomePrice:', locationData.medianHomePrice);
-      
+    };
+    setMessages(prev => [...prev, userMessage]);
+    
       // Set the ZIP data immediately, but preserve user's custom home price if they provided one
       const newUserData: UserData = {
         homePrice: userData.homePrice || locationData.medianHomePrice, // Use user's price if provided, otherwise use ZIP median
@@ -414,8 +409,6 @@ const [chartsReady, setChartsReady] = useState(false);
         downPaymentPercent: userData.downPaymentPercent,
         timeHorizonYears: userData.timeHorizonYears
       };
-      
-      console.log('newUserData.homePrice:', newUserData.homePrice);
       
     setUserData(newUserData);
       setIsLocationLocked(true);
@@ -605,18 +598,21 @@ function shouldShowChart(aiResponse: string): string | null {
       const hasCustomValues = newUserData.homePrice || newUserData.monthlyRent || newUserData.downPaymentPercent;
       
       if (hasCustomValues) {
-        // PATH 10: ZIP + custom data conflict
-        // Store the extracted data so handleUseLocalData can access it
+        // PATH 10: NEW FLOW - ZIP + Custom Home Price
+        // User provided their own home price + ZIP code
         setUserData(newUserData);
-        setShowLocationCard(true);
-        const conflictMessage: Message = {
+        setLocationData(detectedLocationData);
+        setIsLocationLocked(true);
+        setUsingZipData(true);
+        
+        const newFlowMessage: Message = {
           id: Date.now().toString(),
           role: 'assistant',
-          content: `I see you mentioned ${detectedLocationData.city}, ${detectedLocationData.state} (${zipCode}). I'll use your $${newUserData.homePrice?.toLocaleString()} home price. For rent, would you like to use the local average ($${detectedLocationData.averageRent.toLocaleString()}/mo) or do you have your own rent amount?`
+          content: `Perfect! I'll use your $${newUserData.homePrice?.toLocaleString()} home price with the ${detectedLocationData.city}, ${detectedLocationData.state} market data for property taxes and growth rates. What's your current monthly rent?`
         };
-        setMessages(prev => [...prev, conflictMessage]);
+        setMessages(prev => [...prev, newFlowMessage]);
         setIsLoading(false);
-        return; // Wait for user choice
+        return; // Continue with custom rent collection
       }
       
       // Normal ZIP flow (no custom data provided)
@@ -1541,14 +1537,9 @@ If you can't find a value, use null. Only extract numbers that make sense for ea
 
     const extractedData = JSON.parse(response.choices[0].message.content || '{}');
     
-    console.log('DEBUG AI extraction:');
-    console.log('Original message:', message);
-    console.log('Extracted data:', extractedData);
-    
     // Update newData with extracted values (only if they exist)
     if (extractedData.homePrice && extractedData.homePrice > 0) {
       newData.homePrice = extractedData.homePrice;
-      console.log('Set newData.homePrice to:', newData.homePrice);
     }
     if (extractedData.monthlyRent && extractedData.monthlyRent > 0) {
       newData.monthlyRent = extractedData.monthlyRent;
