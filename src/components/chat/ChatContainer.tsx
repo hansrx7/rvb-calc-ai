@@ -190,12 +190,12 @@ const [chartsReady, setChartsReady] = useState(false);
         
         // Timeline
         if (userData.timeHorizonYears) {
-          addText(`⏰ Timeline: ${userData.timeHorizonYears} years`, 10);
+          addText(`Timeline: ${userData.timeHorizonYears} years`, 10);
         }
         
         // Property tax rate
         const propertyTaxRate = locationData?.propertyTaxRate ? (locationData.propertyTaxRate * 100).toFixed(2) : '1.0';
-        addText(`🏛️ Tax: ${propertyTaxRate}%`, 10);
+        addText(`Tax: ${propertyTaxRate}%`, 10);
         
         // Growth rates
         if (locationData) {
@@ -203,14 +203,14 @@ const [chartsReady, setChartsReady] = useState(false);
           const rentGrowthRate = getZIPBasedRates(locationData, userData.timeHorizonYears || 5).rentGrowthRate;
           const investmentReturnRate = getZIPBasedRates(locationData, userData.timeHorizonYears || 5).investmentReturnRate;
           
-          addText(`🏘️ Appreciation: ${homeAppreciationRate.toFixed(1)}%/year (${locationData.city} market)`, 10);
-          addText(`📈 Rent Growth: ${rentGrowthRate.toFixed(1)}%/year (${locationData.city} market)`, 10);
-          addText(`💹 Investment: ${investmentReturnRate.toFixed(1)}%/year (based on timeline)`, 10);
+          addText(`Appreciation: ${homeAppreciationRate.toFixed(1)}%/year (${locationData.city} market)`, 10);
+          addText(`Rent Growth: ${rentGrowthRate.toFixed(1)}%/year (${locationData.city} market)`, 10);
+          addText(`Investment: ${investmentReturnRate.toFixed(1)}%/year (based on timeline)`, 10);
         } else {
           const timelineRates = getTimelineBasedRates(userData.timeHorizonYears || 5);
-          addText(`🏘️ Appreciation: ${timelineRates.homeAppreciationRate.toFixed(1)}%/year (based on timeline)`, 10);
-          addText(`📈 Rent Growth: ${timelineRates.rentGrowthRate.toFixed(1)}%/year (based on timeline)`, 10);
-          addText(`💹 Investment: ${timelineRates.investmentReturnRate.toFixed(1)}%/year (based on timeline)`, 10);
+          addText(`Appreciation: ${timelineRates.homeAppreciationRate.toFixed(1)}%/year (based on timeline)`, 10);
+          addText(`Rent Growth: ${timelineRates.rentGrowthRate.toFixed(1)}%/year (based on timeline)`, 10);
+          addText(`Investment: ${timelineRates.investmentReturnRate.toFixed(1)}%/year (based on timeline)`, 10);
         }
       }
       
@@ -255,14 +255,18 @@ const [chartsReady, setChartsReady] = useState(false);
           const chartElement = document.querySelector(`[data-message-id="${message.id}"] .chart-wrapper`);
           if (chartElement) {
             try {
-              // Small delay to ensure chart is fully rendered
-              await new Promise(resolve => setTimeout(resolve, 100));
+              // Longer delay to ensure chart is fully rendered with proper colors
+              await new Promise(resolve => setTimeout(resolve, 500));
               
               const canvas = await html2canvas(chartElement as HTMLElement, {
-                backgroundColor: '#ffffff',
-                scale: 2, // Higher quality
+                backgroundColor: null, // Transparent background to preserve chart colors
+                scale: 3, // Higher quality for better chart rendering
                 useCORS: true,
-                allowTaint: true
+                allowTaint: true,
+                logging: false, // Disable console logging
+                width: chartElement.scrollWidth,
+                height: chartElement.scrollHeight,
+                foreignObjectRendering: true // Better SVG rendering
               });
               
               const imgData = canvas.toDataURL('image/png');
@@ -272,6 +276,11 @@ const [chartsReady, setChartsReady] = useState(false);
               // Check if we need a new page for the chart
               checkNewPage(imgHeight + 5);
               
+              // Add white background rectangle first for better chart visibility
+              pdf.setFillColor(255, 255, 255);
+              pdf.rect(margin, yPosition, imgWidth, imgHeight, 'F');
+              
+              // Then add the chart image
               pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
               yPosition += imgHeight + 5;
               
@@ -873,44 +882,20 @@ const handleChipClick = (message: string) => {
     // For monthly cost chart, always use fresh data if available (to get updated ZIP-based rates)
     const costs = chartType === 'monthlyCost' ? monthlyCosts : (snapshotData?.monthlyCosts || monthlyCosts);
     const totalData = snapshotData?.totalCostData || totalCostData;
-    const inputVals = snapshotData?.inputValues || (userData.homePrice && userData.monthlyRent && userData.downPaymentPercent ? {
-      homePrice: userData.homePrice,
-      monthlyRent: userData.monthlyRent,
-      downPaymentPercent: userData.downPaymentPercent
-    } : null);
     
     if (!data) return null;
     
-    // Values display box
-    const ValuesBox = inputVals ? (
-      <div style={{
-        background: '#f7fafc',
-        border: '2px solid #e2e8f0',
-        borderRadius: '8px',
-        padding: '12px',
-        marginBottom: '12px',
-        fontSize: '13px',
-        color: '#4a5568'
-      }}>
-        <div style={{ fontWeight: '600', marginBottom: '6px' }}>📊 Values for this chart:</div>
-        <div>🏠 Home Price: <strong>${inputVals.homePrice.toLocaleString()}</strong></div>
-        <div>💵 Monthly Rent: <strong>${inputVals.monthlyRent.toLocaleString()}</strong></div>
-        <div>💰 Down Payment: <strong>{inputVals.downPaymentPercent}%</strong></div>
-      </div>
-    ) : null;
     
     switch (chartType) {
       case 'netWorth':
-  return (
+        return (
           <div className="chart-wrapper">
-            {ValuesBox}
             <NetWorthChart data={data} />
           </div>
         );
       case 'monthlyCost':
         return costs ? (
           <div className="chart-wrapper">
-            {ValuesBox}
             <MonthlyCostChart 
               buyingCosts={costs.buying}
               rentingCosts={costs.renting}
@@ -920,7 +905,6 @@ const handleChipClick = (message: string) => {
       case 'totalCost':
         return totalData ? (
           <div className="chart-wrapper">
-            {ValuesBox}
             <TotalCostChart 
               buyerFinalNetWorth={totalData.buyerFinalNetWorth}
               renterFinalNetWorth={totalData.renterFinalNetWorth}
@@ -935,14 +919,12 @@ const handleChipClick = (message: string) => {
       case 'equity':
         return (
           <div className="chart-wrapper">
-            {ValuesBox}
             <EquityBuildupChart data={data} />
           </div>
         );
       case 'rentGrowth':
         return costs ? (
           <div className="chart-wrapper">
-            {ValuesBox}
             <RentGrowthChart 
               data={data} 
               monthlyMortgage={costs.buying.mortgage}
@@ -952,7 +934,6 @@ const handleChipClick = (message: string) => {
       case 'breakEven':
         return (
           <div className="chart-wrapper">
-            {ValuesBox}
             <BreakEvenChart data={data} />
           </div>
         );
