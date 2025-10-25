@@ -102,7 +102,12 @@ export function BreakEvenChart({ data }: BreakEvenChartProps) {
             dataKey="netWorthDifference" 
             stroke="#667eea" 
             strokeWidth={3}
-            dot={{ fill: '#667eea', strokeWidth: 2, r: 4, stroke: '#667eea' }}
+            dot={{ 
+              fill: '#667eea', 
+              strokeWidth: 0, 
+              r: 3,
+              stroke: 'none'
+            }}
             name="Buying Advantage"
           />
         </LineChart>
