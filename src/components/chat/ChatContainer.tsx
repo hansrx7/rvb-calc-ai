@@ -7,10 +7,9 @@ import { NetWorthChart } from '../charts/NetWorthChart';
 import { calculateNetWorthComparison, calculateBuyingCosts, calculateRentingCosts } from '../../lib/finance/calculator';
 import { getLocationData, formatLocationData, detectZipCode, type FormattedLocationData } from '../../lib/location/zipCodeService';
 import type { ScenarioInputs, MonthlySnapshot } from '../../types/calculator';
-import { openai } from '../../lib/ai/openai';
 import { MonthlyCostChart } from '../charts/MonthlyCostChart';
 import { TotalCostChart } from '../charts/TotalCostChart';
-import { getAIResponse } from '../../lib/ai/openai';
+import { getAIResponse, openai } from '../../lib/ai/openai';
 import { EquityBuildupChart } from '../charts/EquityBuildupChart';
 import { RentGrowthChart } from '../charts/RentGrowthChart';
 import { BreakEvenChart } from '../charts/BreakEvenChart';
@@ -1534,8 +1533,8 @@ function extractUserDataFallback(message: string, currentData: UserData, locatio
   return { userData: newData, locationData };
 }
 
-// Legacy extraction function (kept as backup) - UNUSED
-// function extractUserData(message: string, currentData: UserData): { userData: UserData; locationData: FormattedLocationData | null } {
+// Extract numbers from user messages - handles comma-separated values!
+function extractUserData(message: string, currentData: UserData): { userData: UserData; locationData: FormattedLocationData | null } {
   const newData = { ...currentData };
   const lowerMessage = message.toLowerCase();
   
