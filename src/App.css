@@ -1203,8 +1203,7 @@ body {
   border: 2px solid rgba(56, 161, 105, 0.6);
   border-radius: 20px;
   font-size: 14px;
-  font-weight: 600;
-  font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif !important;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
   backdrop-filter: blur(10px);
