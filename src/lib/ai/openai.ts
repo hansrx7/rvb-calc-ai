@@ -26,6 +26,10 @@ export async function getAIResponse(
   // Check if all data is collected
   const hasAllData = userData.homePrice && userData.monthlyRent && userData.downPaymentPercent && userData.timeHorizonYears;
   
+  // Debug logging
+  console.log('AI Debug - hasAllData:', hasAllData);
+  console.log('AI Debug - userData:', userData);
+  
   // Create system prompt with user's data context
   const systemPrompt = `You are a warm, friendly financial advisor helping someone decide whether to buy a house or keep renting.
 
