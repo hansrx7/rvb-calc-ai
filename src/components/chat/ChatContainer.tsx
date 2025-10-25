@@ -104,6 +104,10 @@ const [chartsReady, setChartsReady] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editableValues, setEditableValues] = useState<UserData | null>(null);
   
+  // Reference box visibility and position state
+  const [isReferenceBoxVisible, setIsReferenceBoxVisible] = useState(true);
+  const [referenceBoxPosition, setReferenceBoxPosition] = useState({ x: 20, y: 20 });
+  
   // Ref for scrolling to charts
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -390,6 +394,37 @@ const [chartsReady, setChartsReady] = useState(false);
       content: "Perfect! I've updated your scenario with the new values. The charts have been recalculated to reflect your changes. Check out the chart buttons above to explore different views!"
     };
     setMessages(prev => [...prev, changeMessage]);
+  };
+
+  // Reference box handlers
+  const handleCloseReferenceBox = () => {
+    setIsReferenceBoxVisible(false);
+  };
+
+  const handleToggleReferenceBox = () => {
+    setIsReferenceBoxVisible(!isReferenceBoxVisible);
+  };
+
+  // Drag functionality for reference box
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX - referenceBoxPosition.x;
+    const startY = e.clientY - referenceBoxPosition.y;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      setReferenceBoxPosition({
+        x: e.clientX - startX,
+        y: e.clientY - startY
+      });
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   };
 
   const handleUseLocalData = () => {
@@ -778,13 +813,11 @@ function shouldShowChart(aiResponse: string): string | null {
     
     // If we have all data and haven't calculated yet (initial case, not data change)
     if (hasAllData && !chartsReady && !dataChanged) {
-      console.log('🔍 Calling calculateAndShowChart with locationData:', locationData);
       calculateAndShowChart(newUserData, locationData);
     }
     
     // Force recalculation if we have location data and charts are ready
     if (hasAllData && chartsReady && locationData) {
-      console.log('🔍 Force recalculating with location data:', locationData);
       calculateAndShowChart(newUserData, locationData);
     }
   };
@@ -802,11 +835,6 @@ const handleChipClick = (message: string) => {
     const locationDataToUse = currentLocationData || locationData;
     const propertyTaxRate = locationDataToUse?.propertyTaxRate ? locationDataToUse.propertyTaxRate * 100 : 1.0;
     
-    // Debug logging for property tax rate
-    console.log('🔍 Property Tax Rate Debug:');
-    console.log('Location Data:', currentLocationData || locationData);
-    console.log('Property Tax Rate (raw):', (currentLocationData || locationData)?.propertyTaxRate);
-    console.log('Property Tax Rate (converted):', propertyTaxRate);
     
     const inputs: ScenarioInputs = {
       homePrice: data.homePrice!,
@@ -1010,10 +1038,29 @@ const handleChipClick = (message: string) => {
       )}
       
       {/* Reference Box: Show after user makes choice */}
-      {isLocationLocked && (
-        <div className="reference-box">
-          <div className="reference-box-header">
+      {isLocationLocked && isReferenceBoxVisible && (
+        <div 
+          className="reference-box draggable"
+          style={{
+            position: 'fixed',
+            left: `${referenceBoxPosition.x}px`,
+            top: `${referenceBoxPosition.y}px`,
+            zIndex: 1000
+          }}
+        >
+          <div 
+            className="reference-box-header draggable-header"
+            onMouseDown={handleMouseDown}
+            style={{ cursor: 'move' }}
+          >
             <h4>📊 Your Inputs</h4>
+            <button 
+              className="close-reference-btn"
+              onClick={handleCloseReferenceBox}
+              title="Close"
+            >
+              ×
+            </button>
           </div>
           <div className="reference-box-content">
             {usingZipData && locationData ? (
@@ -1294,6 +1341,16 @@ const handleChipClick = (message: string) => {
             >
 Restart
             </button>
+            {/* Toggle Reference Box Button */}
+            {isLocationLocked && (
+              <button 
+                className="toggle-reference-btn"
+                onClick={handleToggleReferenceBox}
+                title={isReferenceBoxVisible ? "Hide inputs" : "Show inputs"}
+              >
+                {isReferenceBoxVisible ? '📊' : '📊'}
+              </button>
+            )}
           </div>
       </div>
       

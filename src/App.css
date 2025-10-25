@@ -1159,6 +1159,61 @@ body {
   animation: referenceBoxFadeIn 0.4s ease-out;
 }
 
+/* Draggable reference box */
+.reference-box.draggable {
+  user-select: none;
+  cursor: move;
+}
+
+.reference-box.draggable .draggable-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: move;
+  padding: 8px 0;
+  margin-bottom: 12px;
+  border-bottom: 2px solid #1e293b;
+}
+
+.close-reference-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.close-reference-btn:hover {
+  background: #f1f5f9;
+  color: #333;
+}
+
+.toggle-reference-btn {
+  background: linear-gradient(135deg, #1e293b 0%, #064e3b 100%);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+  margin-left: 8px;
+}
+
+.toggle-reference-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(30, 41, 59, 0.4);
+}
+
 .reference-box-header {
   margin-bottom: 12px;
   padding-bottom: 8px;
