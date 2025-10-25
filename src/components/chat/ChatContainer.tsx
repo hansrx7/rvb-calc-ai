@@ -353,6 +353,14 @@ const [chartsReady, setChartsReady] = useState(false);
 
   const handleUseLocalData = () => {
     if (locationData) {
+      // Add user message showing the choice
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: `Use this data`
+      };
+      setMessages(prev => [...prev, userMessage]);
+      
       // Set the ZIP data immediately
       const newUserData: UserData = {
         homePrice: locationData.medianHomePrice,
@@ -367,7 +375,7 @@ const [chartsReady, setChartsReady] = useState(false);
       
       // Add AI message asking for down payment and timeline
       const aiMessage: Message = {
-        id: Date.now().toString(),
+        id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: `Perfect! I'll use the ${locationData.city}, ${locationData.state} market data. Now I just need two more details:\n\n1. What down payment percentage are you thinking? (e.g., 10%, 20%)\n2. How long do you plan to stay in this home? (e.g., 3, 5, 10 years)`
       };
@@ -380,6 +388,14 @@ const [chartsReady, setChartsReady] = useState(false);
 
   const handleKeepMyData = () => {
     if (locationData) {
+      // Add user message showing the choice
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: `Use my own values`
+      };
+      setMessages(prev => [...prev, userMessage]);
+      
       // Lock the card in reference mode and show it immediately with blanks
       setIsLocationLocked(true);
       setUsingZipData(false);
@@ -390,7 +406,7 @@ const [chartsReady, setChartsReady] = useState(false);
       
       // Add AI message referencing the box
       const aiMessage: Message = {
-        id: Date.now().toString(),
+        id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: `Got it! You can use your own values instead. The default assumptions are shown in the box on the top right. What home price and monthly rent are you working with?`
       };
