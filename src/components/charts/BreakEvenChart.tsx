@@ -98,11 +98,16 @@ export function BreakEvenChart({ data }: BreakEvenChartProps) {
           <ReferenceLine y={0} stroke="#666" strokeDasharray="5 5" />
           
           <Line 
-            type="monotone" 
+            type="linear" 
             dataKey="netWorthDifference" 
             stroke="#667eea" 
             strokeWidth={3}
-            dot={false}
+            dot={{ 
+              fill: '#667eea', 
+              strokeWidth: 0, 
+              r: 3,
+              stroke: 'none'
+            }}
             name="Buying Advantage"
           />
         </LineChart>
