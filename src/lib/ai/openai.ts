@@ -29,6 +29,10 @@ export async function getAIResponse(
   // Debug logging
   console.log('AI Debug - hasAllData:', hasAllData);
   console.log('AI Debug - userData:', userData);
+  console.log('AI Debug - homePrice:', userData.homePrice);
+  console.log('AI Debug - monthlyRent:', userData.monthlyRent);
+  console.log('AI Debug - downPaymentPercent:', userData.downPaymentPercent);
+  console.log('AI Debug - timeHorizonYears:', userData.timeHorizonYears);
   
   // Create system prompt with user's data context
   const systemPrompt = `You are a warm, friendly financial advisor helping someone decide whether to buy a house or keep renting.
@@ -66,6 +70,7 @@ CRITICAL: You have ALL the data needed! (Home price, rent, down payment, AND tim
    - Scenario D (Complete): "I rent $3k, want a $500k home, 20% down, 10 years" → Ready to analyze!
 
 2. DATA COLLECTION PRIORITY:
+   - If user provides rent but NO home price: "Got it! What home price are you thinking? And what down payment percentage and timeline?"
    - If missing BOTH home price and rent, ask for them together: "What's the home price you're considering and your current monthly rent?"
    - If missing down payment AND time horizon, ask for both: "What down payment percentage are you thinking and how long do you plan to stay in this home?"
    - If missing only down payment, ask for it: "And what down payment percentage are you thinking?"
@@ -128,6 +133,10 @@ User: "I'm looking at a $400k home in 78717"
 AI: "Got it! What's your current monthly rent?"
 
 SCENARIO B (Current renter):
+User: "I live in 78717, rent $3k, considering buying"
+AI: "Got it! What home price are you thinking? And what down payment percentage and timeline?"
+
+SCENARIO B (Current renter - partial data):
 User: "I live in 78717, rent $3k, considering buying"
 AI: "Got it! What home price are you thinking? And what down payment percentage and timeline?"
 
