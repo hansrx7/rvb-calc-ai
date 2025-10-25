@@ -410,7 +410,7 @@ const [chartsReady, setChartsReady] = useState(false);
       // Set the ZIP data immediately, but preserve user's custom home price if they provided one
       const newUserData: UserData = {
         homePrice: userData.homePrice || locationData.medianHomePrice, // Use user's price if provided, otherwise use ZIP median
-        monthlyRent: userData.monthlyRent || locationData.averageRent, // Use user's rent if provided, otherwise use ZIP average
+        monthlyRent: locationData.averageRent, // Always use local average rent when "Use this data" is clicked
         downPaymentPercent: userData.downPaymentPercent,
         timeHorizonYears: userData.timeHorizonYears
       };
@@ -422,8 +422,8 @@ const [chartsReady, setChartsReady] = useState(false);
       setUsingZipData(true);
       
       // Add AI message asking for down payment and timeline
-      const homePriceText = userData.homePrice ? `your $${userData.homePrice.toLocaleString()} home price` : `the local median home price ($${locationData.medianHomePrice.toLocaleString()})`;
-      const rentText = userData.monthlyRent ? `your $${userData.monthlyRent.toLocaleString()}/mo rent` : `the local average rent ($${locationData.averageRent.toLocaleString()}/mo)`;
+      const homePriceText = newUserData.homePrice ? `your $${newUserData.homePrice.toLocaleString()} home price` : `the local median home price ($${locationData.medianHomePrice.toLocaleString()})`;
+      const rentText = `the local average rent ($${locationData.averageRent.toLocaleString()}/mo)`;
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -612,7 +612,7 @@ function shouldShowChart(aiResponse: string): string | null {
         const conflictMessage: Message = {
           id: Date.now().toString(),
           role: 'assistant',
-          content: `I see you mentioned ${detectedLocationData.city}, ${detectedLocationData.state} (${zipCode}). Here's the current data for that area. Would you like to use these values instead, or should we continue with the numbers you provided${newUserData.homePrice ? ` ($${(newUserData.homePrice / 1000).toFixed(0)}k` : ''}${newUserData.monthlyRent ? `, $${(newUserData.monthlyRent / 1000).toFixed(1)}k` : ''}${newUserData.downPaymentPercent ? `, ${newUserData.downPaymentPercent}%` : ''})?`
+          content: `I see you mentioned ${detectedLocationData.city}, ${detectedLocationData.state} (${zipCode}). I'll use your $${newUserData.homePrice?.toLocaleString()} home price. For rent, would you like to use the local average ($${detectedLocationData.averageRent.toLocaleString()}/mo) or do you have your own rent amount?`
         };
         setMessages(prev => [...prev, conflictMessage]);
         setIsLoading(false);
