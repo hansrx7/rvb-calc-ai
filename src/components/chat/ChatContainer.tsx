@@ -675,29 +675,14 @@ function shouldShowChart(aiResponse: string): string | null {
     };
     }
     
-    // If we just got all data for the first time, add confirmation card FIRST
-    if (hasAllData && !chartsReady) {
-      const confirmationCard: Message = {
-        id: (Date.now() + 2).toString(),
-        role: 'system', // Special type for UI cards
-        content: JSON.stringify({
-          type: 'confirmation',
-          homePrice: newUserData.homePrice!,
-          monthlyRent: newUserData.monthlyRent!,
-          downPaymentPercent: newUserData.downPaymentPercent!,
-          timeHorizonYears: newUserData.timeHorizonYears!
-        })
-      };
-      setMessages(prev => [...prev, confirmationCard]);
-      
-      // Show reference box if user never used ZIP code (normal flow without location data)
-      if (!isLocationLocked && !locationData) {
-        setIsLocationLocked(true);
-        setUsingZipData(false);
-      }
+    // Charts will be calculated and displayed automatically when all data is collected
+    // Show reference box if user never used ZIP code (normal flow without location data)
+    if (hasAllData && !chartsReady && !isLocationLocked && !locationData) {
+      setIsLocationLocked(true);
+      setUsingZipData(false);
     }
     
-    // Then add bot response (so it appears AFTER the card)
+    // Then add bot response
     setMessages(prev => [...prev, assistantMessage]);
     setIsLoading(false);
     
