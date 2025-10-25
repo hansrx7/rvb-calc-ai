@@ -214,9 +214,14 @@ const [chartsReady, setChartsReady] = useState(false);
           const chartElement = document.querySelector(`[data-message-id="${message.id}"] .chart-wrapper`);
           if (chartElement) {
             try {
+              // Small delay to ensure chart is fully rendered
+              await new Promise(resolve => setTimeout(resolve, 100));
+              
               const canvas = await html2canvas(chartElement as HTMLElement, {
                 backgroundColor: '#ffffff',
-                scale: 2 // Higher quality
+                scale: 2, // Higher quality
+                useCORS: true,
+                allowTaint: true
               });
               
               const imgData = canvas.toDataURL('image/png');
