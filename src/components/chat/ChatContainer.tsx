@@ -1285,7 +1285,7 @@ Restart
             for (let i = 0; i < index; i++) {
               if (messages[i].role === 'assistant') {
                 const wordCount = messages[i].content.split(' ').length;
-                delay += 200 + (wordCount * 50); // 200ms base + 50ms per word
+                delay += 50 + (wordCount * 3); // 50ms base + 3ms per word - much faster
               }
             }
           }
