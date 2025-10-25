@@ -34,7 +34,7 @@ interface ChatMessageProps {
       words.forEach((_, index) => {
         setTimeout(() => {
           setVisibleWords(prev => [...prev, index]);
-        }, index * 50); // 50ms delay between each word
+        }, index * 8); // 8ms delay between each word - very fast
       });
     }, [content, isUser, isVisible]);
     
