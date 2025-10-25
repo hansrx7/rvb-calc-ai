@@ -1348,7 +1348,9 @@ Restart
                 onClick={handleToggleReferenceBox}
                 title={isReferenceBoxVisible ? "Hide inputs" : "Show inputs"}
               >
-                {isReferenceBoxVisible ? '📊' : '📊'}
+                <span className="toggle-btn-content">
+                  <span className="toggle-btn-label">Inputs</span>
+                </span>
               </button>
             )}
           </div>
