@@ -18,29 +18,30 @@ RentVsBuy.ai is a web application that analyzes your housing situation and provi
 - No complicated forms—just chat naturally
 
 ### 📊 Interactive Financial Charts
-The app generates **5 comprehensive charts** to help you visualize your financial future:
+The app generates **6 comprehensive charts** to help you visualize your financial future:
 
-1. **Net Worth Comparison** - Shows how your wealth grows over 30 years when buying vs. renting
+1. **Net Worth Comparison** - Shows how your wealth grows over your timeline when buying vs. renting
 2. **Monthly Cost Breakdown** - Compares monthly expenses for buying (mortgage, taxes, insurance, maintenance) vs. renting
-3. **30-Year Total Cost** - Calculates the true cost of each option after 30 years, factoring in home appreciation and investment returns
+3. **Total Cost Comparison** - Calculates the true cost of each option after your timeline, factoring in home appreciation and investment returns
 4. **Home Equity Buildup** - Visualizes how much equity you build in a home over time
 5. **Rent Growth vs Fixed Mortgage** - Demonstrates how rent increases over time while mortgage payments stay fixed
+6. **Break-Even Timeline** - Shows exactly when buying starts paying off with visual timeline
 
-### 📊 Key Insights Summary
-- Instant "Bottom Line" summary modal (click "💡 Summary" button)
-- Shows winner (Buying vs Renting) with 30-year savings
-- Monthly cost difference at a glance
-- Break-even year calculation
-- Risk assessment based on down payment percentage
-- Professional, unobtrusive design that appears on demand
+### ⏰ Time Horizon Analysis (NEW!)
+- **Custom timeline support** - Analyze any timeframe (3, 5, 10+ years)
+- **Selling costs calculator** - 8% total costs (6% realtor + 2% closing) applied at timeline end
+- **Timeline-based assumptions** - Conservative for short-term, optimistic for long-term
+- **Break-even visualization** - See exactly when buying pays off
+- **AI warnings** for scenarios where early selling makes buying disadvantageous
 
 ### 🔄 Dynamic Scenario Testing
 - Test multiple scenarios in a single conversation
-- Change home price, rent, or down payment mid-chat
+- Change home price, rent, down payment, or timeline mid-chat
 - Switch between different ZIP codes to compare locations
 - Historical charts remain visible for comparison
 - All chart navigation buttons refresh when you provide new data
-- Input confirmation card shows your current scenario at a glance
+- **Editable input reference box** - Lock/unlock mode to modify values
+- Real-time recalculation when values are changed
 
 ### 📍 Location-Based Data (NEW!)
 - Mention any ZIP code to get local market data for 26,000+ locations
@@ -52,6 +53,8 @@ The app generates **5 comprehensive charts** to help you visualize your financia
 
 ### 💾 Professional PDF Export
 - Save your entire conversation and all charts in a single PDF
+- **Complete input documentation** - All parameters and assumptions included
+- **High-quality chart capture** - Full colors and contrast preserved
 - Share with family, financial advisors, or real estate agents
 - Clean, professional formatting suitable for decision-making meetings
 - Progress indicator shows PDF generation status
@@ -60,9 +63,10 @@ The app generates **5 comprehensive charts** to help you visualize your financia
 All calculations use industry-standard formulas:
 - Mortgage amortization with proper interest calculations
 - Property tax, insurance, and maintenance estimates
-- Rent growth projections (3.5% annually)
-- Home appreciation (3% annually)
-- Investment returns (7% annually for down payment alternatives)
+- **Timeline-based growth rates** - Conservative for short-term, optimistic for long-term
+- **Location-specific rates** - ZIP code data for appreciation, rent growth, and property taxes
+- **Selling costs integration** - 8% total costs applied at timeline end
+- **Monthly cash flow tracking** - Proper investment of savings/differences
 
 ## 🚀 Getting Started
 
@@ -110,18 +114,19 @@ All calculations use industry-standard formulas:
    - The AI will greet you and ask about your situation
    - **Option A:** Mention your ZIP code (e.g., "I'm in 92129") to get local data
    - **Option B:** Provide your own values directly
-   - Three key pieces of information needed:
+   - Four key pieces of information needed:
      - Home price (e.g., "$500,000" or "500k")
      - Monthly rent (e.g., "$3,000" or "3k")
      - Down payment percentage (e.g., "20%" or "20")
+     - Time horizon (e.g., "5 years" or "10")
 
 2. **Get instant analysis**
-   - Once you provide all three values, charts are generated in the background
-   - Input confirmation card shows your scenario
+   - Once you provide all four values, charts are generated in the background
    - Reference box appears showing all values being used (with sources: ZIP data vs. custom vs. national averages)
+   - Timeline-based assumptions automatically applied
 
 3. **Request charts**
-   - Ask to see any of the 5 available charts
+   - Ask to see any of the 6 available charts
    - Use natural language: "show me net worth comparison" or "can I see monthly costs?"
    - Click dedicated chart navigation buttons for instant access
    - Click suggestion chips for contextual questions
@@ -134,8 +139,9 @@ All calculations use industry-standard formulas:
 
 5. **Try new scenarios**
    - Say "can I try new values"
-   - Provide all three values at once: "$600k, $4k, 25%"
+   - Provide all four values at once: "$600k, $4k, 25%, 7 years"
    - New charts generate while old ones remain for comparison
+   - Or use the editable reference box to modify values
 
 6. **Save your analysis**
    - Click the "Save Chat" button
@@ -216,6 +222,15 @@ AI: Based on your numbers, buying typically becomes more beneficial
 - Mortgage payment is locked in for 30 years
 - The "rent trap" where costs spiral over time
 
+### 6. Break-Even Timeline (NEW!)
+**What it shows:** Exactly when buying starts paying off
+
+**Key insights:**
+- Shows net worth difference over your timeline
+- Visual break-even point where lines cross
+- "Buying wins from start" vs "Break-even at year X" vs "Renting wins"
+- Accounts for selling costs at timeline end
+
 ## 🔧 Current Limitations & Future Plans
 
 ### Current Limitations
@@ -285,12 +300,13 @@ This project is in **active development** and currently operates at a foundation
 rentvsbuy-ai/
 ├── src/
 │   ├── components/
-│   │   ├── charts/           # 5 chart components
+│   │   ├── charts/           # 6 chart components
 │   │   │   ├── NetWorthChart.tsx
 │   │   │   ├── MonthlyCostChart.tsx
 │   │   │   ├── TotalCostChart.tsx
 │   │   │   ├── EquityBuildupChart.tsx
-│   │   │   └── RentGrowthChart.tsx
+│   │   │   ├── RentGrowthChart.tsx
+│   │   │   └── BreakEvenChart.tsx
 │   │   └── chat/             # Chat interface
 │   │       ├── ChatContainer.tsx
 │   │       ├── ChatInput.tsx
