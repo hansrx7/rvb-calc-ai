@@ -402,12 +402,12 @@ const [chartsReady, setChartsReady] = useState(false);
     };
     setMessages(prev => [...prev, userMessage]);
     
-      // Set the ZIP data immediately
+      // Set the ZIP data immediately, but preserve user's custom home price if they provided one
       const newUserData: UserData = {
-        homePrice: locationData.medianHomePrice,
-        monthlyRent: locationData.averageRent,
-        downPaymentPercent: null,
-        timeHorizonYears: null
+        homePrice: userData.homePrice || locationData.medianHomePrice, // Use user's price if provided, otherwise use ZIP median
+        monthlyRent: userData.monthlyRent || locationData.averageRent, // Use user's rent if provided, otherwise use ZIP average
+        downPaymentPercent: userData.downPaymentPercent,
+        timeHorizonYears: userData.timeHorizonYears
       };
       
     setUserData(newUserData);
@@ -415,10 +415,13 @@ const [chartsReady, setChartsReady] = useState(false);
       setUsingZipData(true);
       
       // Add AI message asking for down payment and timeline
+      const homePriceText = userData.homePrice ? `your $${userData.homePrice.toLocaleString()} home price` : `the local median home price ($${locationData.medianHomePrice.toLocaleString()})`;
+      const rentText = userData.monthlyRent ? `your $${userData.monthlyRent.toLocaleString()}/mo rent` : `the local average rent ($${locationData.averageRent.toLocaleString()}/mo)`;
+      
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: `Perfect! I'll use the ${locationData.city}, ${locationData.state} market data. Now I just need two more details:\n\n1. What down payment percentage are you thinking? (e.g., 10%, 20%)\n2. How long do you plan to stay in this home? (e.g., 3, 5, 10 years)`
+        content: `Perfect! I'll use ${homePriceText} and ${rentText} with the ${locationData.city}, ${locationData.state} market data for property taxes and growth rates. Now I just need two more details:\n\n1. What down payment percentage are you thinking? (e.g., 10%, 20%)\n2. How long do you plan to stay in this home? (e.g., 3, 5, 10 years)`
       };
       setMessages(prev => [...prev, aiMessage]);
       
