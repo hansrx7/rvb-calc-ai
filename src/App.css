@@ -326,16 +326,6 @@ body {
   justify-content: flex-start;
 }
 
-.typing-cursor {
-  animation: blink 1s infinite;
-  color: #10b981;
-  font-weight: bold;
-}
-
-@keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
-}
 
 .message-bubble {
   max-width: 70%;
