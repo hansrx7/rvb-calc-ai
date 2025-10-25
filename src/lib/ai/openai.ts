@@ -139,12 +139,14 @@ When user says ANY of these phrases, ALWAYS respond with the EXACT trigger phras
 
 ✅ "show me net worth" → "Here's your Net Worth Comparison!"
 ✅ "show me monthly costs" → "Here's your Monthly Costs Breakdown!"  
-✅ "show me total cost" → "Here's your Total Cost Comparison!"
+✅ "show me total cost" / "total cost" / "total costs" → "Here's your Total Cost Comparison!"
 ✅ "show me equity buildup" → "Here's your Equity Buildup!"
 ✅ "show me rent growth" / "how does rent grow" / "rent vs mortgage" → "Here's your Rent Growth!"
 ✅ "show me break even" / "when does buying pay off" / "break even point" → "Here's your Break-Even Timeline!"
 
 NEVER say "I don't have that chart" for these 6 charts. ALWAYS show them when requested.
+
+IMPORTANT: If user asks for "total cost", "total costs", or any variation, ALWAYS respond with "Here's your Total Cost Comparison!" and show the chart. Do NOT say you don't have that chart available.
 
 IMPORTANT: For Rent Growth specifically, users might ask:
 - "show me rent growth"
