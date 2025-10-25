@@ -1257,17 +1257,30 @@ Restart
       </div>
       
       <div className="messages-container">
-        {messages.map((message, index) => (
-          <div key={message.id} data-message-id={message.id}>
-            <ChatMessage
-              role={message.role}
-              content={message.content}
-              delay={message.role === 'assistant' ? index * 200 : 0}
-            />
-            {/* Render chart right after message if it has one - uses message's snapshot data */}
-            {message.chartToShow && renderChart(message.chartToShow, message.snapshotData)}
-          </div>
-        ))}
+        {messages.map((message, index) => {
+          // Calculate delay based on previous assistant messages' content length
+          let delay = 0;
+          if (message.role === 'assistant') {
+            for (let i = 0; i < index; i++) {
+              if (messages[i].role === 'assistant') {
+                const wordCount = messages[i].content.split(' ').length;
+                delay += 200 + (wordCount * 50); // 200ms base + 50ms per word
+              }
+            }
+          }
+          
+          return (
+            <div key={message.id} data-message-id={message.id}>
+              <ChatMessage
+                role={message.role}
+                content={message.content}
+                delay={delay}
+              />
+              {/* Render chart right after message if it has one - uses message's snapshot data */}
+              {message.chartToShow && renderChart(message.chartToShow, message.snapshotData)}
+            </div>
+          );
+        })}
         
         {isLoading && (
           <div className="loading-indicator">
