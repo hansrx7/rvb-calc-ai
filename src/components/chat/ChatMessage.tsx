@@ -20,12 +20,13 @@ interface ChatMessageProps {
       }
       
       setIsTyping(true);
+      setDisplayedContent(''); // Reset content
       const words = content.split(' ');
       let currentIndex = 0;
       
       const typeNextWord = () => {
         if (currentIndex < words.length) {
-          setDisplayedContent(prev => prev + (currentIndex === 0 ? '' : ' ') + words[currentIndex]);
+          setDisplayedContent(words.slice(0, currentIndex + 1).join(' '));
           currentIndex++;
           setTimeout(typeNextWord, 100); // 100ms delay between words
         } else {
