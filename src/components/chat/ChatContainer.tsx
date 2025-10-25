@@ -608,7 +608,7 @@ function shouldShowChart(aiResponse: string): string | null {
         const newFlowMessage: Message = {
           id: Date.now().toString(),
           role: 'assistant',
-          content: `Perfect! I'll use your $${newUserData.homePrice?.toLocaleString()} home price with the ${detectedLocationData.city}, ${detectedLocationData.state} market data for property taxes and growth rates. What's your current monthly rent?`
+          content: `Perfect! I'll use your $${newUserData.homePrice?.toLocaleString()} home price with the ${detectedLocationData.city}, ${detectedLocationData.state} market data for property taxes and growth rates. What's your current monthly rent, down payment percentage, and how long do you plan to stay in this home?`
         };
         setMessages(prev => [...prev, newFlowMessage]);
         setIsLoading(false);

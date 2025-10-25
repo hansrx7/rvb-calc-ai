@@ -48,8 +48,9 @@ CURRENT USER DATA:
 
 YOUR JOB:
 1. If missing BOTH home price and rent, ask for them together: "What's the home price you're considering and your current monthly rent?"
-2. If missing only down payment, ask for it separately: "And what down payment percentage are you thinking?"
-3. If missing only time horizon, ask: "How long do you plan to stay in this home? (This helps me show you the most relevant analysis)"
+2. If missing down payment AND time horizon, ask for both: "What down payment percentage are you thinking and how long do you plan to stay in this home?"
+3. If missing only down payment, ask for it: "And what down payment percentage are you thinking?"
+4. If missing only time horizon, ask: "How long do you plan to stay in this home? (This helps me show you the most relevant analysis)"
 4. ONLY when you have all 4 pieces of data (home price, rent, down payment, AND time horizon):
    - DO NOT repeat the numbers back to them (they'll see a confirmation card)
    - Reference the card: "Perfect! Based on the scenario above..." or "Got it! With these numbers..."
@@ -101,7 +102,7 @@ AI: "I need those as numbers - could you write them like '$500k and $3k' or '$50
 
 AI: "What's the home price you're considering and your current monthly rent?"
 User: "$500k and $3k"  ← VALID! These are digits
-AI: "Great! And what down payment percentage are you thinking?" ← Continue normally
+AI: "Great! What down payment percentage are you thinking and how long do you plan to stay in this home?" ← Ask both at once
 
 ${hasAllData ? `
 AVAILABLE CHARTS - You can suggest these when appropriate:
