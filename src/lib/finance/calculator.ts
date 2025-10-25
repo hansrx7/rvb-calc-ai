@@ -6,26 +6,30 @@ import type { ScenarioInputs, MonthlySnapshot } from '../../types/calculator';
 // TIMELINE-BASED ASSUMPTIONS
 // ===================================
 
-function getTimelineBasedRates(timeHorizonYears: number): {
+export function getTimelineBasedRates(timeHorizonYears: number): {
   homeAppreciationRate: number;
+  rentGrowthRate: number;
   investmentReturnRate: number;
 } {
   if (timeHorizonYears <= 3) {
     // Short timeline: Conservative assumptions
     return {
       homeAppreciationRate: 0.5,  // 0.5% annual (realistic for short-term)
+      rentGrowthRate: 2.0,        // 2% annual (conservative)
       investmentReturnRate: 4.0   // 4% annual (conservative)
     };
   } else if (timeHorizonYears <= 7) {
     // Medium timeline: Moderate assumptions
     return {
       homeAppreciationRate: 1.5,  // 1.5% annual (moderate)
+      rentGrowthRate: 3.0,        // 3% annual (moderate)
       investmentReturnRate: 6.0   // 6% annual (moderate)
     };
   } else {
     // Long timeline: Optimistic assumptions
     return {
       homeAppreciationRate: 2.5,  // 2.5% annual (optimistic)
+      rentGrowthRate: 3.5,        // 3.5% annual (optimistic)
       investmentReturnRate: 7.0   // 7% annual (optimistic)
     };
   }

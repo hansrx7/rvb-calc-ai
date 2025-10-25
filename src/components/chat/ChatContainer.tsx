@@ -4,7 +4,7 @@ import { useState, useRef } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { NetWorthChart } from '../charts/NetWorthChart';
-import { calculateNetWorthComparison, calculateBuyingCosts, calculateRentingCosts } from '../../lib/finance/calculator';
+import { calculateNetWorthComparison, calculateBuyingCosts, calculateRentingCosts, getTimelineBasedRates } from '../../lib/finance/calculator';
 import { getLocationData, formatLocationData, detectZipCode, type FormattedLocationData } from '../../lib/location/zipCodeService';
 import type { ScenarioInputs, MonthlySnapshot } from '../../types/calculator';
 import { MonthlyCostChart } from '../charts/MonthlyCostChart';
@@ -745,9 +745,11 @@ const handleChipClick = (message: string) => {
       hoaMonthly: 150,
       maintenanceRate: 1.0,
       renterInsuranceAnnual: 240,
-      homeAppreciationRate: getZIPBasedRates(locationData, data.timeHorizonYears!).homeAppreciationRate,
-      rentGrowthRate: getZIPBasedRates(locationData, data.timeHorizonYears!).rentGrowthRate,
-      investmentReturnRate: getZIPBasedRates(locationData, data.timeHorizonYears!).investmentReturnRate
+      // Use ZIP-based rates if location data exists, otherwise use timeline-based rates
+      ...(locationDataToUse ? 
+        getZIPBasedRates(locationDataToUse, data.timeHorizonYears!) : 
+        getTimelineBasedRates(data.timeHorizonYears!)
+      )
     };
     
     // Calculate net worth comparison
