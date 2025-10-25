@@ -599,7 +599,8 @@ function shouldShowChart(aiResponse: string): string | null {
       
       if (hasCustomValues) {
         // PATH 10: ZIP + custom data conflict
-        // Show card with custom message explaining both options
+        // Store the extracted data so handleUseLocalData can access it
+        setUserData(newUserData);
         setShowLocationCard(true);
         const conflictMessage: Message = {
           id: Date.now().toString(),
