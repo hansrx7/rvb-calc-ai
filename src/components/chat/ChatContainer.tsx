@@ -754,7 +754,13 @@ const handleChipClick = (message: string) => {
     const snapshots = calculateNetWorthComparison(inputs);
 
     setChartData(snapshots);
-    setChartsReady(true); // Mark charts as ready (but don't show yet!)
+    setChartsReady(true); // Mark charts as ready
+    
+    // Automatically show the Net Worth chart when all data is collected
+    setVisibleCharts(prev => ({
+      ...prev,
+      netWorth: true
+    }));
     
     // Calculate monthly costs
     const buying = calculateBuyingCosts(inputs);
@@ -1533,141 +1539,4 @@ function extractUserDataFallback(message: string, currentData: UserData, locatio
   return { userData: newData, locationData };
 }
 
-// Extract numbers from user messages - handles comma-separated values!
-function extractUserData(message: string, currentData: UserData): { userData: UserData; locationData: FormattedLocationData | null } {
-  const newData = { ...currentData };
-  const lowerMessage = message.toLowerCase();
-  
-  // Check for ZIP code FIRST and remove it from the message for number extraction
-  const zipCode = detectZipCode(message);
-  let locationData: FormattedLocationData | null = null;
-  let messageWithoutZip = message;
-  
-  if (zipCode) {
-    const rawLocationData = getLocationData(zipCode);
-    if (rawLocationData) {
-      locationData = formatLocationData(rawLocationData);
-    }
-    // Remove the ZIP code from message so it doesn't get extracted as a home price
-    messageWithoutZip = message.replace(new RegExp(`\\b${zipCode}\\b`, 'g'), '');
-  }
-  
-  // Check if user is providing NEW values (overwrite mode)
-  const isNewData = lowerMessage.includes('new') || 
-                    lowerMessage.includes('try') || 
-                    lowerMessage.includes('different') ||
-                    lowerMessage.includes('change') ||
-                    lowerMessage.includes('instead') ||
-                    lowerMessage.includes('now');
-  
-  // Extract ALL numbers from the message (handles various formats)
-  const extractAllNumbers = (str: string): number[] => {
-    const numbers: number[] = [];
-    
-    // Pattern 1: $500k or 500k (with k/K suffix)
-    const kPattern = /\$?\s*([\d,]+)k\b/gi;
-    let match;
-    while ((match = kPattern.exec(str)) !== null) {
-      const num = parseFloat(match[1].replace(/,/g, '')) * 1000;
-      numbers.push(num);
-    }
-    
-    // Pattern 2: Regular numbers with or without $ and commas: $500,000 or 500000 or $500,000
-    const numPattern = /\$?\s*([\d,]+(?:\.\d+)?)/g;
-    const tempStr = str.replace(/\$?\s*([\d,]+)k\b/gi, ''); // Remove already matched k numbers
-    
-    while ((match = numPattern.exec(tempStr)) !== null) {
-      const cleaned = match[1].replace(/,/g, '');
-      // Only parse if it has actual digits and not just commas
-      if (cleaned && !isNaN(parseFloat(cleaned))) {
-        const num = parseFloat(cleaned);
-        // Avoid tiny numbers that are likely not what we want
-        if (num >= 0.1) {
-          numbers.push(num);
-        }
-      }
-    }
-    
-    return numbers;
-  };
-  
-  const allNumbers = extractAllNumbers(messageWithoutZip);
-  
-  
-  // If only one number, use context clues
-  if (allNumbers.length === 1) {
-    const num = allNumbers[0];
-    
-    // Home price (big number or has keywords)
-    if ((isNewData || !newData.homePrice) && (num > 50000 || lowerMessage.includes('house') || lowerMessage.includes('home') || lowerMessage.includes('price'))) {
-      newData.homePrice = num;
-    }
-    // Rent (medium number or has keywords)
-    else if ((isNewData || !newData.monthlyRent) && (num >= 500 && num <= 50000 || lowerMessage.includes('rent'))) {
-      newData.monthlyRent = num;
-    }
-    // Down payment (small number or has keywords)
-    else if ((isNewData || !newData.downPaymentPercent) && (num >= 1 && num <= 100 || lowerMessage.includes('%') || lowerMessage.includes('down'))) {
-      newData.downPaymentPercent = num;
-    }
-    // Time horizon (years, 1-30 range or has keywords) - Check if message contains both down payment and timeline
-    else if ((isNewData || !newData.timeHorizonYears) && (num >= 1 && num <= 30 || lowerMessage.includes('year') || lowerMessage.includes('stay') || lowerMessage.includes('plan'))) {
-      // If message contains both % and year keywords, or if down payment is already set, assign timeline
-      if (lowerMessage.includes('%') && (lowerMessage.includes('year') || lowerMessage.includes('years') || lowerMessage.includes('yr')) || newData.downPaymentPercent) {
-        newData.timeHorizonYears = num;
-      }
-    }
-  }
-  
-  // If multiple numbers, assign by size
-  else if (allNumbers.length >= 2) {
-    allNumbers.sort((a, b) => b - a); // Sort largest to smallest
-    
-    // Special case: If we have 2 small numbers (1-100) and message contains both % and years
-    if (allNumbers.length === 2 && allNumbers.every(n => n >= 1 && n <= 100) && 
-        lowerMessage.includes('%') && (lowerMessage.includes('year') || lowerMessage.includes('years') || lowerMessage.includes('yr'))) {
-      
-      // Both numbers are small, assign based on context
-      // If message has both % and years, assign both values
-      newData.downPaymentPercent = allNumbers[0];
-      newData.timeHorizonYears = allNumbers[1];
-      
-      return { userData: newData, locationData };
-    }
-    
-    // Detect if all 3 values are present - if so, it's a complete new scenario
-    const hasLargeNumber = allNumbers.some(n => n > 50000);
-    const hasMediumNumber = allNumbers.some(n => n >= 500 && n <= 50000);
-    const hasSmallNumber = allNumbers.some(n => n >= 1 && n <= 100);
-    const isCompleteScenario = hasLargeNumber && hasMediumNumber && hasSmallNumber;
-    
-    // If we have all 3 types of numbers in one message, treat as new scenario (overwrite)
-    const shouldOverwrite = isNewData || isCompleteScenario;
-    
-    // Biggest number = home price
-    if ((shouldOverwrite || !newData.homePrice) && allNumbers[0] > 50000) {
-      newData.homePrice = allNumbers[0];
-    }
-    
-    // Medium number = rent
-    const rentNumber = allNumbers.find(n => n >= 500 && n <= 50000);
-    if ((shouldOverwrite || !newData.monthlyRent) && rentNumber) {
-      newData.monthlyRent = rentNumber;
-    }
-    
-    // Small number = down payment % (1-100)
-    const downNumber = allNumbers.find(n => n >= 1 && n <= 100 && n !== rentNumber);
-    if ((shouldOverwrite || !newData.downPaymentPercent) && downNumber) {
-      newData.downPaymentPercent = downNumber;
-    }
-    
-    // Time horizon (1-30 years)
-    const timeNumber = allNumbers.find(n => n >= 1 && n <= 30 && n !== downNumber && n !== rentNumber);
-    if ((shouldOverwrite || !newData.timeHorizonYears) && timeNumber) {
-      newData.timeHorizonYears = timeNumber;
-    }
-  }
-  
-  
-  return { userData: newData, locationData };
-}
+// Old extractUserData function - replaced with AI-powered extraction
