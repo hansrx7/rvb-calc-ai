@@ -611,6 +611,10 @@ function shouldShowChart(aiResponse: string): string | null {
     // Extract data from message using AI
     const { userData: newUserData, locationData: detectedLocationData } = await extractUserDataWithAI(content, userData);
     
+    // Debug logging
+    console.log('ChatContainer Debug - newUserData:', newUserData);
+    console.log('ChatContainer Debug - content:', content);
+    
     // Check if user mentioned a ZIP code but it wasn't found
     const zipCode = detectZipCode(content);
     if (zipCode && !detectedLocationData) {
@@ -630,7 +634,7 @@ function shouldShowChart(aiResponse: string): string | null {
       setLocationData(detectedLocationData);
       
       // Check if user also provided custom values in the same message
-      const hasCustomValues = newUserData.homePrice || newUserData.monthlyRent || newUserData.downPaymentPercent;
+      const hasCustomValues = newUserData.homePrice || newUserData.downPaymentPercent;
       
       if (hasCustomValues) {
         // PATH 10: NEW FLOW - ZIP + Custom Home Price
@@ -662,6 +666,7 @@ function shouldShowChart(aiResponse: string): string | null {
     
     // Check if we have all data and if it changed
     const hasAllData = newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent && newUserData.timeHorizonYears;
+    console.log('ChatContainer Debug - hasAllData:', hasAllData);
     const dataChanged = 
       newUserData.homePrice !== userData.homePrice ||
       newUserData.monthlyRent !== userData.monthlyRent ||
