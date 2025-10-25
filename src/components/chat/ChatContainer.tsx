@@ -7,6 +7,7 @@ import { NetWorthChart } from '../charts/NetWorthChart';
 import { calculateNetWorthComparison, calculateBuyingCosts, calculateRentingCosts } from '../../lib/finance/calculator';
 import { getLocationData, formatLocationData, detectZipCode, type FormattedLocationData } from '../../lib/location/zipCodeService';
 import type { ScenarioInputs, MonthlySnapshot } from '../../types/calculator';
+import { openai } from '../../lib/ai/openai';
 import { MonthlyCostChart } from '../charts/MonthlyCostChart';
 import { TotalCostChart } from '../charts/TotalCostChart';
 import { getAIResponse } from '../../lib/ai/openai';
@@ -487,8 +488,8 @@ function shouldShowChart(aiResponse: string): string | null {
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     
-    // Extract data from message
-    const { userData: newUserData, locationData: detectedLocationData } = extractUserData(content, userData);
+    // Extract data from message using AI
+    const { userData: newUserData, locationData: detectedLocationData } = await extractUserDataWithAI(content, userData);
     
     // Check if user mentioned a ZIP code but it wasn't found
     const zipCode = detectZipCode(content);
@@ -1412,7 +1413,128 @@ Restart
 
 // Extract numbers from user messages
 
-// Extract numbers from user messages - handles comma-separated values!
+// AI-powered data extraction - handles any user input format
+async function extractUserDataWithAI(message: string, currentData: UserData): Promise<{ userData: UserData; locationData: FormattedLocationData | null }> {
+  const newData = { ...currentData };
+  
+  // Check for ZIP code FIRST
+  const zipCode = detectZipCode(message);
+  let locationData: FormattedLocationData | null = null;
+  
+  if (zipCode) {
+    const rawLocationData = getLocationData(zipCode);
+    if (rawLocationData) {
+      locationData = formatLocationData(rawLocationData);
+    }
+  }
+  
+  // Use AI to extract financial data from the message
+  try {
+    const extractionPrompt = `
+Extract financial data from this user message: "${message}"
+
+Look for and extract:
+1. Home price: Any large number (like 400000, 500k, $500,000) that could be a home price
+2. Monthly rent: Any number that could be monthly rent (like 2500, 2.5k, $2,500)
+3. Down payment percentage: Any number with % or "percent" (like 20%, 15 percent)
+4. Timeline in years: Any number with time-related words (year, yr, yrs, stay, plan, timeline)
+
+Return ONLY a JSON object with this exact format:
+{
+  "homePrice": number or null,
+  "monthlyRent": number or null, 
+  "downPaymentPercent": number or null,
+  "timeHorizonYears": number or null
+}
+
+If you can't find a value, use null. Only extract numbers that make sense for each field.
+`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content: "You are a financial data extraction assistant. Extract only the requested financial data and return valid JSON."
+        },
+        {
+          role: "user", 
+          content: extractionPrompt
+        }
+      ],
+      temperature: 0.1,
+      max_tokens: 200
+    });
+
+    const extractedData = JSON.parse(response.choices[0].message.content || '{}');
+    
+    // Update newData with extracted values (only if they exist)
+    if (extractedData.homePrice && extractedData.homePrice > 0) {
+      newData.homePrice = extractedData.homePrice;
+    }
+    if (extractedData.monthlyRent && extractedData.monthlyRent > 0) {
+      newData.monthlyRent = extractedData.monthlyRent;
+    }
+    if (extractedData.downPaymentPercent && extractedData.downPaymentPercent > 0) {
+      newData.downPaymentPercent = extractedData.downPaymentPercent;
+    }
+    if (extractedData.timeHorizonYears && extractedData.timeHorizonYears > 0) {
+      newData.timeHorizonYears = extractedData.timeHorizonYears;
+    }
+    
+  } catch (error) {
+    console.error('AI extraction failed:', error);
+    // Fall back to basic number extraction if AI fails
+    return extractUserDataFallback(message, currentData, locationData);
+  }
+  
+  return { userData: newData, locationData };
+}
+
+// Fallback extraction for when AI fails
+function extractUserDataFallback(message: string, currentData: UserData, locationData: FormattedLocationData | null): { userData: UserData; locationData: FormattedLocationData | null } {
+  const newData = { ...currentData };
+  const lowerMessage = message.toLowerCase();
+  
+  // Basic number extraction as fallback
+  const numbers = message.match(/\d+(?:,\d{3})*(?:\.\d+)?/g)?.map(n => parseFloat(n.replace(/,/g, ''))) || [];
+  
+  // Simple heuristics for fallback
+  if (numbers.length > 0) {
+    const largest = Math.max(...numbers);
+    const smallest = Math.min(...numbers);
+    
+    // If largest number is very big, it's probably home price
+    if (largest > 100000 && !newData.homePrice) {
+      newData.homePrice = largest;
+    }
+    
+    // If there's a medium number, it's probably rent
+    if (numbers.some(n => n > 500 && n < 10000) && !newData.monthlyRent) {
+      newData.monthlyRent = numbers.find(n => n > 500 && n < 10000) || null;
+    }
+    
+    // Look for percentage
+    if (lowerMessage.includes('%')) {
+      const percentMatch = message.match(/(\d+(?:\.\d+)?)\s*%/);
+      if (percentMatch && !newData.downPaymentPercent) {
+        newData.downPaymentPercent = parseFloat(percentMatch[1]);
+      }
+    }
+    
+    // Look for years
+    if (lowerMessage.includes('year') || lowerMessage.includes('yr')) {
+      const yearMatch = message.match(/(\d+)\s*(?:year|yr|yrs)/i);
+      if (yearMatch && !newData.timeHorizonYears) {
+        newData.timeHorizonYears = parseInt(yearMatch[1]);
+      }
+    }
+  }
+  
+  return { userData: newData, locationData };
+}
+
+// Legacy extraction function (kept as backup)
 function extractUserData(message: string, currentData: UserData): { userData: UserData; locationData: FormattedLocationData | null } {
   const newData = { ...currentData };
   const lowerMessage = message.toLowerCase();
