@@ -173,6 +173,47 @@ const [chartsReady, setChartsReady] = useState(false);
         'Incomplete scenario';
       addText(`Scenario: ${scenario}`, 14, true);
       
+      // Add "Your Inputs" section
+      if (isLocationLocked && userData.homePrice && userData.monthlyRent) {
+        addText('Your Inputs:', 12, true);
+        
+        // Home price
+        addText(`🏠 Home: $${userData.homePrice.toLocaleString()}`, 10);
+        
+        // Monthly rent
+        addText(`💵 Rent: $${userData.monthlyRent.toLocaleString()}/mo`, 10);
+        
+        // Down payment
+        if (userData.downPaymentPercent) {
+          addText(`💰 Down: ${userData.downPaymentPercent}%`, 10);
+        }
+        
+        // Timeline
+        if (userData.timeHorizonYears) {
+          addText(`⏰ Timeline: ${userData.timeHorizonYears} years`, 10);
+        }
+        
+        // Property tax rate
+        const propertyTaxRate = locationData?.propertyTaxRate ? (locationData.propertyTaxRate * 100).toFixed(2) : '1.0';
+        addText(`🏛️ Tax: ${propertyTaxRate}%`, 10);
+        
+        // Growth rates
+        if (locationData) {
+          const homeAppreciationRate = getZIPBasedRates(locationData, userData.timeHorizonYears || 5).homeAppreciationRate;
+          const rentGrowthRate = getZIPBasedRates(locationData, userData.timeHorizonYears || 5).rentGrowthRate;
+          const investmentReturnRate = getZIPBasedRates(locationData, userData.timeHorizonYears || 5).investmentReturnRate;
+          
+          addText(`🏘️ Appreciation: ${homeAppreciationRate.toFixed(1)}%/year (${locationData.city} market)`, 10);
+          addText(`📈 Rent Growth: ${rentGrowthRate.toFixed(1)}%/year (${locationData.city} market)`, 10);
+          addText(`💹 Investment: ${investmentReturnRate.toFixed(1)}%/year (based on timeline)`, 10);
+        } else {
+          const timelineRates = getTimelineBasedRates(userData.timeHorizonYears || 5);
+          addText(`🏘️ Appreciation: ${timelineRates.homeAppreciationRate.toFixed(1)}%/year (based on timeline)`, 10);
+          addText(`📈 Rent Growth: ${timelineRates.rentGrowthRate.toFixed(1)}%/year (based on timeline)`, 10);
+          addText(`💹 Investment: ${timelineRates.investmentReturnRate.toFixed(1)}%/year (based on timeline)`, 10);
+        }
+      }
+      
       yPosition += 5; // Extra space before conversation
       
       // Process each message
