@@ -255,18 +255,14 @@ const [chartsReady, setChartsReady] = useState(false);
           const chartElement = document.querySelector(`[data-message-id="${message.id}"] .chart-wrapper`);
           if (chartElement) {
             try {
-              // Longer delay to ensure chart is fully rendered with proper colors
-              await new Promise(resolve => setTimeout(resolve, 500));
+              // Small delay to ensure chart is fully rendered
+              await new Promise(resolve => setTimeout(resolve, 100));
               
               const canvas = await html2canvas(chartElement as HTMLElement, {
-                backgroundColor: null, // Transparent background to preserve chart colors
-                scale: 3, // Higher quality for better chart rendering
+                backgroundColor: '#ffffff',
+                scale: 2, // Higher quality
                 useCORS: true,
-                allowTaint: true,
-                logging: false, // Disable console logging
-                width: chartElement.scrollWidth,
-                height: chartElement.scrollHeight,
-                foreignObjectRendering: true // Better SVG rendering
+                allowTaint: true
               });
               
               const imgData = canvas.toDataURL('image/png');
@@ -276,11 +272,6 @@ const [chartsReady, setChartsReady] = useState(false);
               // Check if we need a new page for the chart
               checkNewPage(imgHeight + 5);
               
-              // Add white background rectangle first for better chart visibility
-              pdf.setFillColor(255, 255, 255);
-              pdf.rect(margin, yPosition, imgWidth, imgHeight, 'F');
-              
-              // Then add the chart image
               pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
               yPosition += imgHeight + 5;
               
@@ -404,13 +395,13 @@ const [chartsReady, setChartsReady] = useState(false);
   const handleUseLocalData = () => {
     if (locationData) {
       // Add user message showing the choice
-      const userMessage: Message = {
-        id: Date.now().toString(),
-        role: 'user',
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
         content: `Use this data`
-      };
-      setMessages(prev => [...prev, userMessage]);
-      
+    };
+    setMessages(prev => [...prev, userMessage]);
+    
       // Set the ZIP data immediately
       const newUserData: UserData = {
         homePrice: locationData.medianHomePrice,
@@ -419,7 +410,7 @@ const [chartsReady, setChartsReady] = useState(false);
         timeHorizonYears: null
       };
       
-      setUserData(newUserData);
+    setUserData(newUserData);
       setIsLocationLocked(true);
       setUsingZipData(true);
       
@@ -456,8 +447,8 @@ const [chartsReady, setChartsReady] = useState(false);
       
       // Add AI message referencing the box
       const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
         content: `Got it! You can use your own values instead. The default assumptions are shown in the box on the top right. What home price and monthly rent are you working with?`
       };
       setMessages(prev => [...prev, aiMessage]);
@@ -536,13 +527,13 @@ function shouldShowChart(aiResponse: string): string | null {
           lowerContent.includes('use the data') ||
           lowerContent === 'yes' || lowerContent === 'yeah' || lowerContent === 'sure') {
         // Add user message first
-        const userMessage: Message = {
-          id: Date.now().toString(),
-          role: 'user',
+  const userMessage: Message = {
+    id: Date.now().toString(),
+    role: 'user',
           content
-        };
-        setMessages(prev => [...prev, userMessage]);
-        
+  };
+  setMessages(prev => [...prev, userMessage]);
+  
         // Then trigger the action
         handleUseLocalData();
         return;
@@ -588,7 +579,7 @@ function shouldShowChart(aiResponse: string): string | null {
       // Invalid/not found ZIP code
       const invalidZipMessage: Message = {
         id: Date.now().toString(),
-        role: 'assistant',
+      role: 'assistant',
         content: `I couldn't find data for ZIP code ${zipCode}. If you'd like, we can continue with your own numbers using standard assumptions (1.0% property tax, 3.5% rent growth). What home price and monthly rent are you working with?`
       };
       setMessages(prev => [...prev, invalidZipMessage]);
@@ -888,7 +879,7 @@ const handleChipClick = (message: string) => {
     
     switch (chartType) {
       case 'netWorth':
-        return (
+  return (
           <div className="chart-wrapper">
             <NetWorthChart data={data} />
           </div>
@@ -1314,9 +1305,9 @@ Restart
           
           return (
             <div key={message.id} data-message-id={message.id}>
-              <ChatMessage
-                role={message.role}
-                content={message.content}
+          <ChatMessage
+            role={message.role}
+            content={message.content}
                 delay={delay}
               />
               {/* Render chart right after message if it has one - uses message's snapshot data */}
