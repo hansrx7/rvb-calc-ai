@@ -1,7 +1,7 @@
 // src/components/chat/ChatMessage.tsx
 
 interface ChatMessageProps {
-    role: 'user' | 'assistant';
+    role: 'user' | 'assistant' | 'system';
     content: string;
   }
   

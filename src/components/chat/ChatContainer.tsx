@@ -725,7 +725,8 @@ const handleChipClick = (message: string) => {
   const calculateAndShowChart = (data: UserData, currentLocationData?: FormattedLocationData | null) => {
     // Use local property tax rate if available, otherwise default to 1.0%
     // ZIP data stores propertyTaxRate as decimal (0.73 = 0.73%), so convert to percentage
-    const propertyTaxRate = (currentLocationData || locationData)?.propertyTaxRate ? (currentLocationData || locationData).propertyTaxRate * 100 : 1.0;
+    const locationDataToUse = currentLocationData || locationData;
+    const propertyTaxRate = locationDataToUse?.propertyTaxRate ? locationDataToUse.propertyTaxRate * 100 : 1.0;
     
     // Debug logging for property tax rate
     console.log('🔍 Property Tax Rate Debug:');
@@ -1502,7 +1503,6 @@ function extractUserDataFallback(message: string, currentData: UserData, locatio
   // Simple heuristics for fallback
   if (numbers.length > 0) {
     const largest = Math.max(...numbers);
-    const smallest = Math.min(...numbers);
     
     // If largest number is very big, it's probably home price
     if (largest > 100000 && !newData.homePrice) {
@@ -1534,8 +1534,8 @@ function extractUserDataFallback(message: string, currentData: UserData, locatio
   return { userData: newData, locationData };
 }
 
-// Legacy extraction function (kept as backup)
-function extractUserData(message: string, currentData: UserData): { userData: UserData; locationData: FormattedLocationData | null } {
+// Legacy extraction function (kept as backup) - UNUSED
+// function extractUserData(message: string, currentData: UserData): { userData: UserData; locationData: FormattedLocationData | null } {
   const newData = { ...currentData };
   const lowerMessage = message.toLowerCase();
   
