@@ -636,6 +636,9 @@ function shouldShowChart(aiResponse: string): string | null {
       // Check if user also provided custom values in the same message
       const hasCustomValues = newUserData.homePrice || newUserData.downPaymentPercent;
       
+      // Check if user provided rent with ZIP (new flow)
+      const hasCustomRent = newUserData.monthlyRent && !newUserData.homePrice;
+      
       if (hasCustomValues) {
         // PATH 10: NEW FLOW - ZIP + Custom Home Price
         // User provided their own home price + ZIP code
@@ -652,6 +655,24 @@ function shouldShowChart(aiResponse: string): string | null {
         setMessages(prev => [...prev, newFlowMessage]);
         setIsLoading(false);
         return; // Continue with custom rent collection
+      }
+      
+      if (hasCustomRent) {
+        // PATH 11: NEW FLOW - ZIP + Custom Rent
+        // User provided their own rent + ZIP code
+        setUserData(newUserData);
+        setLocationData(detectedLocationData);
+        setIsLocationLocked(true);
+        setUsingZipData(true);
+        
+        const newFlowMessage: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: `Perfect! I'll use your $${newUserData.monthlyRent?.toLocaleString()}/month rent with the ${detectedLocationData.city}, ${detectedLocationData.state} market data for property taxes and growth rates. What home price are you considering, down payment percentage, and how long do you plan to stay in this home?`
+        };
+        setMessages(prev => [...prev, newFlowMessage]);
+        setIsLoading(false);
+        return; // Continue with custom home price collection
       }
       
       // Normal ZIP flow (no custom data provided)
