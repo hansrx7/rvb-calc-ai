@@ -148,6 +148,97 @@ All calculations use industry-standard formulas:
    - Download a professional PDF with conversation and all charts
    - Share with stakeholders for informed decision-making
 
+### 🆕 Advanced Features Guide
+
+#### ⏰ Time Horizon Analysis
+**How to use:**
+- When asked "How long do you plan to stay in this home?", provide any timeframe:
+  - "3 years" (short-term analysis with conservative assumptions)
+  - "7 years" (medium-term with moderate assumptions) 
+  - "15 years" (long-term with optimistic assumptions)
+- **Selling costs automatically applied** at your timeline end (8% total)
+- **Timeline-based assumptions** adjust growth rates based on your timeframe
+- **Break-even chart** shows exactly when buying pays off
+
+#### 📍 ZIP Code Integration
+**How to use:**
+- **Mention any ZIP code** in your first message: "I'm in 90210" or "Looking at 78717"
+- **Choose your data source:**
+  - Click "Use this data" to use local market values
+  - Click "Use my own values" to enter custom numbers
+- **Local data includes:**
+  - Median home price for your area
+  - Average rent for your ZIP code
+  - Property tax rate for your state
+  - Local appreciation and rent growth rates
+- **Switch locations mid-conversation** to compare different areas
+
+#### ✏️ Editable Input Reference Box
+**How to use:**
+- **View current values** in the "Your Inputs" box (top right)
+- **Click "Edit Values"** to modify any parameter
+- **Make changes** to home price, rent, down payment, or timeline
+- **Click "Save Changes"** to recalculate all charts with new values
+- **Click "Cancel"** to discard changes
+- **Real-time updates** - charts automatically refresh with new calculations
+
+#### 🤖 AI-Powered Data Extraction
+**How to use:**
+- **Natural language input** - "I'm looking at $500k, paying $3k rent, 20% down, planning to stay 7 years"
+- **Combined inputs** - "10% and 10 years" (down payment and timeline together)
+- **Flexible formats** - "$500k", "500k", "500000" all work
+- **ZIP code detection** - "I'm in 92127" automatically triggers local data lookup
+- **Tone matching** - AI adapts to your casual or formal communication style
+
+#### 📊 Chart Navigation
+**Available charts:**
+1. **Net Worth Comparison** - "show me net worth" or "net worth comparison"
+2. **Monthly Cost Breakdown** - "show me monthly costs" or "monthly costs breakdown"  
+3. **Total Cost Comparison** - "show me total cost" or "total costs"
+4. **Home Equity Buildup** - "show me equity" or "equity buildup"
+5. **Rent Growth vs Mortgage** - "show me rent growth" or "rent vs mortgage"
+6. **Break-Even Timeline** - "show me break even" or "when does buying pay off"
+
+**Chart buttons** appear after providing all inputs - click any button for instant chart access.
+
+#### 💾 PDF Export Features
+**What's included:**
+- **Complete conversation** with all your questions and AI responses
+- **All 6 charts** in high quality
+- **Your Inputs section** with all parameters and assumptions
+- **Source attribution** (ZIP data vs. custom vs. timeline-based)
+- **Professional formatting** suitable for sharing with advisors
+
+**How to save:**
+- Click "Save Chat" button (top right)
+- Wait for progress indicator to complete
+- PDF automatically downloads with your analysis
+
+### 🚀 Quick Reference for Power Users
+
+#### 💬 Natural Language Examples
+```
+"I'm in 90210, looking at $1.2M, paying $4k rent, 15% down, staying 8 years"
+"Can I try 78717 with $800k, $2.5k rent, 20%, 5 years?"
+"Show me the break-even timeline"
+"What if I stay 3 years instead?"
+```
+
+#### 🔄 Workflow Shortcuts
+- **All-in-one input:** Provide all 4 values in one message
+- **ZIP code first:** Mention location to get local data options
+- **Edit mode:** Use reference box for quick value changes
+- **Chart requests:** Use natural language or click buttons
+- **Scenario testing:** Say "new values" to start fresh
+
+#### 📊 Chart Triggers
+- **Net Worth:** "net worth", "wealth", "money over time"
+- **Monthly Costs:** "monthly costs", "expenses", "monthly breakdown"
+- **Total Cost:** "total cost", "total costs", "30-year cost"
+- **Equity:** "equity", "home equity", "equity buildup"
+- **Rent Growth:** "rent growth", "rent vs mortgage", "rent increases"
+- **Break-Even:** "break even", "when does buying pay off", "break-even point"
+
 ### Example Conversation
 
 ```
