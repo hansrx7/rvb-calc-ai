@@ -308,6 +308,27 @@ const [chartsReady, setChartsReady] = useState(false);
   const handleSaveEdit = () => {
     if (!editableValues) return;
     
+    // Check if any values actually changed
+    const hasChanges = 
+      editableValues.homePrice !== userData.homePrice ||
+      editableValues.monthlyRent !== userData.monthlyRent ||
+      editableValues.downPaymentPercent !== userData.downPaymentPercent ||
+      editableValues.timeHorizonYears !== userData.timeHorizonYears;
+    
+    if (!hasChanges) {
+      // No changes made
+      setIsEditMode(false);
+      setEditableValues(null);
+      
+      const noChangeMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: "No changes were made to your scenario. Everything remains the same!"
+      };
+      setMessages(prev => [...prev, noChangeMessage]);
+      return;
+    }
+    
     // Update user data with edited values
     setUserData(editableValues);
     setIsEditMode(false);
