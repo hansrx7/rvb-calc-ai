@@ -50,6 +50,9 @@ export function DecisionScoreGauge({ score, advantage }: DecisionScoreGaugeProps
             strokeLinecap="round"
             strokeDasharray={dashArray}
             className="gauge-arc"
+            style={{
+              '--target-dash': dashArray
+            } as React.CSSProperties}
           />
           
           {/* Gradient definition */}

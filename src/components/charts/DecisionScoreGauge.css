@@ -22,8 +22,18 @@
 }
 
 .gauge-arc {
-  transition: stroke-dasharray 1.5s ease-out;
+  stroke-dasharray: 0 377;
+  animation: drawArc 2s ease-out forwards;
   transform-origin: 100px 100px;
+}
+
+@keyframes drawArc {
+  0% {
+    stroke-dasharray: 0 377;
+  }
+  100% {
+    stroke-dasharray: var(--target-dash, 377 377);
+  }
 }
 
 .gauge-label {
@@ -34,7 +44,8 @@
   color: white;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   letter-spacing: 0.5px;
-  animation: pulse 2s ease-in-out infinite;
+  opacity: 0;
+  animation: fadeInLabel 0.5s ease-out 1.5s forwards, pulse 2s ease-in-out 2.5s infinite;
 }
 
 @keyframes fadeInScale {
@@ -45,6 +56,15 @@
   100% {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+@keyframes fadeInLabel {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
   }
 }
 
