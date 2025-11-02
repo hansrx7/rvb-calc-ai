@@ -1,0 +1,59 @@
+/* src/components/charts/DecisionScoreGauge.css */
+
+.decision-score-gauge {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  animation: fadeInScale 0.6s ease-out;
+}
+
+.gauge-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.gauge-svg {
+  width: 280px;
+  height: 160px;
+}
+
+.gauge-arc {
+  transition: stroke-dasharray 1.5s ease-out;
+  transform-origin: 100px 100px;
+}
+
+.gauge-label {
+  padding: 0.75rem 2rem;
+  border-radius: 30px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  letter-spacing: 0.5px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes fadeInScale {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+

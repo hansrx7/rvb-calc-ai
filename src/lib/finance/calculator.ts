@@ -35,6 +35,62 @@ export function getTimelineBasedRates(timeHorizonYears: number): {
   }
 }
 
+// ===================================
+// DECISION SCORE CALCULATION
+// ===================================
+
+export function calculateDecisionScore(
+  snapshots: MonthlySnapshot[]
+): { score: number; advantage: 'buying' | 'renting' | 'neutral' } {
+  if (!snapshots || snapshots.length === 0) {
+    return { score: 360, advantage: 'neutral' };
+  }
+  
+  const finalSnapshot = snapshots[snapshots.length - 1];
+  const netWorthDelta = finalSnapshot.netWorthDelta;
+  
+  // Calculate baseline (using home price from first snapshot as proxy)
+  const homeValueEstimate = snapshots[0].homeValue;
+  const percentAdvantage = (netWorthDelta / homeValueEstimate) * 100;
+  
+  // Convert to 0-720 score
+  // Neutral zone: ±5% of home value advantage = 300-420 range (120 point neutral band)
+  // Strong advantage: >15% = 540+ (buying) or 180- (renting)
+  let score: number;
+  
+  if (percentAdvantage >= 15) {
+    // Strong buying advantage
+    score = 540 + Math.min(180, (percentAdvantage - 15) * 10);
+  } else if (percentAdvantage >= 5) {
+    // Moderate buying advantage
+    score = 420 + (percentAdvantage - 5) * 12;
+  } else if (percentAdvantage >= -5) {
+    // Neutral zone
+    score = 300 + (percentAdvantage + 5) * 12;
+  } else if (percentAdvantage >= -15) {
+    // Moderate renting advantage
+    score = 180 + (percentAdvantage + 15) * 12;
+  } else {
+    // Strong renting advantage
+    score = Math.max(0, 180 + (percentAdvantage + 15) * 10);
+  }
+  
+  // Clamp score to 0-720
+  score = Math.max(0, Math.min(720, score));
+  
+  // Determine advantage category
+  let advantage: 'buying' | 'renting' | 'neutral';
+  if (score >= 540) {
+    advantage = 'buying';
+  } else if (score <= 180) {
+    advantage = 'renting';
+  } else {
+    advantage = 'neutral';
+  }
+  
+  return { score: Math.round(score), advantage };
+}
+
 // ZIP + Timeline Hybrid: Use local rates with timeline adjustments
 export function getZIPBasedRates(
   locationData: any, // FormattedLocationData | null

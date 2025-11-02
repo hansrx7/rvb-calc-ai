@@ -13,10 +13,11 @@ import { getAIResponse, openai } from '../../lib/ai/openai';
 import { EquityBuildupChart } from '../charts/EquityBuildupChart';
 import { RentGrowthChart } from '../charts/RentGrowthChart';
 import { BreakEvenChart } from '../charts/BreakEvenChart';
-import { getZIPBasedRates } from '../../lib/finance/calculator';
+import { getZIPBasedRates, calculateDecisionScore } from '../../lib/finance/calculator';
 import { SuggestionChips } from './SuggestionChips';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { DecisionScoreGauge } from '../charts/DecisionScoreGauge';
 
 interface Message {
   id: string;
@@ -125,6 +126,7 @@ const [chartsReady, setChartsReady] = useState(false);
     finalInvestmentValue: number;
   } | null>(null);
   
+  const [decisionScore, setDecisionScore] = useState<{ score: number; advantage: 'buying' | 'renting' | 'neutral' } | null>(null);
   
   // Handle save chat as PDF
   const handleSaveChat = async () => {
@@ -761,6 +763,10 @@ function shouldShowChart(aiResponse: string): string | null {
       setTotalCostData(freshTotalCostData);
       setChartsReady(true);
       
+      // Calculate decision score
+      const scoreResult = calculateDecisionScore(freshChartData);
+      setDecisionScore(scoreResult);
+      
       // Reset visible charts (all become available again)
       setVisibleCharts({
         netWorth: false,
@@ -886,6 +892,10 @@ const handleChipClick = (message: string) => {
 
     setChartData(snapshots);
     setChartsReady(true); // Mark charts as ready
+    
+    // Calculate decision score
+    const scoreResult = calculateDecisionScore(snapshots);
+    setDecisionScore(scoreResult);
     
     // Automatically show the Net Worth chart when all data is collected
     setVisibleCharts(prev => ({
@@ -1425,6 +1435,13 @@ Restart
             onChipClick={handleChipClick}
             visibleCharts={visibleCharts}
           />
+        )}
+        
+        {/* Decision Score Gauge - show after all data collected */}
+        {decisionScore && (
+          <div className="decision-score-container">
+            <DecisionScoreGauge score={decisionScore.score} advantage={decisionScore.advantage} />
+          </div>
         )}
 
         {/* Scroll target for smooth scrolling to charts */}
