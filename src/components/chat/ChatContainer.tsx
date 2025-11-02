@@ -316,7 +316,12 @@ const [chartsReady, setChartsReady] = useState(false);
       {
         id: '1',
         role: 'assistant',
-        content: "Hi! I'm here to help you figure out whether buying or renting makes more financial sense for you. To get started, tell me: what's the home price you're considering and your current monthly rent?"
+        content: "Welcome! I'm your AI-powered financial advisor, here to help you make the smartest decision between buying and renting. I'll analyze your specific situation and show you exactly how your money will grow over time."
+      },
+      {
+        id: '2',
+        role: 'assistant',
+        content: "Let's get started! What's the home price you're considering and your current monthly rent?\n\nPro tip: You can also enter a ZIP code (like 90210) and I'll pull real local market data for that area!"
       }
     ]);
     setUserData({
@@ -337,6 +342,7 @@ const [chartsReady, setChartsReady] = useState(false);
     setChartsReady(false);
     setMonthlyCosts(null);
     setTotalCostData(null);
+    setDecisionScore(null);
     setShowRestartModal(false);
     setLocationData(null);
     setShowLocationCard(false);
@@ -344,6 +350,8 @@ const [chartsReady, setChartsReady] = useState(false);
     setUsingZipData(false);
     setIsEditMode(false);
     setEditableValues(null);
+    setIsReferenceBoxVisible(true);
+    setReferenceBoxPosition({ x: 20, y: 20 });
   };
 
   // Edit mode handlers
