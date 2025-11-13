@@ -11,7 +11,7 @@ RentVsBuy.ai is a web application that analyzes your housing situation and provi
 ## ✨ Features
 
 ### 💬 Conversational AI Interface
-- Natural language interaction powered by OpenAI GPT-4
+- Natural language interaction powered by OpenAI GPT-4 (with graceful offline fallback)
 - Friendly, approachable advisor that explains complex financial concepts
 - Asks 2-3 questions at once for faster data collection
 - Handles distractions and invalid input gracefully
@@ -100,10 +100,11 @@ All calculations use industry-standard formulas:
    ```
 
 4. **Configure environment variables**
-   - Backend (`backend/.env`):
+   - Backend (`backend/.env` — this file is ignored by git):
      ```env
      OPENAI_API_KEY=your_openai_api_key_here
      ```
+     > 🛡️ Keep this file local. Git push protection will block commits if the key is present in history.
    - Frontend (`.env`, optional): override the backend URL if you are not using the default `http://localhost:8000`.
      ```env
      VITE_BACKEND_URL=http://localhost:8000
@@ -126,6 +127,25 @@ All calculations use industry-standard formulas:
 3. **Open your browser**
    
    Navigate to `http://localhost:5173`
+
+### Backend API at a glance
+
+- **App entrypoint:** `backend/app/main.py` (FastAPI)
+- **Finance analysis:** `POST /api/finance/analyze`
+  - Calculates monthly snapshots, totals, and cost breakdowns
+- **AI chat proxy:** `POST /api/ai/chat`
+  - Passes chat history to OpenAI when a key is available
+  - Gracefully falls back to a local “Mock AI” when no key or an API failure occurs
+- **Health check:** `GET /health`
+
+### Troubleshooting
+
+| Symptom | Likely Cause | Fix |
+| --- | --- | --- |
+| `Sorry, I'm having trouble connecting right now. Can you try again?` | Backend is not running or OpenAI call failed | Restart backend (`uvicorn ...`). If logs show an OpenAI error, confirm `backend/.env` contains a valid key. |
+| Response begins with `(Mock AI)` | Backend is running in fallback mode (no key or API error) | Add/verify `OPENAI_API_KEY` in `backend/.env` and restart the backend. |
+| `Address already in use` when starting backend | Previous `uvicorn` still running | Stop old process (`Ctrl+C` or `pkill -f "uvicorn backend.app.main"`). |
+| Git push blocked by secret scanning | `.env` accidentally staged | `git reset --soft HEAD~1`, remove `.env` from staging, recommit. |
 
 ## 📖 How to Use
 
