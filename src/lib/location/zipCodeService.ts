@@ -6,20 +6,20 @@ export interface LocationData {
   state: string;
   city: string;
   homeValue: number;
-  homeValueGrowthRate: number;
-  propertyTaxRate: number;
-  rentValue: number;
-  rentValueGrowthRate: number;
+  homeValueGrowthRate: number | null;
+  propertyTaxRate?: number;
+  rentValue?: number;
+  rentValueGrowthRate: number | null;
 }
 
 export interface FormattedLocationData {
   city: string;
   state: string;
   medianHomePrice: number;
-  averageRent: number;
+  averageRent: number | null;
   propertyTaxRate: number;
-  homeAppreciationRate: number;
-  rentGrowthRate: number;
+  homeAppreciationRate: number | null;
+  rentGrowthRate: number | null;
 }
 
 // Property tax rates by state (approximate averages)
@@ -40,12 +40,17 @@ export const getLocationData = (zipCode: string): LocationData | null => {
 };
 
 export const formatLocationData = (data: LocationData): FormattedLocationData => {
+  // Get property tax rate from data or fallback to state average
+  const stateTaxRatePercent = PROPERTY_TAX_RATES[data.state];
+  const fallbackTaxRate = ((stateTaxRatePercent !== undefined ? stateTaxRatePercent : 1.0)) / 100;
+  const propertyTaxRate = data.propertyTaxRate !== undefined ? data.propertyTaxRate : fallbackTaxRate;
+  
   return {
     city: data.city,
     state: data.state,
     medianHomePrice: data.homeValue,
-    averageRent: data.rentValue,
-    propertyTaxRate: data.propertyTaxRate,
+    averageRent: data.rentValue ?? null,
+    propertyTaxRate: propertyTaxRate,
     homeAppreciationRate: data.homeValueGrowthRate,
     rentGrowthRate: data.rentValueGrowthRate
   };

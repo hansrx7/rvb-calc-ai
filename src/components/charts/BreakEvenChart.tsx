@@ -38,10 +38,7 @@ export function BreakEvenChart({ data }: BreakEvenChartProps) {
   const breakEvenYear = breakEvenPoint ? breakEvenPoint.year : null;
   
   // Calculate final difference
-  const finalDifference = chartData[chartData.length - 1].netWorthDifference;
-  const winner = finalDifference > 0 ? 'Buying' : 'Renting';
-  const savings = Math.abs(finalDifference);
-
+  
 
   return (
     <div className="chart-container">

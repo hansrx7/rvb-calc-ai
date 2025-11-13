@@ -2,6 +2,11 @@
 
 import type { ScenarioInputs, MonthlySnapshot } from '../../types/calculator';
 
+interface LocationRateData {
+  homeAppreciationRate?: number | null;
+  rentGrowthRate?: number | null;
+}
+
 // ===================================
 // TIMELINE-BASED ASSUMPTIONS
 // ===================================
@@ -37,14 +42,18 @@ export function getTimelineBasedRates(timeHorizonYears: number): {
 
 // ZIP + Timeline Hybrid: Use local rates with timeline adjustments
 export function getZIPBasedRates(
-  locationData: any, // FormattedLocationData | null
+  locationData: LocationRateData | null,
   timeHorizonYears: number
 ): { homeAppreciationRate: number; rentGrowthRate: number; investmentReturnRate: number } {
   
   // Get timeline-based investment return (always use timeline for investment)
   const timelineRates = getTimelineBasedRates(timeHorizonYears);
   
-  if (locationData?.homeAppreciationRate && locationData?.rentGrowthRate) {
+  // Check if we have valid ZIP-specific rates (explicitly check for null/undefined, allow 0 and negative)
+  const hasHomeAppreciation = locationData?.homeAppreciationRate !== null && locationData?.homeAppreciationRate !== undefined;
+  const hasRentGrowth = locationData?.rentGrowthRate !== null && locationData?.rentGrowthRate !== undefined;
+  
+  if (hasHomeAppreciation && hasRentGrowth) {
     // Use ZIP-specific rates with timeline adjustments
     const timelineMultiplier = getTimelineMultiplier(timeHorizonYears);
     
@@ -55,10 +64,29 @@ export function getZIPBasedRates(
     };
   }
   
-  // Fallback to timeline-based rates
+  // Partial fallback: use ZIP data for one rate if available, timeline for the other
+  if (hasHomeAppreciation) {
+    const timelineMultiplier = getTimelineMultiplier(timeHorizonYears);
+    return {
+      homeAppreciationRate: locationData.homeAppreciationRate * timelineMultiplier,
+      rentGrowthRate: timelineRates.rentGrowthRate,
+      investmentReturnRate: timelineRates.investmentReturnRate
+    };
+  }
+  
+  if (hasRentGrowth) {
+    const timelineMultiplier = getTimelineMultiplier(timeHorizonYears);
+    return {
+      homeAppreciationRate: timelineRates.homeAppreciationRate,
+      rentGrowthRate: Math.max(0, locationData.rentGrowthRate * timelineMultiplier),
+      investmentReturnRate: timelineRates.investmentReturnRate
+    };
+  }
+  
+  // Full fallback to timeline-based rates
   return {
     homeAppreciationRate: timelineRates.homeAppreciationRate,
-    rentGrowthRate: 3.5, // Default rent growth
+    rentGrowthRate: timelineRates.rentGrowthRate,
     investmentReturnRate: timelineRates.investmentReturnRate
   };
 }

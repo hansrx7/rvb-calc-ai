@@ -1,13 +1,8 @@
 // src/lib/ai/openai.ts
 
-import OpenAI from 'openai';
+import { apiFetch } from '../api/client';
 
-export const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true // Only for development/demo purposes
-});
-
-interface Message {
+export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
 }
@@ -19,12 +14,49 @@ interface UserData {
   timeHorizonYears: number | null;
 }
 
+export interface ChatCompletionOptions {
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+export async function createChatCompletion(
+  messages: ChatMessage[],
+  options: ChatCompletionOptions = {}
+): Promise<string> {
+  const payload = {
+    messages,
+    model: options.model ?? 'gpt-4o-mini',
+    temperature: options.temperature ?? 0.7,
+    max_tokens: options.maxTokens ?? 200
+  };
+
+  try {
+    const { response } = await apiFetch<{ response: string }>('/api/ai/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    return response;
+  } catch (error) {
+    console.error('Backend AI Error:', error);
+    throw error;
+  }
+}
+
 export async function getAIResponse(
-  messages: Message[],
+  messages: ChatMessage[],
   userData: UserData
 ): Promise<string> {
-  // Check if all data is collected
-  const hasAllData = userData.homePrice && userData.monthlyRent && userData.downPaymentPercent && userData.timeHorizonYears;
+  const hasAllData = Boolean(
+    userData.homePrice &&
+    userData.monthlyRent &&
+    userData.downPaymentPercent &&
+    userData.timeHorizonYears
+  );
   
   // Debug logging
   console.log('AI Debug - hasAllData:', hasAllData);
@@ -34,7 +66,6 @@ export async function getAIResponse(
   console.log('AI Debug - downPaymentPercent:', userData.downPaymentPercent);
   console.log('AI Debug - timeHorizonYears:', userData.timeHorizonYears);
   
-  // Create system prompt with user's data context
   const systemPrompt = `You are a warm, friendly financial advisor helping someone decide whether to buy a house or keep renting.
 
 YOUR PERSONALITY:
@@ -231,7 +262,7 @@ CONVERSATION STYLE:
 HANDLING NEW VALUES:
 When a user wants to try different numbers, you MUST ask them to provide ALL THREE values at once:
 - User says: "I want to try new values" or "Can I change the numbers?"
-- You say: "Sure! Give me all three at once - home price, rent, and down payment. For example: '$500k, $3k, 20%'"
+- You say: "Sure! Give me all three at once - home price, rent, and down payment. For example: $500k, $3k, 20%"
 - DO NOT ask for them one by one
 - DO NOT show charts until they provide all three new values in a single message
 - Once they provide all three, acknowledge and offer to show updated charts
@@ -264,17 +295,10 @@ CRITICAL RULES:
 Remember: You're a helpful friend, not a calculator. Make them feel confident about their decision!`;
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', // Using the cheaper, faster model
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...messages
-      ],
-      temperature: 0.7,
-      max_tokens: 200
-    });
-
-    return completion.choices[0].message.content || "I'm having trouble responding right now. Can you try again?";
+    return await createChatCompletion([
+      { role: 'system', content: systemPrompt },
+      ...messages
+    ]);
   } catch (error) {
     console.error('OpenAI API Error:', error);
     return "Sorry, I'm having trouble connecting right now. Can you try again?";

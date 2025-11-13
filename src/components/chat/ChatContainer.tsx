@@ -4,19 +4,27 @@ import { useState, useRef } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { NetWorthChart } from '../charts/NetWorthChart';
-import { calculateNetWorthComparison, calculateBuyingCosts, calculateRentingCosts, getTimelineBasedRates } from '../../lib/finance/calculator';
+import { calculateNetWorthComparison, calculateBuyingCosts, calculateRentingCosts, getTimelineBasedRates, getZIPBasedRates } from '../../lib/finance/calculator';
 import { getLocationData, formatLocationData, detectZipCode, type FormattedLocationData } from '../../lib/location/zipCodeService';
-import type { ScenarioInputs, MonthlySnapshot } from '../../types/calculator';
+import type {
+  ScenarioInputs,
+  MonthlySnapshot,
+  BuyingCostsBreakdown,
+  RentingCostsBreakdown,
+  TotalCostSummary,
+  CalculatorSummary,
+  CalculatorOutput
+} from '../../types/calculator';
 import { MonthlyCostChart } from '../charts/MonthlyCostChart';
 import { TotalCostChart } from '../charts/TotalCostChart';
-import { getAIResponse, openai } from '../../lib/ai/openai';
+import { getAIResponse, createChatCompletion } from '../../lib/ai/openai';
 import { EquityBuildupChart } from '../charts/EquityBuildupChart';
 import { RentGrowthChart } from '../charts/RentGrowthChart';
 import { BreakEvenChart } from '../charts/BreakEvenChart';
-import { getZIPBasedRates } from '../../lib/finance/calculator';
 import { SuggestionChips } from './SuggestionChips';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { analyzeScenario } from '../../lib/api/finance';
 
 interface Message {
   id: string;
@@ -27,17 +35,10 @@ interface Message {
   snapshotData?: {
     chartData: MonthlySnapshot[];
     monthlyCosts: {
-      buying: any;
-      renting: any;
+      buying: BuyingCostsBreakdown;
+      renting: RentingCostsBreakdown;
     };
-    totalCostData: {
-      buyerFinalNetWorth: number;
-      renterFinalNetWorth: number;
-      totalBuyingCosts: number;
-      totalRentingCosts: number;
-      finalHomeValue: number;
-      finalInvestmentValue: number;
-    };
+    totalCostData: TotalCostSummary;
     // Store the input values that created this chart
     inputValues: {
       homePrice: number;
@@ -99,6 +100,7 @@ const [chartsReady, setChartsReady] = useState(false);
   const [showLocationCard, setShowLocationCard] = useState(false);
   const [isLocationLocked, setIsLocationLocked] = useState(false); // Track if user made a choice
   const [usingZipData, setUsingZipData] = useState(false); // Track which scenario
+  const [isBackendAvailable, setIsBackendAvailable] = useState(true);
   
   // Edit mode state
   const [isEditMode, setIsEditMode] = useState(false);
@@ -112,18 +114,11 @@ const [chartsReady, setChartsReady] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const [monthlyCosts, setMonthlyCosts] = useState<{
-    buying: any;
-    renting: any;
+    buying: BuyingCostsBreakdown;
+    renting: RentingCostsBreakdown;
   } | null>(null);
   
-  const [totalCostData, setTotalCostData] = useState<{
-    buyerFinalNetWorth: number;
-    renterFinalNetWorth: number;
-    totalBuyingCosts: number;
-    totalRentingCosts: number;
-    finalHomeValue: number;
-    finalInvestmentValue: number;
-  } | null>(null);
+  const [totalCostData, setTotalCostData] = useState<TotalCostSummary | null>(null);
   
   // Handle save chat as PDF
   const handleSaveChat = async () => {
@@ -157,7 +152,7 @@ const [chartsReady, setChartsReady] = useState(false);
         }
         
         // Remove emojis that cause random symbols in PDF
-        const cleanText = text.replace(/[📊🏠💵💰🔄💾]/g, '').trim();
+        const cleanText = text.replace(/[📊🏠💵💰🔄💾]/gu, '').trim();
         
         const lines = pdf.splitTextToSize(cleanText, pageWidth - 2 * margin);
         checkNewPage(lines.length * fontSize * 0.35 + 3);
@@ -278,7 +273,7 @@ const [chartsReady, setChartsReady] = useState(false);
               pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
               yPosition += imgHeight + 5;
               
-            } catch (error) {
+            } catch {
               addText('[Chart image could not be captured]', 10);
             }
           }
@@ -361,7 +356,7 @@ const [chartsReady, setChartsReady] = useState(false);
     setEditableValues(null);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editableValues) return;
     
     // Check if any values actually changed
@@ -391,13 +386,16 @@ const [chartsReady, setChartsReady] = useState(false);
     setEditableValues(null);
     
     // Recalculate charts with new values
-    calculateAndShowChart(editableValues, locationData);
-    
+    const analysisUpdate = await calculateAndShowChart(editableValues, locationData);
+    const fallbackNotice = analysisUpdate?.source === 'local'
+      ? "\n\nHeads up: I'm using the built-in calculator while the analysis service reconnects."
+      : '';
+
     // Add AI message acknowledging the change
     const changeMessage: Message = {
       id: Date.now().toString(),
       role: 'assistant',
-      content: "Perfect! I've updated your scenario with the new values. The charts have been recalculated to reflect your changes. Check out the chart buttons above to explore different views!"
+      content: `Perfect! I've updated your scenario with the new values. The charts have been recalculated to reflect your changes. Check out the chart buttons above to explore different views!${fallbackNotice}`
     };
     setMessages(prev => [...prev, changeMessage]);
   };
@@ -446,7 +444,7 @@ const [chartsReady, setChartsReady] = useState(false);
       // Set the ZIP data immediately, but preserve user's custom home price if they provided one
       const newUserData: UserData = {
         homePrice: userData.homePrice || locationData.medianHomePrice, // Use user's price if provided, otherwise use ZIP median
-        monthlyRent: locationData.averageRent, // Always use local average rent when "Use this data" is clicked
+        monthlyRent: locationData.averageRent || userData.monthlyRent, // Use local average rent if available, otherwise keep user's rent
         downPaymentPercent: userData.downPaymentPercent,
         timeHorizonYears: userData.timeHorizonYears
       };
@@ -457,7 +455,11 @@ const [chartsReady, setChartsReady] = useState(false);
       
       // Add AI message asking for down payment and timeline
       const homePriceText = newUserData.homePrice ? `your $${newUserData.homePrice.toLocaleString()} home price` : `the local median home price ($${locationData.medianHomePrice.toLocaleString()})`;
-      const rentText = `the local average rent ($${locationData.averageRent.toLocaleString()}/mo)`;
+      const rentText = locationData.averageRent 
+        ? `the local average rent ($${locationData.averageRent.toLocaleString()}/mo)` 
+        : newUserData.monthlyRent 
+          ? `your rent ($${newUserData.monthlyRent.toLocaleString()}/mo)` 
+          : `your rent`;
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -544,7 +546,7 @@ function shouldShowChart(aiResponse: string): string | null {
         setUsingZipData(true);
         setUserData({
           homePrice: locationData.medianHomePrice,
-          monthlyRent: locationData.averageRent,
+          monthlyRent: locationData.averageRent || null,
           downPaymentPercent: null,
           timeHorizonYears: null
         });
@@ -704,79 +706,60 @@ function shouldShowChart(aiResponse: string): string | null {
     let freshChartData = chartData;
     let freshMonthlyCosts = monthlyCosts;
     let freshTotalCostData = totalCostData;
-    
+    let analysisInputs: ScenarioInputs | null = null;
+    let analysisResult: CalculatorOutput | null = null;
+    let analysisSource: 'backend' | 'local' | null = null;
+    let analysisApplied = false;
+
     if (hasAllData && dataChanged) {
-      // Calculate fresh data synchronously
-      const inputs = {
-        homePrice: newUserData.homePrice!,
-        downPaymentPercent: newUserData.downPaymentPercent!,
-        interestRate: 7.0,
-        loanTermYears: 30,
-        timeHorizonYears: newUserData.timeHorizonYears!,
-        propertyTaxRate: 1.0,
-        homeInsuranceAnnual: 1200,
-        hoaMonthly: 150,
-        maintenanceRate: 1.0,
-        homeAppreciationRate: getZIPBasedRates(locationData, newUserData.timeHorizonYears!).homeAppreciationRate,
-        monthlyRent: newUserData.monthlyRent!,
-        rentGrowthRate: getZIPBasedRates(locationData, newUserData.timeHorizonYears!).rentGrowthRate,
-        renterInsuranceAnnual: 240,
-        investmentReturnRate: getZIPBasedRates(locationData, newUserData.timeHorizonYears!).investmentReturnRate
-      } as ScenarioInputs;
-      
-      // Calculate net worth comparison
-      const snapshots = calculateNetWorthComparison(inputs);
-      freshChartData = snapshots;
-      
-      // Calculate monthly costs
-      const buying = calculateBuyingCosts(inputs);
-      const renting = calculateRentingCosts(inputs, 1);
-      freshMonthlyCosts = {
-        buying: {
-          mortgage: buying.mortgage,
-          propertyTax: buying.propertyTax,
-          insurance: buying.insurance,
-          hoa: buying.hoa,
-          maintenance: buying.maintenance,
-          total: buying.total
-        },
-        renting: {
-          rent: renting.monthlyRent,
-          insurance: renting.insurance,
-          total: renting.total
-        }
-      };
-      
-      // Calculate total costs over user's timeline
-      const finalMonth = snapshots[snapshots.length - 1]; // Last month of user's timeline
-      const totalBuyingCosts = snapshots.reduce((sum, s) => sum + s.monthlyBuyingCosts, 0);
-      const totalRentingCosts = snapshots.reduce((sum, s) => sum + s.monthlyRentingCosts, 0);
-      
-      freshTotalCostData = {
-        buyerFinalNetWorth: finalMonth.buyerNetWorth,
-        renterFinalNetWorth: finalMonth.renterNetWorth,
-        totalBuyingCosts,
-        totalRentingCosts,
-        finalHomeValue: finalMonth.homeValue,
-        finalInvestmentValue: finalMonth.investedDownPayment
-      };
-      
-      // Update state
-      setChartData(freshChartData);
-      setMonthlyCosts(freshMonthlyCosts);
-      setTotalCostData(freshTotalCostData);
-      setChartsReady(true);
-      
-      // Reset visible charts (all become available again)
-      setVisibleCharts({
-        netWorth: false,
-        monthlyCost: false,
-        totalCost: false,
-        equity: false,
-        rentGrowth: false,
-        breakEven: false
-      });
-  }
+      const inputs = buildScenarioInputs(newUserData, locationData);
+
+      if (inputs) {
+        analysisInputs = inputs;
+
+        const { analysis, source } = await runAnalysis(inputs);
+        analysisResult = analysis;
+        analysisSource = source;
+        analysisApplied = true;
+
+        freshChartData = analysis.monthlySnapshots;
+        freshMonthlyCosts = {
+          buying: analysis.monthlyCosts,
+          renting: analysis.rentingCosts
+        };
+        freshTotalCostData = analysis.totals;
+
+        applyAnalysis(analysis);
+
+        // Reset visible charts (all become available again)
+        setVisibleCharts({
+          netWorth: false,
+          monthlyCost: false,
+          totalCost: false,
+          equity: false,
+          rentGrowth: false,
+          breakEven: false
+        });
+      }
+    }
+
+    if (hasAllData && !analysisApplied) {
+      const calcResult = await calculateAndShowChart(newUserData, locationData);
+
+      if (calcResult) {
+        analysisInputs = analysisInputs ?? calcResult.inputs;
+        analysisResult = analysisResult ?? calcResult.analysis;
+        analysisSource = analysisSource ?? calcResult.source;
+        analysisApplied = true;
+
+        freshChartData = calcResult.analysis.monthlySnapshots;
+        freshMonthlyCosts = {
+          buying: calcResult.analysis.monthlyCosts,
+          renting: calcResult.analysis.rentingCosts
+        };
+        freshTotalCostData = calcResult.analysis.totals;
+      }
+    }
 
     // Get AI response
     const allMessages = [...messages, userMessage].map(m => ({
@@ -789,29 +772,40 @@ function shouldShowChart(aiResponse: string): string | null {
     // Check if AI response indicates a chart should be shown
     const chartToShow = shouldShowChart(botResponse);
     
+    const fallbackSuffix = analysisSource === 'local'
+      ? '\n\n_(Using local backup calculations while the analysis service reconnects.)_'
+      : '';
+    const responseContent = botResponse + fallbackSuffix;
+    
+    const snapshotData = analysisResult && analysisInputs
+      ? buildSnapshotData(analysisResult, analysisInputs)
+      : (freshChartData && freshMonthlyCosts && freshTotalCostData && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent
+          ? {
+              chartData: freshChartData,
+              monthlyCosts: freshMonthlyCosts,
+              totalCostData: freshTotalCostData,
+              inputValues: {
+                homePrice: newUserData.homePrice,
+                monthlyRent: newUserData.monthlyRent,
+                downPaymentPercent: newUserData.downPaymentPercent
+              }
+            }
+          : null);
+    
     let assistantMessage: Message;
-    if (chartToShow && (chartsReady || hasAllData) && freshChartData && freshMonthlyCosts && freshTotalCostData) {
+    if (chartToShow && (chartsReady || hasAllData) && snapshotData) {
       // AI wants to show a chart and we have the data
       assistantMessage = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-        content: botResponse,
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: responseContent,
         chartToShow: chartToShow as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth' | 'breakEven',
-        snapshotData: {
-          chartData: freshChartData,
-          monthlyCosts: freshMonthlyCosts,
-          totalCostData: freshTotalCostData,
-          inputValues: {
-            homePrice: newUserData.homePrice!,
-            monthlyRent: newUserData.monthlyRent!,
-            downPaymentPercent: newUserData.downPaymentPercent!
-          }
-        }
+        snapshotData
       };
       
       // Mark this chart as visible
-    setVisibleCharts(prev => ({
-      ...prev,
+      setVisibleCharts(prev => ({
+        ...prev,
         [chartToShow]: true
       }));
       
@@ -826,10 +820,10 @@ function shouldShowChart(aiResponse: string): string | null {
     } else {
       // Normal AI response without chart
       assistantMessage = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: botResponse
-    };
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: responseContent
+      };
     }
     
     // Charts will be calculated and displayed automatically when all data is collected
@@ -843,15 +837,6 @@ function shouldShowChart(aiResponse: string): string | null {
     setMessages(prev => [...prev, assistantMessage]);
     setIsLoading(false);
     
-    // If we have all data and haven't calculated yet (initial case, not data change)
-    if (hasAllData && !chartsReady && !dataChanged) {
-      calculateAndShowChart(newUserData, locationData);
-    }
-    
-    // Force recalculation if we have location data and charts are ready
-    if (hasAllData && chartsReady && locationData) {
-      calculateAndShowChart(newUserData, locationData);
-    }
   };
 
 // Handle suggestion chip clicks
@@ -861,76 +846,84 @@ const handleChipClick = (message: string) => {
     
 };
 
-  const calculateAndShowChart = (data: UserData, currentLocationData?: FormattedLocationData | null) => {
-    // Use local property tax rate if available, otherwise default to 1.0%
-    // ZIP data stores propertyTaxRate as decimal (0.73 = 0.73%), so convert to percentage
-    const locationDataToUse = currentLocationData || locationData;
-    const propertyTaxRate = locationDataToUse?.propertyTaxRate ? locationDataToUse.propertyTaxRate * 100 : 1.0;
-    
-    
-    const inputs: ScenarioInputs = {
-      homePrice: data.homePrice!,
-      downPaymentPercent: data.downPaymentPercent!,
-      monthlyRent: data.monthlyRent!,
-      interestRate: 7.0,
-      loanTermYears: 30,
-      timeHorizonYears: data.timeHorizonYears!,
-      propertyTaxRate: propertyTaxRate,
-      homeInsuranceAnnual: 1200,
-      hoaMonthly: 150,
-      maintenanceRate: 1.0,
-      renterInsuranceAnnual: 240,
-      // Use ZIP-based rates if location data exists, otherwise use timeline-based rates
-      ...(locationDataToUse ? 
-        getZIPBasedRates(locationDataToUse, data.timeHorizonYears!) : 
-        getTimelineBasedRates(data.timeHorizonYears!)
-      )
-    };
-    
-    // Calculate net worth comparison
-    const snapshots = calculateNetWorthComparison(inputs);
+  const runAnalysis = async (inputs: ScenarioInputs): Promise<{ analysis: CalculatorOutput; source: 'backend' | 'local'; }> => {
+    try {
+      const { analysis } = await analyzeScenario(inputs);
+      if (!isBackendAvailable) {
+        setIsBackendAvailable(true);
+      }
+      return { analysis, source: 'backend' };
+    } catch (error) {
+      console.error('Failed to analyze scenario via backend:', error);
+      if (isBackendAvailable) {
+        setIsBackendAvailable(false);
+      }
+      const fallbackAnalysis = buildLocalAnalysis(inputs);
+      return { analysis: fallbackAnalysis, source: 'local' };
+    }
+  };
 
-    setChartData(snapshots);
-    setChartsReady(true); // Mark charts as ready
-    
+  const calculateAndShowChart = async (
+    data: UserData,
+    currentLocationData?: FormattedLocationData | null
+  ) => {
+    const inputs = buildScenarioInputs(data, currentLocationData);
+    if (!inputs) return null;
+
+    const result = await runAnalysis(inputs);
+    applyAnalysis(result.analysis);
+
     // Automatically show the Net Worth chart when all data is collected
     setVisibleCharts(prev => ({
       ...prev,
       netWorth: true
     }));
-    
-    // Calculate monthly costs
-    const buying = calculateBuyingCosts(inputs);
-    const renting = calculateRentingCosts(inputs, 1);
-    setMonthlyCosts({
-      buying: {
-        mortgage: buying.mortgage,
-        propertyTax: buying.propertyTax,
-        insurance: buying.insurance,
-        hoa: buying.hoa,
-        maintenance: buying.maintenance,
-        total: buying.total
-      },
-      renting: {
-        rent: renting.monthlyRent,
-        insurance: renting.insurance,
-        total: renting.total
-      }
-    });
-    
-    // Calculate total costs over user's timeline
-    const finalMonth = snapshots[snapshots.length - 1]; // Last month of user's timeline
-    const totalBuyingCosts = snapshots.reduce((sum, s) => sum + s.monthlyBuyingCosts, 0);
-    const totalRentingCosts = snapshots.reduce((sum, s) => sum + s.monthlyRentingCosts, 0);
 
-    setTotalCostData({
-      buyerFinalNetWorth: finalMonth.buyerNetWorth,
-      renterFinalNetWorth: finalMonth.renterNetWorth,
-      totalBuyingCosts,
-      totalRentingCosts,
-      finalHomeValue: finalMonth.homeValue,
-      finalInvestmentValue: finalMonth.investedDownPayment
-    });
+    return {
+      analysis: result.analysis,
+      source: result.source,
+      inputs
+    };
+  };
+  
+  const buildScenarioInputs = (
+    data: UserData,
+    currentLocationData?: FormattedLocationData | null
+  ): ScenarioInputs | null => {
+    if (
+      data.homePrice == null ||
+      data.monthlyRent == null ||
+      data.downPaymentPercent == null ||
+      data.timeHorizonYears == null
+    ) {
+      return null;
+    }
+
+    const locationDataToUse = currentLocationData ?? locationData;
+    const propertyTaxRate = locationDataToUse?.propertyTaxRate
+      ? locationDataToUse.propertyTaxRate * 100
+      : 1.0;
+
+    const rateSource = locationDataToUse
+      ? getZIPBasedRates(locationDataToUse, data.timeHorizonYears)
+      : getTimelineBasedRates(data.timeHorizonYears);
+
+    return {
+      homePrice: data.homePrice,
+      downPaymentPercent: data.downPaymentPercent,
+      interestRate: 7.0,
+      loanTermYears: 30,
+      timeHorizonYears: data.timeHorizonYears,
+      monthlyRent: data.monthlyRent,
+      propertyTaxRate,
+      homeInsuranceAnnual: 1200,
+      hoaMonthly: 150,
+      maintenanceRate: 1.0,
+      renterInsuranceAnnual: 240,
+      homeAppreciationRate: rateSource.homeAppreciationRate,
+      rentGrowthRate: rateSource.rentGrowthRate,
+      investmentReturnRate: rateSource.investmentReturnRate
+    };
   };
   
   // Helper function to render chart based on type - uses message's snapshot data
@@ -1000,6 +993,33 @@ const handleChipClick = (message: string) => {
     }
   };
   
+  const applyAnalysis = (analysis: CalculatorOutput) => {
+    setChartData(analysis.monthlySnapshots);
+    setMonthlyCosts({
+      buying: analysis.monthlyCosts,
+      renting: analysis.rentingCosts
+    });
+    setTotalCostData(analysis.totals);
+    setChartsReady(true);
+  };
+
+  const buildSnapshotData = (
+    analysis: CalculatorOutput,
+    inputs: ScenarioInputs
+  ) => ({
+    chartData: analysis.monthlySnapshots,
+    monthlyCosts: {
+      buying: analysis.monthlyCosts,
+      renting: analysis.rentingCosts
+    },
+    totalCostData: analysis.totals,
+    inputValues: {
+      homePrice: inputs.homePrice,
+      monthlyRent: inputs.monthlyRent,
+      downPaymentPercent: inputs.downPaymentPercent
+    }
+  });
+
   return (
     <div className="app-layout">
       
@@ -1027,7 +1047,11 @@ const handleChipClick = (message: string) => {
             <div className="location-data-item">
               <span className="location-icon">💵</span>
               <span className="location-label">Average rent:</span>
-              <span className="location-value">${locationData.averageRent.toLocaleString()}/mo</span>
+              <span className="location-value">
+                {locationData.averageRent 
+                  ? `$${locationData.averageRent.toLocaleString()}/mo` 
+                  : 'Not available'}
+              </span>
             </div>
             <div className="location-data-item">
               <span className="location-icon">🏛️</span>
@@ -1571,6 +1595,52 @@ Restart
 
 
 
+function buildLocalAnalysis(inputs: ScenarioInputs): CalculatorOutput {
+  const monthlySnapshots = calculateNetWorthComparison(inputs);
+  const monthlyCosts = calculateBuyingCosts(inputs);
+  const rentingCosts = calculateRentingCosts(inputs, 1);
+
+  const summary = buildLocalSummary(monthlySnapshots);
+
+  const totalBuyingCosts = monthlySnapshots.reduce((sum, snapshot) => sum + snapshot.monthlyBuyingCosts, 0);
+  const totalRentingCosts = monthlySnapshots.reduce((sum, snapshot) => sum + snapshot.monthlyRentingCosts, 0);
+  const finalSnapshot = monthlySnapshots[monthlySnapshots.length - 1];
+
+  const totals: TotalCostSummary = {
+    buyerFinalNetWorth: finalSnapshot.buyerNetWorth,
+    renterFinalNetWorth: finalSnapshot.renterNetWorth,
+    totalBuyingCosts,
+    totalRentingCosts,
+    finalHomeValue: finalSnapshot.homeValue,
+    finalInvestmentValue: finalSnapshot.investedDownPayment
+  };
+
+  return {
+    inputs,
+    monthlySnapshots,
+    summary,
+    monthlyCosts,
+    rentingCosts,
+    totals
+  };
+}
+
+function buildLocalSummary(snapshots: MonthlySnapshot[]): CalculatorSummary {
+  const totalInterestPaid = snapshots.reduce((sum, snapshot) => sum + snapshot.interestPaid, 0);
+  const totalPrincipalPaid = snapshots.reduce((sum, snapshot) => sum + snapshot.principalPaid, 0);
+  const breakevenMonth = snapshots.find(snapshot => snapshot.netWorthDelta >= 0)?.month ?? null;
+  const finalSnapshot = snapshots[snapshots.length - 1];
+
+  return {
+    totalInterestPaid,
+    totalPrincipalPaid,
+    breakevenMonth,
+    finalBuyerNetWorth: finalSnapshot.buyerNetWorth,
+    finalRenterNetWorth: finalSnapshot.renterNetWorth,
+    finalNetWorthDelta: finalSnapshot.netWorthDelta
+  };
+}
+
 // Extract numbers from user messages
 
 // AI-powered data extraction - handles any user input format
@@ -1610,9 +1680,8 @@ Return ONLY a JSON object with this exact format:
 If you can't find a value, use null. Only extract numbers that make sense for each field.
 `;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
+    const completion = await createChatCompletion(
+      [
         {
           role: "system",
           content: "You are a financial data extraction assistant. Extract only the requested financial data and return valid JSON."
@@ -1622,11 +1691,13 @@ If you can't find a value, use null. Only extract numbers that make sense for ea
           content: extractionPrompt
         }
       ],
-      temperature: 0.1,
-      max_tokens: 200
-    });
+      {
+        temperature: 0.1,
+        maxTokens: 200
+      }
+    );
 
-    const extractedData = JSON.parse(response.choices[0].message.content || '{}');
+    const extractedData = JSON.parse(completion || '{}');
     
     // Update newData with extracted values (only if they exist)
     if (extractedData.homePrice && extractedData.homePrice > 0) {

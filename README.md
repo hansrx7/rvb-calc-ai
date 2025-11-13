@@ -73,6 +73,8 @@ All calculations use industry-standard formulas:
 ### Prerequisites
 - Node.js 20.19+ or 22.12+
 - npm or yarn
+- Python 3.11+
+- pip (or uv)
 - OpenAI API key
 
 ### Installation
@@ -83,26 +85,45 @@ All calculations use industry-standard formulas:
    cd rentvsbuy-ai
    ```
 
-2. **Install dependencies**
+2. **Install frontend dependencies**
    ```bash
    npm install
    ```
 
-3. **Set up environment variables**
-   
-   Create a `.env` file in the root directory:
-   ```env
-   VITE_OPENAI_API_KEY=your_openai_api_key_here
+3. **Create a Python virtual environment and install backend dependencies**
+   ```bash
+   cd backend
+   python3 -m venv .venv
+   source .venv/bin/activate        # On Windows use: .venv\Scripts\activate
+   pip install -r requirements.txt
+   cd ..
    ```
 
-   Get your OpenAI API key from [platform.openai.com](https://platform.openai.com/api-keys)
+4. **Configure environment variables**
+   - Backend (`backend/.env`):
+     ```env
+     OPENAI_API_KEY=your_openai_api_key_here
+     ```
+   - Frontend (`.env`, optional): override the backend URL if you are not using the default `http://localhost:8000`.
+     ```env
+     VITE_BACKEND_URL=http://localhost:8000
+     ```
 
-4. **Start the development server**
+### Running the app locally
+
+1. **Start the Python backend**
+   ```bash
+   cd backend
+   source .venv/bin/activate        # On Windows use: .venv\Scripts\activate
+   uvicorn app.main:app --reload --port 8000
+   ```
+
+2. **Start the Vite frontend (new terminal)**
    ```bash
    npm run dev
    ```
 
-5. **Open your browser**
+3. **Open your browser**
    
    Navigate to `http://localhost:5173`
 
