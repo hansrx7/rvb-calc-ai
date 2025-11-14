@@ -484,15 +484,10 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Recharts for beautiful, responsive charts
 - The personal finance community for calculation validation
 
-## 📧 Contact
-
-**Project Maintainer:** Mehwish Ahmed  
-**GitHub:** [@mehwishahmed](https://github.com/mehwishahmed)
-
 ---
 
 **⚠️ Disclaimer:** This tool provides educational estimates and should not be considered financial advice. Consult with a qualified financial advisor before making major financial decisions. Actual costs, appreciation rates, and returns may vary significantly based on location, market conditions, and individual circumstances.
 
 ---
 
-Made with ❤️ for better financial decisions
+Made with ❤️
