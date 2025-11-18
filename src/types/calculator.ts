@@ -88,6 +88,31 @@ export interface CalculatorSummary {
   finalNetWorthDelta: number;
 }
 
+export interface CashFlowPoint {
+  month: number;
+  homeownerCashFlow: number;
+  renterCashFlow: number;
+}
+
+export interface CumulativeCostPoint {
+  month: number;
+  cumulativeBuying: number;
+  cumulativeRenting: number;
+}
+
+export interface LiquidityPoint {
+  month: number;
+  homeownerCashAccount: number;
+  renterInvestmentBalance: number;
+}
+
+export interface TaxSavingsPoint {
+  year: number;
+  deductibleMortgageInterest: number;
+  deductiblePropertyTax: number;
+  totalTaxBenefit: number;
+}
+
 export interface CalculatorOutput {
   inputs: ScenarioInputs;
   monthlySnapshots: MonthlySnapshot[];
@@ -95,6 +120,11 @@ export interface CalculatorOutput {
   monthlyCosts: BuyingCostsBreakdown;
   rentingCosts: RentingCostsBreakdown;
   totals: TotalCostSummary;
+  // --- ADDED ADVANCED FIELDS ---
+  cashFlow?: CashFlowPoint[] | null;
+  cumulativeCosts?: CumulativeCostPoint[] | null;
+  liquidityTimeline?: LiquidityPoint[] | null;
+  taxSavings?: TaxSavingsPoint[] | null;
 }
 
 export interface TimelinePoint {
