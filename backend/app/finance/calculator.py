@@ -1,5 +1,9 @@
 """Finance calculator logic mirrored from the TypeScript implementation."""
 
+
+import random
+import numpy as np
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -253,16 +257,12 @@ def _compute_summary(snapshots: Iterable[MonthlySnapshot]) -> CalculatorSummary:
 
 def calculate_analysis(inputs: ScenarioInputs) -> CalculatorOutput:
     snapshots = calculate_net_worth_comparison(inputs)
-
     buying_costs = calculate_buying_costs(inputs)
     renting_costs_month_one = calculate_renting_costs(inputs, 1)
-
     summary = _compute_summary(snapshots)
-
     total_buying_costs = sum(s.monthlyBuyingCosts for s in snapshots)
     total_renting_costs = sum(s.monthlyRentingCosts for s in snapshots)
     final_snapshot = snapshots[-1]
-
     totals = TotalCostSummary(
         buyerFinalNetWorth=final_snapshot.buyerNetWorth,
         renterFinalNetWorth=final_snapshot.renterNetWorth,
@@ -271,7 +271,11 @@ def calculate_analysis(inputs: ScenarioInputs) -> CalculatorOutput:
         finalHomeValue=final_snapshot.homeValue,
         finalInvestmentValue=final_snapshot.investedDownPayment,
     )
-
+    # Extended analytics locations (for direct analyze API)
+    cash_flow = calculate_cash_flow(snapshots)
+    cum_costs = calculate_cumulative_costs(snapshots)
+    liquidity = calculate_liquidity_timeline(snapshots)
+    tax_savings = calculate_tax_savings(inputs, snapshots)  # using default bracket/income
     return CalculatorOutput(
         inputs=inputs,
         monthlySnapshots=snapshots,
@@ -279,4 +283,117 @@ def calculate_analysis(inputs: ScenarioInputs) -> CalculatorOutput:
         monthlyCosts=buying_costs,
         rentingCosts=renting_costs_month_one,
         totals=totals,
+        cashFlow=cash_flow,
+        cumulativeCosts=cum_costs,
+        liquidityTimeline=liquidity,
+        taxSavings=tax_savings,
     )
+
+def calculate_cash_flow(snapshots: list[MonthlySnapshot]) -> list[dict]:
+    result = []
+    for snap in snapshots:
+        result.append({
+            'month': snap.month,
+            'homeownerCashFlow': snap.monthlyRentingCosts - snap.monthlyBuyingCosts,  # cash diff each month
+            'renterCashFlow': snap.monthlyRentingCosts
+        })
+    return result
+
+def calculate_cumulative_costs(snapshots: list[MonthlySnapshot]) -> list[dict]:
+    result = []
+    cum_buy, cum_rent = 0.0, 0.0
+    for snap in snapshots:
+        cum_buy += snap.monthlyBuyingCosts
+        cum_rent += snap.monthlyRentingCosts
+        result.append({
+            'month': snap.month,
+            'cumulativeBuying': cum_buy,
+            'cumulativeRenting': cum_rent,
+        })
+    return result
+
+def calculate_liquidity_timeline(snapshots: list[MonthlySnapshot]) -> list[dict]:
+    result = []
+    # monthly snapshots must be expanded to expose cash & investment
+    # defaults to 0 if not present
+    for snap in snapshots:
+        result.append({
+            'month': snap.month,
+            'homeownerCashAccount': getattr(snap, 'buyerNetWorth', 0),
+            'renterInvestmentBalance': getattr(snap, 'renterNetWorth', 0),
+        })
+    return result
+
+def calculate_tax_savings(inputs: ScenarioInputs, snapshots: list[MonthlySnapshot], income: float = 100000, tax_bracket: float = 0.24) -> list[dict]:
+    # Simple US deduction simulation by year: itemized interest + property tax, up to IRS limits.
+    # Default bracket is 24% (median). User can override by argument/in API.
+    mortgage_interest_per_year = []
+    property_tax_per_year = []
+    result = []
+    year_snaps = [snapshots[i*12:(i+1)*12] for i in range(len(snapshots)//12+1)]
+    for year, months in enumerate(year_snaps, 1):
+        tot_interest = sum(m.interestPaid for m in months)
+        tot_property_tax = sum((inputs.propertyTaxRate/100 * m.homeValue)/12 for m in months)
+        deductible_interest = min(tot_interest, 750000)  # $750k loan limit for deduction
+        deductible_tax = min(tot_property_tax, 10000)  # $10k SALT limit
+        tax_benefit = (deductible_interest + deductible_tax) * tax_bracket
+        result.append({
+            'year': year,
+            'deductibleMortgageInterest': deductible_interest,
+            'deductiblePropertyTax': deductible_tax,
+            'totalTaxBenefit': tax_benefit,
+        })
+    return result
+
+def calculate_sensitivity(base: ScenarioInputs, interest_rate_delta=0.0, home_price_delta=0.0, rent_delta=0.0):
+    # Returns a list of (variant, CalculatorOutput)
+    variants = []
+    # -/0/+ for each delta type
+    for label, mod in [('interest-', -interest_rate_delta), ('interest+', interest_rate_delta)]:
+        modified = base.copy(update={'interestRate': base.interestRate + mod})
+        variants.append({'variant': label, 'output': calculate_analysis(modified)})
+    for label, mod in [('price-', -home_price_delta), ('price+', home_price_delta)]:
+        modified = base.copy(update={'homePrice': base.homePrice + mod})
+        variants.append({'variant': label, 'output': calculate_analysis(modified)})
+    for label, mod in [('rent-', -rent_delta), ('rent+', rent_delta)]:
+        modified = base.copy(update={'monthlyRent': base.monthlyRent + mod})
+        variants.append({'variant': label, 'output': calculate_analysis(modified)})
+    return variants
+
+def calculate_scenarios(scenarios: list[ScenarioInputs]):
+    return [{'scenario': s, 'output': calculate_analysis(s)} for s in scenarios]
+
+def calculate_heatmap(timelines: list[int], downpayments: list[float], base: ScenarioInputs):
+    result = []
+    for t in timelines:
+        for dp in downpayments:
+            inputs = base.copy(update={'timeHorizonYears': t, 'downPaymentPercent': dp})
+            out = calculate_analysis(inputs)
+            result.append({
+                'timelineYears': t,
+                'downPaymentPercent': dp,
+                'breakevenMonth': out.summary.breakevenMonth
+            })
+    return result
+
+
+def calculate_monte_carlo(inputs: ScenarioInputs, runs: int = 500):
+    results = []
+    for run in range(runs):
+        # Randomize appreciation, rent, investment returns ~ Normal(centered at input, stdev 1.5% for apprec/rent, 2.5% for invest)
+        scenario = inputs.copy(update={
+            'homeAppreciationRate': random.gauss(inputs.homeAppreciationRate, 1.5),
+            'rentGrowthRate':  random.gauss(inputs.rentGrowthRate, 1.5),
+            'investmentReturnRate': random.gauss(inputs.investmentReturnRate, 2.5)
+        })
+        out = calculate_analysis(scenario)
+        results.append({
+            'run': run+1,
+            'finalBuyerNetWorth': out.totals.buyerFinalNetWorth,
+            'finalRenterNetWorth': out.totals.renterFinalNetWorth,
+            'breakevenMonth': out.summary.breakevenMonth
+        })
+    final_nw = [r['finalBuyerNetWorth']-r['finalRenterNetWorth'] for r in results]
+    percentiles = np.percentile(final_nw, [10, 50, 90])
+    summary = {'percentile10': percentiles[0], 'percentile50': percentiles[1], 'percentile90': percentiles[2]}
+    return {'runs': results, 'summary': summary}

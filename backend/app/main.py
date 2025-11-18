@@ -9,8 +9,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .config import get_settings
-from .finance.calculator import calculate_analysis
-from .models import AnalysisRequest, AnalysisResponse, TimelinePoint
+from .finance.calculator import (
+    calculate_analysis, calculate_cash_flow, calculate_cumulative_costs, calculate_liquidity_timeline,
+    calculate_tax_savings, calculate_sensitivity, calculate_scenarios, calculate_heatmap, calculate_monte_carlo)
+from .models import (
+    AnalysisRequest, AnalysisResponse, TimelinePoint, ScenarioRequest, SensitivityRequest, HeatmapRequest, MonteCarloRequest
+)
 from .services.openai_service import OpenAIService
 
 settings = get_settings()
@@ -71,6 +75,39 @@ def analyze_finance(request: AnalysisRequest) -> AnalysisResponse:
 
     return AnalysisResponse(analysis=analysis, timeline=timeline)
 
+
+@app.post(f"{settings.api_prefix}/finance/heatmap")
+def break_even_heatmap(req: HeatmapRequest, base: AnalysisRequest) -> list:
+    # base.inputs sent with HeatmapRequest: timelines, downPayments
+    return calculate_heatmap(req.timelines, req.downPayments, base.inputs)
+
+@app.post(f"{settings.api_prefix}/finance/scenarios")
+def scenario_overlay_chart(req: ScenarioRequest) -> list:
+    return calculate_scenarios(req.scenarios)
+
+@app.post(f"{settings.api_prefix}/finance/sensitivity")
+def sensitivity_chart(req: SensitivityRequest) -> list:
+    return calculate_sensitivity(
+        req.base,
+        interest_rate_delta=req.interestRateDelta,
+        home_price_delta=req.homePriceDelta,
+        rent_delta=req.rentDelta
+    )
+
+@app.post(f"{settings.api_prefix}/finance/tax-savings")
+def tax_savings(inputs: dict) -> list:
+    # expects inputs matching ScenarioInputs + optional income/tax_bracket
+    from .models import ScenarioInputs
+    scenario = ScenarioInputs(**inputs)
+    analysis = calculate_analysis(scenario)
+    # Allow POST with optional income, tax_bracket
+    income = inputs.get('income', 100000)
+    bracket = inputs.get('taxBracket', 0.24)
+    return calculate_tax_savings(scenario, analysis.monthlySnapshots, income, bracket)
+
+@app.post(f"{settings.api_prefix}/finance/monte-carlo")
+def monte_carlo_endpoint(req: MonteCarloRequest) -> dict:
+    return calculate_monte_carlo(req.inputs, req.runs)
 
 @app.post(f"{settings.api_prefix}/ai/chat")
 def chat_completion(

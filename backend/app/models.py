@@ -73,6 +73,29 @@ class CalculatorSummary(BaseModel):
     finalRenterNetWorth: float
     finalNetWorthDelta: float
 
+class CashFlowPoint(BaseModel):
+    month: int
+    homeownerCashFlow: float
+    renterCashFlow: float
+
+
+class CumulativeCostPoint(BaseModel):
+    month: int
+    cumulativeBuying: float
+    cumulativeRenting: float
+
+
+class LiquidityPoint(BaseModel):
+    month: int
+    homeownerCashAccount: float
+    renterInvestmentBalance: float
+
+
+class TaxSavingsPoint(BaseModel):
+    year: int
+    deductibleMortgageInterest: float
+    deductiblePropertyTax: float
+    totalTaxBenefit: float
 
 class CalculatorOutput(BaseModel):
     inputs: ScenarioInputs
@@ -81,6 +104,10 @@ class CalculatorOutput(BaseModel):
     monthlyCosts: MonthlyCosts
     rentingCosts: RentingCosts
     totals: TotalCostSummary
+    cashFlow: Optional[List[CashFlowPoint]] = None
+    cumulativeCosts: Optional[List[CumulativeCostPoint]] = None
+    liquidityTimeline: Optional[List[LiquidityPoint]] = None
+    taxSavings: Optional[List[TaxSavingsPoint]] = None
 
 
 class AnalysisRequest(BaseModel):
@@ -98,3 +125,53 @@ class TimelinePoint(BaseModel):
 class AnalysisResponse(BaseModel):
     analysis: CalculatorOutput
     timeline: Optional[List[TimelinePoint]] = None
+
+
+class HeatmapRequest(BaseModel):
+    timelines: List[int]           # e.g., [5, 10, 15, 20]
+    downPayments: List[float]      # percent list
+
+
+class HeatmapPoint(BaseModel):
+    timelineYears: int
+    downPaymentPercent: float
+    breakevenMonth: Optional[int]
+
+
+class ScenarioRequest(BaseModel):
+    scenarios: List[ScenarioInputs]
+
+
+class ScenarioResult(BaseModel):
+    scenario: ScenarioInputs
+    output: CalculatorOutput
+
+
+class SensitivityRequest(BaseModel):
+    base: ScenarioInputs
+    interestRateDelta: float = 0.0
+    homePriceDelta: float = 0.0
+    rentDelta: float = 0.0
+
+
+class SensitivityResult(BaseModel):
+    variant: str
+    output: CalculatorOutput
+
+
+class MonteCarloRequest(BaseModel):
+    inputs: ScenarioInputs
+    runs: int = 500
+
+
+class MonteCarloRun(BaseModel):
+    run: int
+    finalBuyerNetWorth: float
+    finalRenterNetWorth: float
+    breakevenMonth: Optional[int]
+
+
+class MonteCarloSummary(BaseModel):
+    percentile10: float
+    percentile50: float
+    percentile90: float
