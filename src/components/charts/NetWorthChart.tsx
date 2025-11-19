@@ -1,26 +1,26 @@
 // src/components/charts/NetWorthChart.tsx
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import type { MonthlySnapshot } from '../../types/calculator';
+import type { TimelinePoint } from '../../types/calculator';
 
 interface NetWorthChartProps {
-  data: MonthlySnapshot[];
+  timeline: TimelinePoint[];
 }
 
-export function NetWorthChart({ data }: NetWorthChartProps) {
+export function NetWorthChart({ timeline }: NetWorthChartProps) {
   // Transform data for the chart
   // We'll show data points every 12 months (yearly) to keep it clean
-  const chartData = data
-    .filter((_, index) => index % 12 === 0 || index === data.length - 1) // Every year + final month
-    .map(snapshot => ({
-      year: Math.round(snapshot.month / 12),
-      buying: Math.round(snapshot.buyerNetWorth),
-      renting: Math.round(snapshot.renterNetWorth)
+  const chartData = timeline
+    .filter((_, index) => index % 12 === 0 || index === timeline.length - 1) // Every year + final month
+    .map(point => ({
+      year: point.year,
+      buying: Math.round(point.netWorthBuy),
+      renting: Math.round(point.netWorthRent)
     }));
   
   return (
     <div className="chart-container">
-      <h3 className="chart-title">Net Worth Comparison Over {Math.ceil(data.length / 12)} Years</h3>
+      <h3 className="chart-title">Net Worth Comparison Over {Math.ceil(timeline.length / 12)} Years</h3>
       <ResponsiveContainer width="100%" height={400}>
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" />

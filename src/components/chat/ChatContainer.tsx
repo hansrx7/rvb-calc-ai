@@ -13,7 +13,13 @@ import type {
   RentingCostsBreakdown,
   TotalCostSummary,
   CalculatorSummary,
-  CalculatorOutput
+  CalculatorOutput,
+  CashFlowPoint,
+  CumulativeCostPoint,
+  LiquidityPoint,
+  TaxSavingsPoint,
+  AnalysisResult,
+  TimelinePoint
 } from '../../types/calculator';
 import { MonthlyCostChart } from '../charts/MonthlyCostChart';
 import { TotalCostChart } from '../charts/TotalCostChart';
@@ -24,27 +30,68 @@ import { BreakEvenChart } from '../charts/BreakEvenChart';
 import { SuggestionChips } from './SuggestionChips';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { analyzeScenario } from '../../lib/api/finance';
+import { analyzeScenario, fetchBreakEvenHeatmap } from '../../lib/api/finance';
 import { CashFlowChart } from '../charts/CashFlowChart';
 import { CumulativeCostChart } from '../charts/CumulativeCostChart';
 import { LiquidityTimeline } from '../charts/LiquidityTimeline';
 import { TaxSavingsChart } from '../charts/TaxSavingsChart';
 import { BreakEvenHeatmap } from '../charts/BreakEvenHeatmap';
+import type { BreakEvenHeatmapPoint } from '../../types/calculator';
 import { MonteCarloChart } from '../charts/MonteCarloChart';
+
+type ChartType =
+  | 'netWorth'
+  | 'monthlyCost'
+  | 'totalCost'
+  | 'equity'
+  | 'rentGrowth'
+  | 'breakEven'
+  | 'cashFlow'
+  | 'cumulativeCost'
+  | 'liquidity'
+  | 'taxSavings'
+  | 'breakEvenHeatmap'
+  | 'monteCarlo';
+
+const chartKeys: ChartType[] = [
+  'netWorth',
+  'monthlyCost',
+  'totalCost',
+  'equity',
+  'rentGrowth',
+  'breakEven',
+  'cashFlow',
+  'cumulativeCost',
+  'liquidity',
+  'taxSavings',
+  'breakEvenHeatmap',
+  'monteCarlo'
+];
+
+const DEFAULT_HEATMAP_TIMELINES = [5, 10, 15, 20];
+const DEFAULT_HEATMAP_DOWN_PAYMENTS = [5, 10, 15, 20];
 
 interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
-  chartToShow?: 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth' | 'breakEven';
+  chartToShow?: ChartType;
   // Store chart data with the message so it doesn't change when new scenarios are calculated
   snapshotData?: {
-    chartData: MonthlySnapshot[];
-    monthlyCosts: {
+    // New unified structure
+    analysis?: AnalysisResult;
+    // Legacy structure for backward compatibility (will be removed later)
+    chartData?: MonthlySnapshot[];
+    monthlyCosts?: {
       buying: BuyingCostsBreakdown;
       renting: RentingCostsBreakdown;
     };
-    totalCostData: TotalCostSummary;
+    totalCostData?: TotalCostSummary;
+    cashFlow?: CashFlowPoint[] | null;
+    cumulativeCosts?: CumulativeCostPoint[] | null;
+    liquidityTimeline?: LiquidityPoint[] | null;
+    taxSavings?: TaxSavingsPoint[] | null;
+    heatmapPoints?: BreakEvenHeatmapPoint[] | null;
     // Store the input values that created this chart
     inputValues: {
       homePrice: number;
@@ -82,22 +129,18 @@ export function ChatContainer() {
     timeHorizonYears: null
   });
   
+  const createVisibleChartState = () =>
+    chartKeys.reduce(
+      (acc, key) => {
+        acc[key] = false;
+        return acc;
+      },
+      {} as Record<ChartType, boolean>
+    );
+
   const [chartData, setChartData] = useState<MonthlySnapshot[] | null>(null);
   // Track which charts are visible
-  const [visibleCharts, setVisibleCharts] = useState({
-  netWorth: false,
-  monthlyCost: false,
-  totalCost: false,
-  equity: false,
-  rentGrowth: false,
-  breakEven: false,
-  cashFlow: false,
-  cumulativeCost: false,
-  liquidity: false,
-  taxSavings: false,
-  breakEvenHeatmap: false,
-  monteCarlo: false,
-});
+  const [visibleCharts, setVisibleCharts] = useState<Record<ChartType, boolean>>(createVisibleChartState());
 
 // Track if charts are ready to show (data calculated)
 const [chartsReady, setChartsReady] = useState(false);
@@ -131,6 +174,18 @@ const [chartsReady, setChartsReady] = useState(false);
   } | null>(null);
   
   const [totalCostData, setTotalCostData] = useState<TotalCostSummary | null>(null);
+  const [advancedMetrics, setAdvancedMetrics] = useState<{
+    cashFlow: CashFlowPoint[] | null;
+    cumulativeCosts: CumulativeCostPoint[] | null;
+    liquidityTimeline: LiquidityPoint[] | null;
+    taxSavings: TaxSavingsPoint[] | null;
+  }>({
+    cashFlow: null,
+    cumulativeCosts: null,
+    liquidityTimeline: null,
+    taxSavings: null
+  });
+  const [heatmapData, setHeatmapData] = useState<BreakEvenHeatmapPoint[] | null>(null);
   
   // Handle save chat as PDF
   const handleSaveChat = async () => {
@@ -335,17 +390,17 @@ const [chartsReady, setChartsReady] = useState(false);
       timeHorizonYears: null
     });
     setChartData(null);
-    setVisibleCharts({
-      netWorth: false,
-      monthlyCost: false,
-      totalCost: false,
-      equity: false,
-      rentGrowth: false,
-      breakEven: false
-    });
+    setVisibleCharts(createVisibleChartState());
     setChartsReady(false);
     setMonthlyCosts(null);
     setTotalCostData(null);
+    setAdvancedMetrics({
+      cashFlow: null,
+      cumulativeCosts: null,
+      liquidityTimeline: null,
+      taxSavings: null
+    });
+    setHeatmapData(null);
     setShowRestartModal(false);
     setLocationData(null);
     setShowLocationCard(false);
@@ -519,21 +574,31 @@ function shouldShowChart(aiResponse: string): string | null {
   
   // Check for chart trigger phrases (allows for "updated", "new", etc.)
   // Match patterns like: "here's your [updated/new] net worth comparison"
-  if (lower.match(/here'?s your (updated |new )?net worth comparison/)) return 'netWorth';
-  if (lower.match(/here'?s your (updated |new )?monthly costs breakdown/)) return 'monthlyCost';
-  if (lower.match(/here'?s your (updated |new )?total cost comparison/)) return 'totalCost';
-  if (lower.match(/here'?s your (updated |new )?equity buildup/)) return 'equity';
-  // More flexible pattern for Rent Growth (with or without "chart", "comparison", etc.)
-  if (lower.match(/here'?s your (updated |new )?rent growth( chart| comparison)?/)) return 'rentGrowth';
-  if (lower.match(/here'?s your (updated |new )?break.?even timeline/)) return 'breakEven';
-  // Extended charts
-  if (lower.match(/cash flow/)) return 'cashFlow';
-  if (lower.match(/liquidity/)) return 'liquidity';
-  if (lower.match(/cumulative cost/)) return 'cumulativeCost';
-  if (lower.match(/tax savings?/)) return 'taxSavings';
-  if (lower.match(/scenario overlay/)) return 'scenarioOverlay';
-  if (lower.match(/monte carlo/)) return 'monteCarlo';
-  if (lower.match(/break-?even heatmap/)) return 'breakEvenHeatmap';
+  const netWorthPattern = /here'?s (?:how )?(?:your )?(?:updated |new )?net worth comparison/;
+  const monthlyPattern = /here'?s (?:how )?(?:your )?(?:updated |new )?monthly costs breakdown/;
+  const totalPattern = /here'?s (?:how )?(?:your )?(?:updated |new )?total cost comparison/;
+  const equityPattern = /here'?s (?:how )?(?:your )?(?:updated |new )?equity buildup/;
+  const rentPattern = /here'?s (?:how )?(?:your )?(?:updated |new )?rent growth( chart| comparison)?/;
+  const breakEvenPattern = /here'?s (?:how )?(?:your )?(?:updated |new )?break.?even timeline/;
+  const cashFlowPattern = /here'?s (?:how )?(?:your )?(?:updated |new )?cash flow/;
+  const cumulativePattern = /here'?s (?:how )?(?:your )?(?:updated |new )?cumulative (?:cost|spend)/;
+  const liquidityPattern = /here'?s (?:how )?(?:your )?(?:updated |new )?liquidity timeline/;
+  const taxPattern = /here'?s (?:how )?(?:your )?(?:updated |new )?tax savings/;
+  const heatmapPattern = /here'?s (?:how )?(?:your )?(?:updated |new )?break.?even heatmap/;
+  const montePattern = /here'?s (?:how )?(?:your )?(?:updated |new )?monte carlo simulation/;
+
+  if (lower.match(netWorthPattern)) return 'netWorth';
+  if (lower.match(monthlyPattern)) return 'monthlyCost';
+  if (lower.match(totalPattern)) return 'totalCost';
+  if (lower.match(equityPattern)) return 'equity';
+  if (lower.match(rentPattern)) return 'rentGrowth';
+  if (lower.match(breakEvenPattern)) return 'breakEven';
+  if (lower.match(cashFlowPattern)) return 'cashFlow';
+  if (lower.match(cumulativePattern)) return 'cumulativeCost';
+  if (lower.match(liquidityPattern)) return 'liquidity';
+  if (lower.match(taxPattern)) return 'taxSavings';
+  if (lower.match(heatmapPattern)) return 'breakEvenHeatmap';
+  if (lower.match(montePattern)) return 'monteCarlo';
   
   return null;
 }
@@ -626,14 +691,14 @@ function shouldShowChart(aiResponse: string): string | null {
       }
     }
     
-    // Add user message
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
+  // Add user message
+  const userMessage: Message = {
+    id: Date.now().toString(),
+    role: 'user',
       content
-    };
+  };
     
-    setMessages(prev => [...prev, userMessage]);
+  setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     
     // Extract data from message using AI
@@ -677,7 +742,7 @@ function shouldShowChart(aiResponse: string): string | null {
         
         const newFlowMessage: Message = {
           id: Date.now().toString(),
-          role: 'assistant',
+      role: 'assistant',
           content: `Perfect! I'll use your $${newUserData.homePrice?.toLocaleString()} home price with the ${detectedLocationData.city}, ${detectedLocationData.state} market data for property taxes and growth rates. What's your current monthly rent, down payment percentage, and how long do you plan to stay in this home?`
         };
         setMessages(prev => [...prev, newFlowMessage]);
@@ -728,17 +793,20 @@ function shouldShowChart(aiResponse: string): string | null {
     let freshTotalCostData = totalCostData;
     let analysisInputs: ScenarioInputs | null = null;
     let analysisResult: CalculatorOutput | null = null;
+    let unifiedAnalysisResult: AnalysisResult | null = null;
     let analysisSource: 'backend' | 'local' | null = null;
     let analysisApplied = false;
 
     if (hasAllData && dataChanged) {
+      setHeatmapData(null);
       const inputs = buildScenarioInputs(newUserData, locationData);
 
       if (inputs) {
         analysisInputs = inputs;
 
-        const { analysis, source } = await runAnalysis(inputs);
+        const { analysis, unifiedAnalysis, source } = await runAnalysis(inputs);
         analysisResult = analysis;
+        unifiedAnalysisResult = unifiedAnalysis ?? null;
         analysisSource = source;
         analysisApplied = true;
 
@@ -791,6 +859,15 @@ function shouldShowChart(aiResponse: string): string | null {
 
     // Check if AI response indicates a chart should be shown
     const chartToShow = shouldShowChart(botResponse);
+    let heatmapPointsResult: BreakEvenHeatmapPoint[] | null = null;
+    if (chartToShow === 'breakEvenHeatmap') {
+      // Always build fresh inputs from current user data to ensure heatmap uses latest values
+      setHeatmapData(null); // Clear old cached data
+      const baseInputs = buildScenarioInputs(newUserData, locationData);
+      if (baseInputs) {
+        heatmapPointsResult = await loadHeatmapData(baseInputs);
+      }
+    }
     
     const fallbackSuffix = analysisSource === 'local'
       ? '\n\n_(Using local backup calculations while the analysis service reconnects.)_'
@@ -798,12 +875,21 @@ function shouldShowChart(aiResponse: string): string | null {
     const responseContent = botResponse + fallbackSuffix;
     
     const snapshotData = analysisResult && analysisInputs
-      ? buildSnapshotData(analysisResult, analysisInputs)
+      ? {
+          ...buildSnapshotData(analysisResult, analysisInputs),
+          analysis: unifiedAnalysisResult ?? undefined,
+          heatmapPoints: heatmapPointsResult ?? heatmapData
+        }
       : (freshChartData && freshMonthlyCosts && freshTotalCostData && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent
           ? {
               chartData: freshChartData,
               monthlyCosts: freshMonthlyCosts,
               totalCostData: freshTotalCostData,
+              cashFlow: advancedMetrics.cashFlow,
+              cumulativeCosts: advancedMetrics.cumulativeCosts,
+              liquidityTimeline: advancedMetrics.liquidityTimeline,
+              taxSavings: advancedMetrics.taxSavings,
+              heatmapPoints: heatmapPointsResult ?? heatmapData,
               inputValues: {
                 homePrice: newUserData.homePrice,
                 monthlyRent: newUserData.monthlyRent,
@@ -816,10 +902,10 @@ function shouldShowChart(aiResponse: string): string | null {
     if (chartToShow && (chartsReady || hasAllData) && snapshotData) {
       // AI wants to show a chart and we have the data
       assistantMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
         content: responseContent,
-        chartToShow: chartToShow as 'netWorth' | 'monthlyCost' | 'totalCost' | 'equity' | 'rentGrowth' | 'breakEven',
+        chartToShow,
         snapshotData
       };
       
@@ -866,13 +952,112 @@ const handleChipClick = (message: string) => {
     
 };
 
-  const runAnalysis = async (inputs: ScenarioInputs): Promise<{ analysis: CalculatorOutput; source: 'backend' | 'local'; }> => {
+  // Converter: Transform new unified AnalysisResult to old CalculatorOutput format for backward compatibility
+  const convertAnalysisResultToCalculatorOutput = (result: AnalysisResult, inputs: ScenarioInputs): CalculatorOutput => {
+    const timeline = result.timeline;
+    const firstPoint = timeline[0];
+    const lastPoint = timeline[timeline.length - 1];
+
+    // Convert TimelinePoint[] to MonthlySnapshot[]
+    const monthlySnapshots: MonthlySnapshot[] = timeline.map(point => ({
+      month: point.monthIndex,
+      mortgagePayment: point.mortgagePayment,
+      principalPaid: point.principalPaid,
+      interestPaid: point.interestPaid,
+      remainingBalance: point.remainingBalance,
+      homeValue: point.homeValue,
+      homeEquity: point.homeEquity,
+      monthlyBuyingCosts: point.buyMonthlyOutflow,
+      monthlyRent: point.rentMonthlyOutflow,
+      monthlyRentingCosts: point.rentMonthlyOutflow,
+      investedDownPayment: point.renterInvestmentBalance,
+      buyerNetWorth: point.netWorthBuy,
+      renterNetWorth: point.netWorthRent,
+      netWorthDelta: point.netWorthBuy - point.netWorthRent,
+    }));
+
+    // Build monthly costs (first month)
+    const monthlyCosts: BuyingCostsBreakdown = {
+      mortgage: firstPoint.mortgagePayment,
+      propertyTax: firstPoint.propertyTaxMonthly,
+      insurance: firstPoint.insuranceMonthly,
+      hoa: firstPoint.hoaMonthly,
+      maintenance: firstPoint.maintenanceMonthly,
+      total: firstPoint.buyMonthlyOutflow,
+    };
+
+    // Build renting costs (first month)
+    const rentingCosts: RentingCostsBreakdown = {
+      rent: firstPoint.rentMonthlyOutflow,
+      insurance: 0, // Not in unified structure, use 0 or calculate
+      total: firstPoint.rentMonthlyOutflow,
+    };
+
+    // Build totals
+    const totals: TotalCostSummary = {
+      buyerFinalNetWorth: lastPoint.netWorthBuy,
+      renterFinalNetWorth: lastPoint.netWorthRent,
+      totalBuyingCosts: result.totalBuyCost,
+      totalRentingCosts: result.totalRentCost,
+      finalHomeValue: lastPoint.homeValue,
+      finalInvestmentValue: lastPoint.renterInvestmentBalance,
+    };
+
+    // Build summary
+    const summary: CalculatorSummary = {
+      totalInterestPaid: timeline.reduce((sum, p) => sum + p.interestPaid, 0),
+      totalPrincipalPaid: timeline.reduce((sum, p) => sum + p.principalPaid, 0),
+      breakevenMonth: result.breakEven.monthIndex,
+      finalBuyerNetWorth: lastPoint.netWorthBuy,
+      finalRenterNetWorth: lastPoint.netWorthRent,
+      finalNetWorthDelta: lastPoint.netWorthBuy - lastPoint.netWorthRent,
+    };
+
+    // Build advanced metrics from timeline
+    const cashFlow: CashFlowPoint[] = timeline.map(p => ({
+      month: p.monthIndex,
+      homeownerCashFlow: p.rentMonthlyOutflow - p.buyMonthlyOutflow,
+      renterCashFlow: p.rentMonthlyOutflow,
+    }));
+
+    const cumulativeCosts: CumulativeCostPoint[] = timeline.map(p => ({
+      month: p.monthIndex,
+      cumulativeBuying: p.totalCostBuyToDate,
+      cumulativeRenting: p.totalCostRentToDate,
+    }));
+
+    const liquidityTimeline: LiquidityPoint[] = timeline.map(p => ({
+      month: p.monthIndex,
+      homeownerCashAccount: p.buyerCashAccount,
+      renterInvestmentBalance: p.renterInvestmentBalance,
+    }));
+
+    // Tax savings would need to be calculated separately or added to TimelinePoint
+    const taxSavings: TaxSavingsPoint[] = []; // TODO: Calculate from timeline if needed
+
+    return {
+      inputs,
+      monthlySnapshots,
+      summary,
+      monthlyCosts,
+      rentingCosts,
+      totals,
+      cashFlow,
+      cumulativeCosts,
+      liquidityTimeline,
+      taxSavings: taxSavings.length > 0 ? taxSavings : null,
+    };
+  };
+
+  const runAnalysis = async (inputs: ScenarioInputs): Promise<{ analysis: CalculatorOutput; unifiedAnalysis?: AnalysisResult; source: 'backend' | 'local'; }> => {
     try {
       const { analysis } = await analyzeScenario(inputs);
       if (!isBackendAvailable) {
         setIsBackendAvailable(true);
       }
-      return { analysis, source: 'backend' };
+      // Convert new unified structure to old format for backward compatibility
+      const converted = convertAnalysisResultToCalculatorOutput(analysis, inputs);
+      return { analysis: converted, unifiedAnalysis: analysis, source: 'backend' };
     } catch (error) {
       console.error('Failed to analyze scenario via backend:', error);
       if (isBackendAvailable) {
@@ -880,6 +1065,21 @@ const handleChipClick = (message: string) => {
       }
       const fallbackAnalysis = buildLocalAnalysis(inputs);
       return { analysis: fallbackAnalysis, source: 'local' };
+    }
+  };
+
+  const loadHeatmapData = async (inputs: ScenarioInputs) => {
+    try {
+      const data = await fetchBreakEvenHeatmap({
+        base: inputs,
+        timelines: DEFAULT_HEATMAP_TIMELINES,
+        downPayments: DEFAULT_HEATMAP_DOWN_PAYMENTS
+      });
+      setHeatmapData(data);
+      return data;
+    } catch (error) {
+      console.error('Failed to load heatmap data:', error);
+      return null;
     }
   };
 
@@ -947,103 +1147,235 @@ const handleChipClick = (message: string) => {
   };
   
   // Helper function to render chart based on type - uses message's snapshot data
-  const renderChart = (chartType: string, snapshotData?: Message['snapshotData']) => {
-    // Use snapshot data from the message, or fall back to current data
+  const renderChart = (chartType: ChartType, snapshotData?: Message['snapshotData']) => {
+    // Use new unified structure if available, otherwise fall back to legacy
+    const analysis = snapshotData?.analysis;
+    const timeline = analysis?.timeline;
+    const breakEven = analysis?.breakEven;
+    
+    // Legacy fallbacks
     const data = snapshotData?.chartData || chartData;
-    // For monthly cost chart, always use fresh data if available (to get updated ZIP-based rates)
     const costs = chartType === 'monthlyCost' ? monthlyCosts : (snapshotData?.monthlyCosts || monthlyCosts);
     const totalData = snapshotData?.totalCostData || totalCostData;
+    const cashFlowSeries = snapshotData?.cashFlow ?? advancedMetrics.cashFlow;
+    const cumulativeSeries = snapshotData?.cumulativeCosts ?? advancedMetrics.cumulativeCosts;
+    const liquiditySeries = snapshotData?.liquidityTimeline ?? advancedMetrics.liquidityTimeline;
+    const taxSeries = snapshotData?.taxSavings ?? advancedMetrics.taxSavings;
+    const heatmapPoints = snapshotData?.heatmapPoints ?? heatmapData;
     
-    if (!data) return null;
+    const renderUnavailable = (label: string) => (
+      <div className="chart-wrapper">
+        <div className="chart-placeholder">
+          {label} data isn't available yet for this scenario.
+        </div>
+      </div>
+    );
+    
+    // Use new structure if available, otherwise require legacy data
+    if (!timeline && !data) return null;
     
     
     switch (chartType) {
       case 'netWorth':
-  return (
+        return timeline ? (
           <div className="chart-wrapper">
-            <NetWorthChart data={data} />
+            <NetWorthChart timeline={timeline} />
           </div>
-        );
-      case 'monthlyCost':
-        return costs ? (
+        ) : data ? (
           <div className="chart-wrapper">
-            <MonthlyCostChart 
-              buyingCosts={costs.buying}
-              rentingCosts={costs.renting}
-            />
+            <NetWorthChart timeline={data.map(s => ({
+              monthIndex: s.month,
+              year: Math.ceil(s.month / 12),
+              netWorthBuy: s.buyerNetWorth,
+              netWorthRent: s.renterNetWorth,
+              totalCostBuyToDate: 0,
+              totalCostRentToDate: 0,
+              buyMonthlyOutflow: s.monthlyBuyingCosts,
+              rentMonthlyOutflow: s.monthlyRentingCosts,
+              mortgagePayment: s.mortgagePayment,
+              propertyTaxMonthly: 0,
+              insuranceMonthly: 0,
+              maintenanceMonthly: 0,
+              hoaMonthly: 0,
+              principalPaid: s.principalPaid,
+              interestPaid: s.interestPaid,
+              remainingBalance: s.remainingBalance,
+              homeValue: s.homeValue,
+              homeEquity: s.homeEquity,
+              renterInvestmentBalance: s.investedDownPayment,
+              buyerCashAccount: 0,
+            }))} />
+          </div>
+        ) : null;
+      case 'monthlyCost':
+        return timeline ? (
+          <div className="chart-wrapper">
+            <MonthlyCostChart timeline={timeline} />
+          </div>
+        ) : costs ? (
+          <div className="chart-wrapper">
+            <MonthlyCostChart timeline={[{
+              monthIndex: 1,
+              year: 1,
+              netWorthBuy: 0,
+              netWorthRent: 0,
+              totalCostBuyToDate: 0,
+              totalCostRentToDate: 0,
+              buyMonthlyOutflow: costs.buying.total,
+              rentMonthlyOutflow: costs.renting.total,
+              mortgagePayment: costs.buying.mortgage,
+              propertyTaxMonthly: costs.buying.propertyTax,
+              insuranceMonthly: costs.buying.insurance,
+              maintenanceMonthly: costs.buying.maintenance,
+              hoaMonthly: costs.buying.hoa,
+            }]} />
           </div>
         ) : null;
       case 'totalCost':
-        return totalData ? (
+        return analysis ? (
           <div className="chart-wrapper">
-            <TotalCostChart 
-              buyerFinalNetWorth={totalData.buyerFinalNetWorth}
-              renterFinalNetWorth={totalData.renterFinalNetWorth}
-              totalBuyingCosts={totalData.totalBuyingCosts}
-              totalRentingCosts={totalData.totalRentingCosts}
-              finalHomeValue={totalData.finalHomeValue}
-              finalInvestmentValue={totalData.finalInvestmentValue}
-              timelineYears={Math.ceil((chartData?.length || 0) / 12)}
-            />
+            <TotalCostChart analysis={analysis} />
+          </div>
+        ) : totalData ? (
+          <div className="chart-wrapper">
+            <TotalCostChart analysis={{
+              timeline: [],
+              breakEven: { monthIndex: null, year: null },
+              totalBuyCost: totalData.totalBuyingCosts,
+              totalRentCost: totalData.totalRentingCosts,
+            }} />
           </div>
         ) : null;
       case 'equity':
-        return (
+        return timeline ? (
           <div className="chart-wrapper">
-            <EquityBuildupChart data={data} />
+            <EquityBuildupChart timeline={timeline} />
           </div>
-        );
-      case 'rentGrowth':
-        return costs ? (
+        ) : data ? (
           <div className="chart-wrapper">
-            <RentGrowthChart 
-              data={data} 
-              monthlyMortgage={costs.buying.mortgage}
-            />
+            <EquityBuildupChart timeline={data.map(s => ({
+              monthIndex: s.month,
+              year: Math.ceil(s.month / 12),
+              netWorthBuy: s.buyerNetWorth,
+              netWorthRent: s.renterNetWorth,
+              totalCostBuyToDate: 0,
+              totalCostRentToDate: 0,
+              buyMonthlyOutflow: s.monthlyBuyingCosts,
+              rentMonthlyOutflow: s.monthlyRentingCosts,
+              mortgagePayment: s.mortgagePayment,
+              propertyTaxMonthly: 0,
+              insuranceMonthly: 0,
+              maintenanceMonthly: 0,
+              hoaMonthly: 0,
+              principalPaid: s.principalPaid,
+              interestPaid: s.interestPaid,
+              remainingBalance: s.remainingBalance,
+              homeValue: s.homeValue,
+              homeEquity: s.homeEquity,
+              renterInvestmentBalance: s.investedDownPayment,
+              buyerCashAccount: 0,
+            }))} />
+          </div>
+        ) : null;
+      case 'rentGrowth':
+        return timeline ? (
+          <div className="chart-wrapper">
+            <RentGrowthChart timeline={timeline} />
+          </div>
+        ) : (data && costs) ? (
+          <div className="chart-wrapper">
+            <RentGrowthChart timeline={data.map(s => ({
+              monthIndex: s.month,
+              year: Math.ceil(s.month / 12),
+              netWorthBuy: s.buyerNetWorth,
+              netWorthRent: s.renterNetWorth,
+              totalCostBuyToDate: 0,
+              totalCostRentToDate: 0,
+              buyMonthlyOutflow: s.monthlyBuyingCosts,
+              rentMonthlyOutflow: s.monthlyRent,
+              mortgagePayment: costs.buying.mortgage,
+              propertyTaxMonthly: 0,
+              insuranceMonthly: 0,
+              maintenanceMonthly: 0,
+              hoaMonthly: 0,
+              principalPaid: s.principalPaid,
+              interestPaid: s.interestPaid,
+              remainingBalance: s.remainingBalance,
+              homeValue: s.homeValue,
+              homeEquity: s.homeEquity,
+              renterInvestmentBalance: s.investedDownPayment,
+              buyerCashAccount: 0,
+            }))} />
           </div>
         ) : null;
       case 'breakEven':
-        return (
+        return analysis ? (
           <div className="chart-wrapper">
-            <BreakEvenChart data={data} />
+            <BreakEvenChart analysis={analysis} />
           </div>
-        );
+        ) : data ? (
+          <div className="chart-wrapper">
+            <BreakEvenChart analysis={{
+              timeline: data.map(s => ({
+                monthIndex: s.month,
+                year: Math.ceil(s.month / 12),
+                netWorthBuy: s.buyerNetWorth,
+                netWorthRent: s.renterNetWorth,
+                totalCostBuyToDate: 0,
+                totalCostRentToDate: 0,
+                buyMonthlyOutflow: s.monthlyBuyingCosts,
+                rentMonthlyOutflow: s.monthlyRentingCosts,
+                mortgagePayment: s.mortgagePayment,
+                propertyTaxMonthly: 0,
+                insuranceMonthly: 0,
+                maintenanceMonthly: 0,
+                hoaMonthly: 0,
+                principalPaid: s.principalPaid,
+                interestPaid: s.interestPaid,
+                remainingBalance: s.remainingBalance,
+                homeValue: s.homeValue,
+                homeEquity: s.homeEquity,
+                renterInvestmentBalance: s.investedDownPayment,
+                buyerCashAccount: 0,
+              })),
+              breakEven: { monthIndex: null, year: null },
+              totalBuyCost: 0,
+              totalRentCost: 0,
+            }} />
+          </div>
+        ) : null;
       case 'cashFlow':
-        return (
+        return cashFlowSeries && cashFlowSeries.length ? (
           <div className="chart-wrapper">
-            <CashFlowChart data={data} />
+            <CashFlowChart data={cashFlowSeries} />
           </div>
-        );
+        ) : renderUnavailable('Cash flow');
       case 'cumulativeCost':
-        return (
+        return cumulativeSeries && cumulativeSeries.length ? (
           <div className="chart-wrapper">
-            <CumulativeCostChart data={data} />
+            <CumulativeCostChart data={cumulativeSeries} />
           </div>
-        );
+        ) : renderUnavailable('Cumulative cost');
       case 'liquidity':
-        return (
+        return liquiditySeries && liquiditySeries.length ? (
           <div className="chart-wrapper">
-            <LiquidityTimeline data={data} />
+            <LiquidityTimeline data={liquiditySeries} />
           </div>
-        );
+        ) : renderUnavailable('Liquidity timeline');
       case 'taxSavings':
-        return (
+        return taxSeries && taxSeries.length ? (
           <div className="chart-wrapper">
-            <TaxSavingsChart data={data} />
+            <TaxSavingsChart data={taxSeries} />
           </div>
-        );
+        ) : renderUnavailable('Tax savings');
       case 'breakEvenHeatmap':
-        return (
+        return heatmapPoints && heatmapPoints.length ? (
           <div className="chart-wrapper">
-            <BreakEvenHeatmap data={data} />
+            <BreakEvenHeatmap points={heatmapPoints} />
           </div>
-        );
+        ) : renderUnavailable('Break-Even heatmap');
       case 'monteCarlo':
-        return (
-          <div className="chart-wrapper">
-            <MonteCarloChart data={data} />
-          </div>
-        );
+        return renderUnavailable('Monte Carlo simulation');
       default:
         return null;
     }
@@ -1056,6 +1388,12 @@ const handleChipClick = (message: string) => {
       renting: analysis.rentingCosts
     });
     setTotalCostData(analysis.totals);
+    setAdvancedMetrics({
+      cashFlow: analysis.cashFlow ?? null,
+      cumulativeCosts: analysis.cumulativeCosts ?? null,
+      liquidityTimeline: analysis.liquidityTimeline ?? null,
+      taxSavings: analysis.taxSavings ?? null
+    });
     setChartsReady(true);
   };
 
@@ -1069,6 +1407,10 @@ const handleChipClick = (message: string) => {
       renting: analysis.rentingCosts
     },
     totalCostData: analysis.totals,
+    cashFlow: analysis.cashFlow ?? null,
+    cumulativeCosts: analysis.cumulativeCosts ?? null,
+    liquidityTimeline: analysis.liquidityTimeline ?? null,
+    taxSavings: analysis.taxSavings ?? null,
     inputValues: {
       homePrice: inputs.homePrice,
       monthlyRent: inputs.monthlyRent,

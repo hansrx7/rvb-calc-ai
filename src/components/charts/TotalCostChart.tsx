@@ -1,26 +1,22 @@
 // src/components/charts/TotalCostChart.tsx
 // total costs chart
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+import type { AnalysisResult } from '../../types/calculator';
 
 interface TotalCostChartProps {
-  buyerFinalNetWorth: number;
-  renterFinalNetWorth: number;
-  totalBuyingCosts: number;
-  totalRentingCosts: number;
-  finalHomeValue: number;
-  finalInvestmentValue: number;
-  timelineYears: number;
+  analysis: AnalysisResult;
 }
 
-export function TotalCostChart({
-  buyerFinalNetWorth,
-  renterFinalNetWorth,
-  totalBuyingCosts,
-  totalRentingCosts,
-  finalHomeValue,
-  finalInvestmentValue,
-  timelineYears
-}: TotalCostChartProps) {
+export function TotalCostChart({ analysis }: TotalCostChartProps) {
+  const lastPoint = analysis.timeline[analysis.timeline.length - 1];
+  const timelineYears = Math.ceil(analysis.timeline.length / 12);
+  
+  const buyerFinalNetWorth = lastPoint.netWorthBuy;
+  const renterFinalNetWorth = lastPoint.netWorthRent;
+  const totalBuyingCosts = analysis.totalBuyCost;
+  const totalRentingCosts = analysis.totalRentCost;
+  const finalHomeValue = lastPoint.homeValue;
+  const finalInvestmentValue = lastPoint.renterInvestmentBalance;
   
   // Calculate net cost (what you spent minus what you have)
   const buyingNetCost = totalBuyingCosts - finalHomeValue;

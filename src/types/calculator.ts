@@ -113,6 +113,12 @@ export interface TaxSavingsPoint {
   totalTaxBenefit: number;
 }
 
+export interface BreakEvenHeatmapPoint {
+  timelineYears: number;
+  downPaymentPercent: number;
+  breakevenMonth: number | null;
+}
+
 export interface CalculatorOutput {
   inputs: ScenarioInputs;
   monthlySnapshots: MonthlySnapshot[];
@@ -128,13 +134,46 @@ export interface CalculatorOutput {
 }
 
 export interface TimelinePoint {
-  month: number;
-  buyerNetWorth: number;
-  renterNetWorth: number;
-  netWorthDelta: number;
+  monthIndex: number;
+  year: number;
+
+  netWorthBuy: number;
+  netWorthRent: number;
+
+  totalCostBuyToDate: number;
+  totalCostRentToDate: number;
+
+  buyMonthlyOutflow: number;
+  rentMonthlyOutflow: number;
+
+  mortgagePayment: number;
+  propertyTaxMonthly: number;
+  insuranceMonthly: number;
+  maintenanceMonthly: number;
+  hoaMonthly: number;
+
+  // Additional fields for backward compatibility and advanced charts
+  principalPaid: number;
+  interestPaid: number;
+  remainingBalance: number;
+  homeValue: number;
+  homeEquity: number;
+  renterInvestmentBalance: number;
+  buyerCashAccount: number;
+}
+
+export interface BreakEvenInfo {
+  monthIndex: number | null;
+  year: number | null;
+}
+
+export interface AnalysisResult {
+  timeline: TimelinePoint[];
+  breakEven: BreakEvenInfo;
+  totalBuyCost: number;
+  totalRentCost: number;
 }
 
 export interface AnalysisResponse {
-  analysis: CalculatorOutput;
-  timeline?: TimelinePoint[];
+  analysis: AnalysisResult;
 }

@@ -59,27 +59,16 @@ def get_openai_service() -> OpenAIService:
 
 @app.post(f"{settings.api_prefix}/finance/analyze", response_model=AnalysisResponse)
 def analyze_finance(request: AnalysisRequest) -> AnalysisResponse:
-    analysis = calculate_analysis(request.inputs)
-
-    timeline: Optional[List[TimelinePoint]] = None
-    if request.includeTimeline:
-        timeline = [
-            TimelinePoint(
-                month=snapshot.month,
-                buyerNetWorth=snapshot.buyerNetWorth,
-                renterNetWorth=snapshot.renterNetWorth,
-                netWorthDelta=snapshot.netWorthDelta,
-            )
-            for snapshot in analysis.monthlySnapshots
-        ]
-
-    return AnalysisResponse(analysis=analysis, timeline=timeline)
+    """Unified analysis endpoint - returns single AnalysisResult with all data."""
+    from .finance.calculator import calculate_unified_analysis
+    
+    analysis = calculate_unified_analysis(request.inputs)
+    return AnalysisResponse(analysis=analysis)
 
 
 @app.post(f"{settings.api_prefix}/finance/heatmap")
-def break_even_heatmap(req: HeatmapRequest, base: AnalysisRequest) -> list:
-    # base.inputs sent with HeatmapRequest: timelines, downPayments
-    return calculate_heatmap(req.timelines, req.downPayments, base.inputs)
+def break_even_heatmap(req: HeatmapRequest) -> list:
+    return calculate_heatmap(req.timelines, req.downPayments, req.base)
 
 @app.post(f"{settings.api_prefix}/finance/scenarios")
 def scenario_overlay_chart(req: ScenarioRequest) -> list:

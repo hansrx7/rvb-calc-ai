@@ -1,24 +1,30 @@
 // src/components/charts/MonthlyCostChart.tsx
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+import type { TimelinePoint } from '../../types/calculator';
 
 interface MonthlyCostChartProps {
-  buyingCosts: {
-    mortgage: number;
-    propertyTax: number;
-    insurance: number;
-    hoa: number;
-    maintenance: number;
-    total: number;
-  };
-  rentingCosts: {
-    rent: number;
-    insurance: number;
-    total: number;
-  };
+  timeline: TimelinePoint[];
 }
 
-export function MonthlyCostChart({ buyingCosts, rentingCosts }: MonthlyCostChartProps) {
+export function MonthlyCostChart({ timeline }: MonthlyCostChartProps) {
+  // Use first month's data for monthly costs
+  const firstPoint = timeline[0];
+  
+  const buyingCosts = {
+    mortgage: firstPoint.mortgagePayment,
+    propertyTax: firstPoint.propertyTaxMonthly,
+    insurance: firstPoint.insuranceMonthly,
+    hoa: firstPoint.hoaMonthly,
+    maintenance: firstPoint.maintenanceMonthly,
+    total: firstPoint.buyMonthlyOutflow,
+  };
+  
+  const rentingCosts = {
+    rent: firstPoint.rentMonthlyOutflow,
+    insurance: 0, // Not tracked in unified structure
+    total: firstPoint.rentMonthlyOutflow,
+  };
   // Prepare data for the chart
   const data = [
     {

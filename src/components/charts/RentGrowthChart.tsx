@@ -1,26 +1,24 @@
 // src/components/charts/RentGrowthChart.tsx
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import type { MonthlySnapshot } from '../../types/calculator';
+import type { TimelinePoint } from '../../types/calculator';
 
 interface RentGrowthChartProps {
-  data: MonthlySnapshot[];
-  monthlyMortgage: number; // Fixed mortgage payment
+  timeline: TimelinePoint[];
 }
 
-export function RentGrowthChart({ data, monthlyMortgage }: RentGrowthChartProps) {
+export function RentGrowthChart({ timeline }: RentGrowthChartProps) {
   // Transform data - show every year
-  const chartData = data
-    .filter((_, index) => index % 12 === 0 || index === data.length - 1)
-    .map(snapshot => {
-      const year = snapshot.month / 12;
-      
-      return {
-        year: parseFloat(year.toFixed(1)),
-        rent: Math.round(snapshot.monthlyRent),
-        mortgage: Math.round(monthlyMortgage)
-      };
-    });
+  // Mortgage payment is fixed, so use first month's value
+  const monthlyMortgage = timeline[0].mortgagePayment;
+  
+  const chartData = timeline
+    .filter((_, index) => index % 12 === 0 || index === timeline.length - 1)
+    .map(point => ({
+      year: point.year,
+      rent: Math.round(point.rentMonthlyOutflow),
+      mortgage: Math.round(monthlyMortgage)
+    }));
   
   const finalRent = chartData[chartData.length - 1].rent;
   const rentIncrease = finalRent - chartData[0].rent;
@@ -28,11 +26,11 @@ export function RentGrowthChart({ data, monthlyMortgage }: RentGrowthChartProps)
   
   return (
     <div className="chart-container">
-      <h3 className="chart-title">Rent Growth vs Fixed Mortgage Over {Math.ceil(data.length / 12)} Years</h3>
+      <h3 className="chart-title">Rent Growth vs Fixed Mortgage Over {Math.ceil(timeline.length / 12)} Years</h3>
       
       <div style={{ marginBottom: '16px', padding: '16px', background: '#fff4e6', borderRadius: '8px', border: '2px solid #f59e0b' }}>
         <p style={{ margin: 0, fontSize: '16px', color: '#2d3748' }}>
-          <strong>Rent grows {percentIncrease}%</strong> over {Math.ceil(data.length / 12)} years 
+          <strong>Rent grows {percentIncrease}%</strong> over {Math.ceil(timeline.length / 12)} years 
           (from <strong>${chartData[0].rent.toLocaleString()}/mo</strong> to <strong>${finalRent.toLocaleString()}/mo</strong>), 
           while your mortgage stays fixed at <strong>${monthlyMortgage.toLocaleString()}/mo</strong>
         </p>
@@ -84,7 +82,7 @@ export function RentGrowthChart({ data, monthlyMortgage }: RentGrowthChartProps)
         <h4 style={{ marginBottom: '12px', color: '#2d3748' }}>What This Shows:</h4>
         <p style={{ marginBottom: '8px', lineHeight: '1.6', color: '#2d3748' }}>
           This illustrates the <strong>"rent trap"</strong> - rent increases every year (typically 3-4%), 
-          while your mortgage payment stays the same for {Math.ceil(data.length / 12)} years.
+          while your mortgage payment stays the same for {Math.ceil(timeline.length / 12)} years.
         </p>
         <ul style={{ marginLeft: '20px', lineHeight: '1.8', color: '#2d3748' }}>
           <li><strong>Red line (Rent):</strong> Climbs steadily due to inflation</li>
