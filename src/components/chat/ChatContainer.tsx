@@ -25,6 +25,12 @@ import { SuggestionChips } from './SuggestionChips';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { analyzeScenario } from '../../lib/api/finance';
+import { CashFlowChart } from '../charts/CashFlowChart';
+import { CumulativeCostChart } from '../charts/CumulativeCostChart';
+import { LiquidityTimeline } from '../charts/LiquidityTimeline';
+import { TaxSavingsChart } from '../charts/TaxSavingsChart';
+import { BreakEvenHeatmap } from '../charts/BreakEvenHeatmap';
+import { MonteCarloChart } from '../charts/MonteCarloChart';
 
 interface Message {
   id: string;
@@ -84,7 +90,13 @@ export function ChatContainer() {
   totalCost: false,
   equity: false,
   rentGrowth: false,
-  breakEven: false
+  breakEven: false,
+  cashFlow: false,
+  cumulativeCost: false,
+  liquidity: false,
+  taxSavings: false,
+  breakEvenHeatmap: false,
+  monteCarlo: false,
 });
 
 // Track if charts are ready to show (data calculated)
@@ -514,6 +526,14 @@ function shouldShowChart(aiResponse: string): string | null {
   // More flexible pattern for Rent Growth (with or without "chart", "comparison", etc.)
   if (lower.match(/here'?s your (updated |new )?rent growth( chart| comparison)?/)) return 'rentGrowth';
   if (lower.match(/here'?s your (updated |new )?break.?even timeline/)) return 'breakEven';
+  // Extended charts
+  if (lower.match(/cash flow/)) return 'cashFlow';
+  if (lower.match(/liquidity/)) return 'liquidity';
+  if (lower.match(/cumulative cost/)) return 'cumulativeCost';
+  if (lower.match(/tax savings?/)) return 'taxSavings';
+  if (lower.match(/scenario overlay/)) return 'scenarioOverlay';
+  if (lower.match(/monte carlo/)) return 'monteCarlo';
+  if (lower.match(/break-?even heatmap/)) return 'breakEvenHeatmap';
   
   return null;
 }
@@ -986,6 +1006,42 @@ const handleChipClick = (message: string) => {
         return (
           <div className="chart-wrapper">
             <BreakEvenChart data={data} />
+          </div>
+        );
+      case 'cashFlow':
+        return (
+          <div className="chart-wrapper">
+            <CashFlowChart data={data} />
+          </div>
+        );
+      case 'cumulativeCost':
+        return (
+          <div className="chart-wrapper">
+            <CumulativeCostChart data={data} />
+          </div>
+        );
+      case 'liquidity':
+        return (
+          <div className="chart-wrapper">
+            <LiquidityTimeline data={data} />
+          </div>
+        );
+      case 'taxSavings':
+        return (
+          <div className="chart-wrapper">
+            <TaxSavingsChart data={data} />
+          </div>
+        );
+      case 'breakEvenHeatmap':
+        return (
+          <div className="chart-wrapper">
+            <BreakEvenHeatmap data={data} />
+          </div>
+        );
+      case 'monteCarlo':
+        return (
+          <div className="chart-wrapper">
+            <MonteCarloChart data={data} />
           </div>
         );
       default:
@@ -1508,6 +1564,12 @@ Restart
             >
               ⏰ Break-Even
             </button>
+            <button className="chart-nav-btn-sm" onClick={()=>handleChipClick('show me cash flow')}>💸 Cash Flow</button>
+            <button className="chart-nav-btn-sm" onClick={()=>handleChipClick('show me cumulative costs')}>📊 Cumulative</button>
+            <button className="chart-nav-btn-sm" onClick={()=>handleChipClick('show me liquidity')}>💧 Liquidity</button>
+            <button className="chart-nav-btn-sm" onClick={()=>handleChipClick('show me tax savings')}>🏛️ Tax Savings</button>
+            <button className="chart-nav-btn-sm" onClick={()=>handleChipClick('show me break even heatmap')}>🟩 Heatmap</button>
+            <button className="chart-nav-btn-sm" onClick={()=>handleChipClick('run monte carlo simulation')}>🎲 Monte Carlo</button>
           </div>
               </div>
             )}
