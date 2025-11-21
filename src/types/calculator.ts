@@ -119,6 +119,45 @@ export interface BreakEvenHeatmapPoint {
   breakevenMonth: number | null;
 }
 
+export interface MonteCarloRun {
+  run: number;
+  finalBuyerNetWorth: number;
+  finalRenterNetWorth: number;
+  breakevenMonth: number | null;
+}
+
+export interface MonteCarloSummary {
+  percentile10: number;
+  percentile50: number;
+  percentile90: number;
+}
+
+export interface MonteCarloResponse {
+  runs: MonteCarloRun[];
+  summary: MonteCarloSummary;
+}
+
+export interface SensitivityResult {
+  variant: string;
+  output: CalculatorOutput;
+}
+
+export interface SensitivityRequest {
+  base: ScenarioInputs;
+  interestRateDelta?: number;
+  homePriceDelta?: number;
+  rentDelta?: number;
+}
+
+export interface ScenarioResult {
+  scenario: ScenarioInputs;
+  output: CalculatorOutput;
+}
+
+export interface ScenarioRequest {
+  scenarios: ScenarioInputs[];
+}
+
 export interface CalculatorOutput {
   inputs: ScenarioInputs;
   monthlySnapshots: MonthlySnapshot[];

@@ -1,4 +1,4 @@
-import type { AnalysisResponse, ScenarioInputs, BreakEvenHeatmapPoint } from '../../types/calculator';
+import type { AnalysisResponse, ScenarioInputs, BreakEvenHeatmapPoint, MonteCarloResponse, SensitivityRequest, SensitivityResult, ScenarioRequest, ScenarioResult } from '../../types/calculator';
 import { apiFetch } from './client';
 
 export function analyzeScenario(inputs: ScenarioInputs, includeTimeline = false): Promise<AnalysisResponse> {
@@ -18,6 +18,36 @@ export function fetchBreakEvenHeatmap(params: HeatmapParams): Promise<BreakEvenH
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(params)
+  });
+}
+
+export function fetchMonteCarlo(inputs: ScenarioInputs, runs = 500): Promise<MonteCarloResponse> {
+  return apiFetch<MonteCarloResponse>('/api/finance/monte-carlo', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ inputs, runs })
+  });
+}
+
+export function fetchSensitivity(request: SensitivityRequest): Promise<SensitivityResult[]> {
+  return apiFetch<SensitivityResult[]>('/api/finance/sensitivity', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(request)
+  });
+}
+
+export function fetchScenarios(request: ScenarioRequest): Promise<ScenarioResult[]> {
+  return apiFetch<ScenarioResult[]>('/api/finance/scenarios', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(request)
   });
 }
 

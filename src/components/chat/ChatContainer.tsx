@@ -19,7 +19,11 @@ import type {
   LiquidityPoint,
   TaxSavingsPoint,
   AnalysisResult,
-  TimelinePoint
+  TimelinePoint,
+  MonteCarloRun,
+  MonteCarloSummary,
+  SensitivityResult,
+  ScenarioResult
 } from '../../types/calculator';
 import { MonthlyCostChart } from '../charts/MonthlyCostChart';
 import { TotalCostChart } from '../charts/TotalCostChart';
@@ -30,7 +34,7 @@ import { BreakEvenChart } from '../charts/BreakEvenChart';
 import { SuggestionChips } from './SuggestionChips';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { analyzeScenario, fetchBreakEvenHeatmap } from '../../lib/api/finance';
+import { analyzeScenario, fetchBreakEvenHeatmap, fetchMonteCarlo, fetchSensitivity, fetchScenarios } from '../../lib/api/finance';
 import { CashFlowChart } from '../charts/CashFlowChart';
 import { CumulativeCostChart } from '../charts/CumulativeCostChart';
 import { LiquidityTimeline } from '../charts/LiquidityTimeline';
@@ -38,6 +42,8 @@ import { TaxSavingsChart } from '../charts/TaxSavingsChart';
 import { BreakEvenHeatmap } from '../charts/BreakEvenHeatmap';
 import type { BreakEvenHeatmapPoint } from '../../types/calculator';
 import { MonteCarloChart } from '../charts/MonteCarloChart';
+import { SensitivityChart } from '../charts/SensitivityChart';
+import { ScenarioOverlayChart } from '../charts/ScenarioOverlayChart';
 
 type ChartType =
   | 'netWorth'
@@ -51,7 +57,9 @@ type ChartType =
   | 'liquidity'
   | 'taxSavings'
   | 'breakEvenHeatmap'
-  | 'monteCarlo';
+  | 'monteCarlo'
+  | 'sensitivity'
+  | 'scenarioOverlay';
 
 const chartKeys: ChartType[] = [
   'netWorth',
@@ -65,7 +73,9 @@ const chartKeys: ChartType[] = [
   'liquidity',
   'taxSavings',
   'breakEvenHeatmap',
-  'monteCarlo'
+  'monteCarlo',
+  'sensitivity',
+  'scenarioOverlay'
 ];
 
 const DEFAULT_HEATMAP_TIMELINES = [5, 10, 15, 20];
@@ -92,6 +102,9 @@ interface Message {
     liquidityTimeline?: LiquidityPoint[] | null;
     taxSavings?: TaxSavingsPoint[] | null;
     heatmapPoints?: BreakEvenHeatmapPoint[] | null;
+    monteCarlo?: { runs: MonteCarloRun[]; summary: MonteCarloSummary } | null;
+    sensitivity?: SensitivityResult[] | null;
+    scenarioOverlay?: ScenarioResult[] | null;
     // Store the input values that created this chart
     inputValues: {
       homePrice: number;
@@ -155,6 +168,7 @@ const [chartsReady, setChartsReady] = useState(false);
   const [showLocationCard, setShowLocationCard] = useState(false);
   const [isLocationLocked, setIsLocationLocked] = useState(false); // Track if user made a choice
   const [usingZipData, setUsingZipData] = useState(false); // Track which scenario
+  const [useZipAutoFill, setUseZipAutoFill] = useState(true); // Toggle for ZIP auto-fill
   const [isBackendAvailable, setIsBackendAvailable] = useState(true);
   
   // Edit mode state
@@ -186,6 +200,9 @@ const [chartsReady, setChartsReady] = useState(false);
     taxSavings: null
   });
   const [heatmapData, setHeatmapData] = useState<BreakEvenHeatmapPoint[] | null>(null);
+  const [monteCarloData, setMonteCarloData] = useState<{ runs: MonteCarloRun[]; summary: MonteCarloSummary } | null>(null);
+  const [sensitivityData, setSensitivityData] = useState<SensitivityResult[] | null>(null);
+  const [scenarioOverlayData, setScenarioOverlayData] = useState<ScenarioResult[] | null>(null);
   
   // Handle save chat as PDF
   const handleSaveChat = async () => {
@@ -401,11 +418,15 @@ const [chartsReady, setChartsReady] = useState(false);
       taxSavings: null
     });
     setHeatmapData(null);
+    setMonteCarloData(null);
+    setSensitivityData(null);
+    setScenarioOverlayData(null);
     setShowRestartModal(false);
     setLocationData(null);
     setShowLocationCard(false);
     setIsLocationLocked(false);
     setUsingZipData(false);
+    setUseZipAutoFill(true); // Reset to default (enabled)
     setIsEditMode(false);
     setEditableValues(null);
     setIsReferenceBoxVisible(true);
@@ -586,6 +607,8 @@ function shouldShowChart(aiResponse: string): string | null {
   const taxPattern = /here'?s (?:how )?(?:your )?(?:updated |new )?tax savings/;
   const heatmapPattern = /here'?s (?:how )?(?:your )?(?:updated |new )?break.?even heatmap/;
   const montePattern = /here'?s (?:how )?(?:your )?(?:updated |new )?monte carlo simulation/;
+  const sensitivityPattern = /here'?s (?:how )?(?:your )?(?:updated |new )?sensitivity (?:analysis|chart)/;
+  const scenarioPattern = /here'?s (?:how )?(?:your )?(?:updated |new )?scenario (?:overlay|comparison)/;
 
   if (lower.match(netWorthPattern)) return 'netWorth';
   if (lower.match(monthlyPattern)) return 'monthlyCost';
@@ -599,6 +622,8 @@ function shouldShowChart(aiResponse: string): string | null {
   if (lower.match(taxPattern)) return 'taxSavings';
   if (lower.match(heatmapPattern)) return 'breakEvenHeatmap';
   if (lower.match(montePattern)) return 'monteCarlo';
+  if (lower.match(sensitivityPattern)) return 'sensitivity';
+  if (lower.match(scenarioPattern)) return 'scenarioOverlay';
   
   return null;
 }
@@ -769,11 +794,35 @@ function shouldShowChart(aiResponse: string): string | null {
       }
       
       // Normal ZIP flow (no custom data provided)
-      setShowLocationCard(true);
-      // Reset lock if user is trying a new ZIP code
-      if (isLocationLocked) {
-        setIsLocationLocked(false);
-        setUsingZipData(false);
+      if (useZipAutoFill) {
+        // Auto-fill mode: automatically use ZIP data
+        const autoFilledData: UserData = {
+          homePrice: detectedLocationData.medianHomePrice,
+          monthlyRent: detectedLocationData.averageRent,
+          downPaymentPercent: null, // Still need to ask
+          timeHorizonYears: null // Still need to ask
+        };
+        setUserData(autoFilledData);
+        setIsLocationLocked(true);
+        setUsingZipData(true);
+        setShowLocationCard(false);
+        
+        const autoFillMessage: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: `Perfect! I've auto-filled values based on market data for ${detectedLocationData.city}, ${detectedLocationData.state}:\n\n🏠 Home: $${detectedLocationData.medianHomePrice.toLocaleString()}\n💵 Rent: ${detectedLocationData.averageRent ? `$${detectedLocationData.averageRent.toLocaleString()}/mo` : '___'}\n\nWhat's your down payment percentage and how long do you plan to stay in this home?`
+        };
+        setMessages(prev => [...prev, autoFillMessage]);
+        setIsLoading(false);
+        return;
+      } else {
+        // Manual mode: show location card for user to choose
+        setShowLocationCard(true);
+        // Reset lock if user is trying a new ZIP code
+        if (isLocationLocked) {
+          setIsLocationLocked(false);
+          setUsingZipData(false);
+        }
       }
     }
     setUserData(newUserData);
@@ -860,6 +909,10 @@ function shouldShowChart(aiResponse: string): string | null {
     // Check if AI response indicates a chart should be shown
     const chartToShow = shouldShowChart(botResponse);
     let heatmapPointsResult: BreakEvenHeatmapPoint[] | null = null;
+    let monteCarloResult: { runs: MonteCarloRun[]; summary: MonteCarloSummary } | null = null;
+    let sensitivityResult: SensitivityResult[] | null = null;
+    let scenarioOverlayResult: ScenarioResult[] | null = null;
+    
     if (chartToShow === 'breakEvenHeatmap') {
       // Always build fresh inputs from current user data to ensure heatmap uses latest values
       setHeatmapData(null); // Clear old cached data
@@ -869,16 +922,45 @@ function shouldShowChart(aiResponse: string): string | null {
       }
     }
     
-    const fallbackSuffix = analysisSource === 'local'
-      ? '\n\n_(Using local backup calculations while the analysis service reconnects.)_'
-      : '';
-    const responseContent = botResponse + fallbackSuffix;
+    if (chartToShow === 'monteCarlo') {
+      // Load Monte Carlo simulation data
+      setMonteCarloData(null); // Clear old cached data
+      const baseInputs = buildScenarioInputs(newUserData, locationData);
+      if (baseInputs) {
+        monteCarloResult = await loadMonteCarloData(baseInputs, 500);
+      }
+    }
+    
+    if (chartToShow === 'sensitivity') {
+      // Load sensitivity analysis data (default deltas: ±1% interest, ±10% price, ±10% rent)
+      setSensitivityData(null); // Clear old cached data
+      const baseInputs = buildScenarioInputs(newUserData, locationData);
+      if (baseInputs) {
+        sensitivityResult = await loadSensitivityData(baseInputs, 1.0, 0.1, 0.1);
+      }
+    }
+    
+    if (chartToShow === 'scenarioOverlay') {
+      // Load scenario overlay data (for now, use current scenario as single scenario)
+      // TODO: Allow users to specify multiple scenarios
+      setScenarioOverlayData(null); // Clear old cached data
+      const baseInputs = buildScenarioInputs(newUserData, locationData);
+      if (baseInputs) {
+        // For now, just use the current scenario. Later we can allow multiple scenarios
+        scenarioOverlayResult = await loadScenarioOverlayData([baseInputs]);
+      }
+    }
+    
+    const responseContent = botResponse;
     
     const snapshotData = analysisResult && analysisInputs
       ? {
           ...buildSnapshotData(analysisResult, analysisInputs),
           analysis: unifiedAnalysisResult ?? undefined,
-          heatmapPoints: heatmapPointsResult ?? heatmapData
+          heatmapPoints: heatmapPointsResult ?? heatmapData,
+          monteCarlo: monteCarloResult ?? monteCarloData,
+          sensitivity: sensitivityResult ?? sensitivityData,
+          scenarioOverlay: scenarioOverlayResult ?? scenarioOverlayData
         }
       : (freshChartData && freshMonthlyCosts && freshTotalCostData && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent
           ? {
@@ -890,6 +972,9 @@ function shouldShowChart(aiResponse: string): string | null {
               liquidityTimeline: advancedMetrics.liquidityTimeline,
               taxSavings: advancedMetrics.taxSavings,
               heatmapPoints: heatmapPointsResult ?? heatmapData,
+              monteCarlo: monteCarloResult ?? monteCarloData,
+              sensitivity: sensitivityResult ?? sensitivityData,
+              scenarioOverlay: scenarioOverlayResult ?? scenarioOverlayData,
               inputValues: {
                 homePrice: newUserData.homePrice,
                 monthlyRent: newUserData.monthlyRent,
@@ -1032,8 +1117,45 @@ const handleChipClick = (message: string) => {
       renterInvestmentBalance: p.renterInvestmentBalance,
     }));
 
-    // Tax savings would need to be calculated separately or added to TimelinePoint
-    const taxSavings: TaxSavingsPoint[] = []; // TODO: Calculate from timeline if needed
+    // Calculate tax savings: group by year, sum interest + property tax, apply caps and tax bracket
+    const taxSavings: TaxSavingsPoint[] = [];
+    const DEFAULT_TAX_BRACKET = 0.24; // 24% default tax bracket
+    
+    // Group timeline points by year
+    const pointsByYear = new Map<number, TimelinePoint[]>();
+    timeline.forEach(point => {
+      const year = point.year;
+      if (!pointsByYear.has(year)) {
+        pointsByYear.set(year, []);
+      }
+      pointsByYear.get(year)!.push(point);
+    });
+    
+    // Calculate tax savings for each year
+    pointsByYear.forEach((points, year) => {
+      // Sum interest paid for the year
+      const totalInterest = points.reduce((sum, p) => sum + p.interestPaid, 0);
+      
+      // Sum property tax for the year (propertyTaxMonthly * 12, but we have monthly values)
+      const totalPropertyTax = points.reduce((sum, p) => sum + p.propertyTaxMonthly, 0);
+      
+      // Apply caps: $750k loan limit for interest deduction, $10k SALT limit for property tax
+      const deductibleInterest = Math.min(totalInterest, 750000);
+      const deductiblePropertyTax = Math.min(totalPropertyTax, 10000);
+      
+      // Calculate tax benefit: (deductible interest + deductible property tax) * tax bracket
+      const totalTaxBenefit = (deductibleInterest + deductiblePropertyTax) * DEFAULT_TAX_BRACKET;
+      
+      taxSavings.push({
+        year,
+        deductibleMortgageInterest: deductibleInterest,
+        deductiblePropertyTax: deductiblePropertyTax,
+        totalTaxBenefit: totalTaxBenefit,
+      });
+    });
+    
+    // Sort by year
+    taxSavings.sort((a, b) => a.year - b.year);
 
     return {
       inputs,
@@ -1045,7 +1167,7 @@ const handleChipClick = (message: string) => {
       cashFlow,
       cumulativeCosts,
       liquidityTimeline,
-      taxSavings: taxSavings.length > 0 ? taxSavings : null,
+      taxSavings: taxSavings.length > 0 ? taxSavings : null, // Now properly calculated from timeline
     };
   };
 
@@ -1079,6 +1201,44 @@ const handleChipClick = (message: string) => {
       return data;
     } catch (error) {
       console.error('Failed to load heatmap data:', error);
+      return null;
+    }
+  };
+
+  const loadMonteCarloData = async (inputs: ScenarioInputs, runs = 500) => {
+    try {
+      const data = await fetchMonteCarlo(inputs, runs);
+      setMonteCarloData(data);
+      return data;
+    } catch (error) {
+      console.error('Failed to load Monte Carlo data:', error);
+      return null;
+    }
+  };
+
+  const loadSensitivityData = async (baseInputs: ScenarioInputs, interestRateDelta = 1.0, homePriceDelta = 0.1, rentDelta = 0.1) => {
+    try {
+      const data = await fetchSensitivity({
+        base: baseInputs,
+        interestRateDelta,
+        homePriceDelta,
+        rentDelta
+      });
+      setSensitivityData(data);
+      return data;
+    } catch (error) {
+      console.error('Failed to load sensitivity data:', error);
+      return null;
+    }
+  };
+
+  const loadScenarioOverlayData = async (scenarios: ScenarioInputs[]) => {
+    try {
+      const data = await fetchScenarios({ scenarios });
+      setScenarioOverlayData(data);
+      return data;
+    } catch (error) {
+      console.error('Failed to load scenario overlay data:', error);
       return null;
     }
   };
@@ -1162,6 +1322,9 @@ const handleChipClick = (message: string) => {
     const liquiditySeries = snapshotData?.liquidityTimeline ?? advancedMetrics.liquidityTimeline;
     const taxSeries = snapshotData?.taxSavings ?? advancedMetrics.taxSavings;
     const heatmapPoints = snapshotData?.heatmapPoints ?? heatmapData;
+    const monteCarlo = snapshotData?.monteCarlo ?? monteCarloData;
+    const sensitivity = snapshotData?.sensitivity ?? sensitivityData;
+    const scenarioOverlay = snapshotData?.scenarioOverlay ?? scenarioOverlayData;
     
     const renderUnavailable = (label: string) => (
       <div className="chart-wrapper">
@@ -1375,7 +1538,23 @@ const handleChipClick = (message: string) => {
           </div>
         ) : renderUnavailable('Break-Even heatmap');
       case 'monteCarlo':
-        return renderUnavailable('Monte Carlo simulation');
+        return monteCarlo && monteCarlo.runs && monteCarlo.runs.length > 0 ? (
+          <div className="chart-wrapper">
+            <MonteCarloChart runs={monteCarlo.runs} summary={monteCarlo.summary} />
+          </div>
+        ) : renderUnavailable('Monte Carlo simulation');
+      case 'sensitivity':
+        return sensitivity && sensitivity.length > 0 ? (
+          <div className="chart-wrapper">
+            <SensitivityChart results={sensitivity} />
+          </div>
+        ) : renderUnavailable('Sensitivity analysis');
+      case 'scenarioOverlay':
+        return scenarioOverlay && scenarioOverlay.length > 0 ? (
+          <div className="chart-wrapper">
+            <ScenarioOverlayChart results={scenarioOverlay} />
+          </div>
+        ) : renderUnavailable('Scenario overlay');
       default:
         return null;
     }
@@ -1517,235 +1696,342 @@ const handleChipClick = (message: string) => {
             </button>
           </div>
           <div className="reference-box-content">
-            {usingZipData && locationData ? (
-              // Scenario 1: Using ZIP data
-              <>
-                <div className="reference-item">
-                  <span className="ref-label">🏠 Home:</span>
-                  {isEditMode ? (
-                    <div className="ref-input-container">
-                      <input
-                        type="number"
-                        value={editableValues?.homePrice || ''}
-                        onChange={(e) => setEditableValues(prev => prev ? {...prev, homePrice: parseInt(e.target.value) || null} : null)}
-                        className="ref-input"
-                        placeholder="Home price"
-                      />
-                      <small>({locationData.city})</small>
+            {(() => {
+              const currentInputs = buildScenarioInputs(userData, locationData);
+              const downPaymentAmount = userData.homePrice && userData.downPaymentPercent 
+                ? (userData.homePrice * userData.downPaymentPercent / 100) 
+                : null;
+              const rateSource = locationData && userData.timeHorizonYears
+                ? getZIPBasedRates(locationData, userData.timeHorizonYears)
+                : userData.timeHorizonYears
+                ? getTimelineBasedRates(userData.timeHorizonYears)
+                : null;
+              
+              return usingZipData && locationData ? (
+                // Scenario 1: Using ZIP data
+                <>
+                  <div style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '2px solid #e2e8f0' }}>
+                    <strong style={{ fontSize: '14px', color: '#1a202c' }}>Your Inputs</strong>
+                    <div style={{ marginTop: '6px', fontSize: '12px', color: '#718096', fontStyle: 'italic' }}>
+                      Values based on market data for {locationData.city}, {locationData.state} (you can override anything)
                     </div>
-                  ) : (
-                    <span className="ref-value">
-                      {userData.homePrice ? `$${userData.homePrice.toLocaleString()}` : '___'} 
-                      <small>({locationData.city})</small>
-                    </span>
+                  </div>
+                  <div className="reference-item">
+                    <span className="ref-label">🏠 Home:</span>
+                    {isEditMode ? (
+                      <div className="ref-input-container">
+                        <input
+                          type="number"
+                          value={editableValues?.homePrice || ''}
+                          onChange={(e) => setEditableValues(prev => prev ? {...prev, homePrice: parseInt(e.target.value) || null} : null)}
+                          className="ref-input"
+                          placeholder="Home price"
+                        />
+                        <small>({locationData.city})</small>
+                      </div>
+                    ) : (
+                      <span className="ref-value">
+                        {userData.homePrice ? `$${userData.homePrice.toLocaleString()}` : '___'} 
+                        <small>({locationData.city})</small>
+                      </span>
+                    )}
+                  </div>
+                  <div className="reference-item">
+                    <span className="ref-label">💵 Rent:</span>
+                    {isEditMode ? (
+                      <div className="ref-input-container">
+                        <input
+                          type="number"
+                          value={editableValues?.monthlyRent || ''}
+                          onChange={(e) => setEditableValues(prev => prev ? {...prev, monthlyRent: parseInt(e.target.value) || null} : null)}
+                          className="ref-input"
+                          placeholder="Monthly rent"
+                        />
+                        <small>({locationData.city})</small>
+                      </div>
+                    ) : (
+                      <span className="ref-value">
+                        {userData.monthlyRent ? `$${userData.monthlyRent.toLocaleString()}/mo` : '___'} 
+                        <small>({locationData.city})</small>
+                      </span>
+                    )}
+                  </div>
+                  <div className="reference-item">
+                    <span className="ref-label">💰 Down:</span>
+                    {isEditMode ? (
+                      <div className="ref-input-container">
+                        <input
+                          type="number"
+                          value={editableValues?.downPaymentPercent || ''}
+                          onChange={(e) => setEditableValues(prev => prev ? {...prev, downPaymentPercent: parseInt(e.target.value) || null} : null)}
+                          className="ref-input"
+                          placeholder="Down payment %"
+                          min="1"
+                          max="100"
+                        />
+                        <small>(you chose)</small>
+                      </div>
+                    ) : (
+                      <span className="ref-value">
+                        {userData.downPaymentPercent ? `${userData.downPaymentPercent}%` : '___'} 
+                        {downPaymentAmount && <small> (${downPaymentAmount.toLocaleString()})</small>}
+                        <small>(you chose)</small>
+                      </span>
+                    )}
+                  </div>
+                  <div className="reference-item">
+                    <span className="ref-label">⏰ Timeline:</span>
+                    {isEditMode ? (
+                      <div className="ref-input-container">
+                        <input
+                          type="number"
+                          value={editableValues?.timeHorizonYears || ''}
+                          onChange={(e) => setEditableValues(prev => prev ? {...prev, timeHorizonYears: parseInt(e.target.value) || null} : null)}
+                          className="ref-input"
+                          placeholder="Years"
+                          min="1"
+                          max="30"
+                        />
+                        <small>(you chose)</small>
+                      </div>
+                    ) : (
+                      <span className="ref-value">
+                        {userData.timeHorizonYears ? `${userData.timeHorizonYears} years` : '___'} 
+                        <small>(you chose)</small>
+                      </span>
+                    )}
+                  </div>
+                  {currentInputs && (
+                    <>
+                      <div className="reference-item">
+                        <span className="ref-label">📋 Loan term:</span>
+                        <span className="ref-value">{currentInputs.loanTermYears} years <small>(default)</small></span>
+                      </div>
+                      <div className="reference-item">
+                        <span className="ref-label">📊 Mortgage rate:</span>
+                        <span className="ref-value">{currentInputs.interestRate}% <small>(default)</small></span>
+                      </div>
+                    </>
                   )}
-                </div>
-                <div className="reference-item">
-                  <span className="ref-label">💵 Rent:</span>
-                  {isEditMode ? (
-                    <div className="ref-input-container">
-                      <input
-                        type="number"
-                        value={editableValues?.monthlyRent || ''}
-                        onChange={(e) => setEditableValues(prev => prev ? {...prev, monthlyRent: parseInt(e.target.value) || null} : null)}
-                        className="ref-input"
-                        placeholder="Monthly rent"
-                      />
-                      <small>({locationData.city})</small>
-                    </div>
-                  ) : (
+                  
+                  <div style={{ marginTop: '16px', marginBottom: '12px', paddingTop: '12px', paddingBottom: '8px', borderTop: '2px solid #e2e8f0', borderBottom: '2px solid #e2e8f0' }}>
+                    <strong style={{ fontSize: '14px', color: '#1a202c' }}>Assumptions & Market Data</strong>
+                  </div>
+                  
+                  <div className="reference-item">
+                    <span className="ref-label">🏛️ Property tax:</span>
                     <span className="ref-value">
-                      {userData.monthlyRent ? `$${userData.monthlyRent.toLocaleString()}/mo` : '___'} 
-                      <small>({locationData.city})</small>
+                      {(locationData.propertyTaxRate * 100).toFixed(2)}% 
+                      <small>({locationData.state} state avg)</small>
                     </span>
+                  </div>
+                  {currentInputs && (
+                    <>
+                      <div className="reference-item">
+                        <span className="ref-label">🔧 Maintenance:</span>
+                        <span className="ref-value">{currentInputs.maintenanceRate}% of home value/year <small>(default)</small></span>
+                      </div>
+                      <div className="reference-item">
+                        <span className="ref-label">🛡️ Home insurance:</span>
+                        <span className="ref-value">${currentInputs.homeInsuranceAnnual.toLocaleString()}/year <small>(default)</small></span>
+                      </div>
+                      <div className="reference-item">
+                        <span className="ref-label">🛡️ Renter insurance:</span>
+                        <span className="ref-value">${currentInputs.renterInsuranceAnnual.toLocaleString()}/year <small>(default)</small></span>
+                      </div>
+                      {currentInputs.hoaMonthly > 0 && (
+                        <div className="reference-item">
+                          <span className="ref-label">🏘️ HOA:</span>
+                          <span className="ref-value">${currentInputs.hoaMonthly.toLocaleString()}/mo <small>(default)</small></span>
+                        </div>
+                      )}
+                    </>
                   )}
-                </div>
-                <div className="reference-item">
-                  <span className="ref-label">💰 Down:</span>
-                  {isEditMode ? (
-                    <div className="ref-input-container">
-                      <input
-                        type="number"
-                        value={editableValues?.downPaymentPercent || ''}
-                        onChange={(e) => setEditableValues(prev => prev ? {...prev, downPaymentPercent: parseInt(e.target.value) || null} : null)}
-                        className="ref-input"
-                        placeholder="Down payment %"
-                        min="1"
-                        max="100"
-                      />
-                      <small>(you chose)</small>
-                    </div>
-                  ) : (
+                  <div className="reference-divider"></div>
+                  <div className="reference-item">
+                    <span className="ref-label">📈 Rent growth:</span>
                     <span className="ref-value">
-                      {userData.downPaymentPercent ? `${userData.downPaymentPercent}%` : '___'} 
-                      <small>(you chose)</small>
+                      {rateSource ? `${rateSource.rentGrowthRate.toFixed(1)}%/year` : '___'} 
+                      <small>({locationData ? `${locationData.city} market` : 'national avg'})</small>
                     </span>
-                  )}
-                </div>
-                <div className="reference-item">
-                  <span className="ref-label">⏰ Timeline:</span>
-                  {isEditMode ? (
-                    <div className="ref-input-container">
-                      <input
-                        type="number"
-                        value={editableValues?.timeHorizonYears || ''}
-                        onChange={(e) => setEditableValues(prev => prev ? {...prev, timeHorizonYears: parseInt(e.target.value) || null} : null)}
-                        className="ref-input"
-                        placeholder="Years"
-                        min="1"
-                        max="30"
-                      />
-                      <small>(you chose)</small>
-                    </div>
-                  ) : (
+                  </div>
+                  <div className="reference-item">
+                    <span className="ref-label">🏘️ Appreciation:</span>
                     <span className="ref-value">
-                      {userData.timeHorizonYears ? `${userData.timeHorizonYears} years` : '___'} 
-                      <small>(you chose)</small>
+                      {rateSource ? `${rateSource.homeAppreciationRate.toFixed(1)}%/year` : '___'} 
+                      <small>({locationData ? `${locationData.city} market` : 'based on timeline'})</small>
                     </span>
-                  )}
-                </div>
-                <div className="reference-item">
-                  <span className="ref-label">🏛️ Tax:</span>
-                  <span className="ref-value">{(locationData.propertyTaxRate * 100).toFixed(2)}% <small>({locationData.state})</small></span>
-                </div>
-                <div className="reference-divider"></div>
-                <div className="reference-item">
-                  <span className="ref-label">📈 Rent growth:</span>
-                  <span className="ref-value">
-                    {userData.timeHorizonYears ? `${getZIPBasedRates(locationData, userData.timeHorizonYears).rentGrowthRate.toFixed(1)}%/year` : '___'} 
-                    <small>({locationData ? `${locationData.city} market` : 'nat\'l avg'})</small>
-                  </span>
-                </div>
-                <div className="reference-item">
-                  <span className="ref-label">🏘️ Appreciation:</span>
-                  <span className="ref-value">
-                    {userData.timeHorizonYears ? `${getZIPBasedRates(locationData, userData.timeHorizonYears).homeAppreciationRate.toFixed(1)}%/year` : '___'} 
-                    <small>({locationData ? `${locationData.city} market` : 'based on timeline'})</small>
-                  </span>
-                </div>
-                <div className="reference-item">
-                  <span className="ref-label">💹 Investment:</span>
-                  <span className="ref-value">
-                    {userData.timeHorizonYears ? `${getZIPBasedRates(locationData, userData.timeHorizonYears).investmentReturnRate}%/year` : '___'} 
-                    <small>(based on timeline)</small>
-                  </span>
-                </div>
-              </>
-            ) : (
-              // Scenario 2: Using custom data
-              <>
-                <div className="reference-item">
-                  <span className="ref-label">🏠 Home:</span>
-                  {isEditMode ? (
-                    <div className="ref-input-container">
-                      <input
-                        type="number"
-                        value={editableValues?.homePrice || ''}
-                        onChange={(e) => setEditableValues(prev => prev ? {...prev, homePrice: parseInt(e.target.value) || null} : null)}
-                        className="ref-input"
-                        placeholder="Home price"
-                      />
-                      <small>(you chose)</small>
-                    </div>
-                  ) : (
+                  </div>
+                  <div className="reference-item">
+                    <span className="ref-label">💹 Investment:</span>
                     <span className="ref-value">
-                      {userData.homePrice ? `$${userData.homePrice.toLocaleString()}` : '___'} 
-                      <small>(you chose)</small>
+                      {rateSource ? `${rateSource.investmentReturnRate}%/year` : '___'} 
+                      <small>(based on timeline)</small>
                     </span>
+                  </div>
+                </>
+              ) : (
+                // Scenario 2: Using custom data
+                <>
+                  <div style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '2px solid #e2e8f0' }}>
+                    <strong style={{ fontSize: '14px', color: '#1a202c' }}>Your Inputs</strong>
+                  </div>
+                  <div className="reference-item">
+                    <span className="ref-label">🏠 Home:</span>
+                    {isEditMode ? (
+                      <div className="ref-input-container">
+                        <input
+                          type="number"
+                          value={editableValues?.homePrice || ''}
+                          onChange={(e) => setEditableValues(prev => prev ? {...prev, homePrice: parseInt(e.target.value) || null} : null)}
+                          className="ref-input"
+                          placeholder="Home price"
+                        />
+                        <small>(you chose)</small>
+                      </div>
+                    ) : (
+                      <span className="ref-value">
+                        {userData.homePrice ? `$${userData.homePrice.toLocaleString()}` : '___'} 
+                        <small>(you chose)</small>
+                      </span>
+                    )}
+                  </div>
+                  <div className="reference-item">
+                    <span className="ref-label">💵 Rent:</span>
+                    {isEditMode ? (
+                      <div className="ref-input-container">
+                        <input
+                          type="number"
+                          value={editableValues?.monthlyRent || ''}
+                          onChange={(e) => setEditableValues(prev => prev ? {...prev, monthlyRent: parseInt(e.target.value) || null} : null)}
+                          className="ref-input"
+                          placeholder="Monthly rent"
+                        />
+                        <small>(you chose)</small>
+                      </div>
+                    ) : (
+                      <span className="ref-value">
+                        {userData.monthlyRent ? `$${userData.monthlyRent.toLocaleString()}/mo` : '___'} 
+                        <small>(you chose)</small>
+                      </span>
+                    )}
+                  </div>
+                  <div className="reference-item">
+                    <span className="ref-label">💰 Down:</span>
+                    {isEditMode ? (
+                      <div className="ref-input-container">
+                        <input
+                          type="number"
+                          value={editableValues?.downPaymentPercent || ''}
+                          onChange={(e) => setEditableValues(prev => prev ? {...prev, downPaymentPercent: parseInt(e.target.value) || null} : null)}
+                          className="ref-input"
+                          placeholder="Down payment %"
+                          min="1"
+                          max="100"
+                        />
+                        <small>(you chose)</small>
+                      </div>
+                    ) : (
+                      <span className="ref-value">
+                        {userData.downPaymentPercent ? `${userData.downPaymentPercent}%` : '___'} 
+                        {downPaymentAmount && <small> (${downPaymentAmount.toLocaleString()})</small>}
+                        <small>(you chose)</small>
+                      </span>
+                    )}
+                  </div>
+                  <div className="reference-item">
+                    <span className="ref-label">⏰ Timeline:</span>
+                    {isEditMode ? (
+                      <div className="ref-input-container">
+                        <input
+                          type="number"
+                          value={editableValues?.timeHorizonYears || ''}
+                          onChange={(e) => setEditableValues(prev => prev ? {...prev, timeHorizonYears: parseInt(e.target.value) || null} : null)}
+                          className="ref-input"
+                          placeholder="Years"
+                          min="1"
+                          max="30"
+                        />
+                        <small>(you chose)</small>
+                      </div>
+                    ) : (
+                      <span className="ref-value">
+                        {userData.timeHorizonYears ? `${userData.timeHorizonYears} years` : '___'} 
+                        <small>(you chose)</small>
+                      </span>
+                    )}
+                  </div>
+                  {currentInputs && (
+                    <>
+                      <div className="reference-item">
+                        <span className="ref-label">📋 Loan term:</span>
+                        <span className="ref-value">{currentInputs.loanTermYears} years <small>(default)</small></span>
+                      </div>
+                      <div className="reference-item">
+                        <span className="ref-label">📊 Mortgage rate:</span>
+                        <span className="ref-value">{currentInputs.interestRate}% <small>(default)</small></span>
+                      </div>
+                    </>
                   )}
-                </div>
-                <div className="reference-item">
-                  <span className="ref-label">💵 Rent:</span>
-                  {isEditMode ? (
-                    <div className="ref-input-container">
-                      <input
-                        type="number"
-                        value={editableValues?.monthlyRent || ''}
-                        onChange={(e) => setEditableValues(prev => prev ? {...prev, monthlyRent: parseInt(e.target.value) || null} : null)}
-                        className="ref-input"
-                        placeholder="Monthly rent"
-                      />
-                      <small>(you chose)</small>
-                    </div>
-                  ) : (
+                  
+                  <div style={{ marginTop: '16px', marginBottom: '12px', paddingTop: '12px', paddingBottom: '8px', borderTop: '2px solid #e2e8f0', borderBottom: '2px solid #e2e8f0' }}>
+                    <strong style={{ fontSize: '14px', color: '#1a202c' }}>Assumptions & Market Data</strong>
+                  </div>
+                  
+                  <div className="reference-item">
+                    <span className="ref-label">🏛️ Property tax:</span>
                     <span className="ref-value">
-                      {userData.monthlyRent ? `$${userData.monthlyRent.toLocaleString()}/mo` : '___'} 
-                      <small>(you chose)</small>
+                      {currentInputs ? `${currentInputs.propertyTaxRate.toFixed(2)}%` : '1.0%'} 
+                      <small>(national avg)</small>
                     </span>
+                  </div>
+                  {currentInputs && (
+                    <>
+                      <div className="reference-item">
+                        <span className="ref-label">🔧 Maintenance:</span>
+                        <span className="ref-value">{currentInputs.maintenanceRate}% of home value/year <small>(default)</small></span>
+                      </div>
+                      <div className="reference-item">
+                        <span className="ref-label">🛡️ Home insurance:</span>
+                        <span className="ref-value">${currentInputs.homeInsuranceAnnual.toLocaleString()}/year <small>(default)</small></span>
+                      </div>
+                      <div className="reference-item">
+                        <span className="ref-label">🛡️ Renter insurance:</span>
+                        <span className="ref-value">${currentInputs.renterInsuranceAnnual.toLocaleString()}/year <small>(default)</small></span>
+                      </div>
+                      {currentInputs.hoaMonthly > 0 && (
+                        <div className="reference-item">
+                          <span className="ref-label">🏘️ HOA:</span>
+                          <span className="ref-value">${currentInputs.hoaMonthly.toLocaleString()}/mo <small>(default)</small></span>
+                        </div>
+                      )}
+                    </>
                   )}
-                </div>
-                <div className="reference-item">
-                  <span className="ref-label">💰 Down:</span>
-                  {isEditMode ? (
-                    <div className="ref-input-container">
-                      <input
-                        type="number"
-                        value={editableValues?.downPaymentPercent || ''}
-                        onChange={(e) => setEditableValues(prev => prev ? {...prev, downPaymentPercent: parseInt(e.target.value) || null} : null)}
-                        className="ref-input"
-                        placeholder="Down payment %"
-                        min="1"
-                        max="100"
-                      />
-                      <small>(you chose)</small>
-                    </div>
-                  ) : (
+                  <div className="reference-divider"></div>
+                  <div className="reference-item">
+                    <span className="ref-label">📈 Rent growth:</span>
                     <span className="ref-value">
-                      {userData.downPaymentPercent ? `${userData.downPaymentPercent}%` : '___'} 
-                      <small>(you chose)</small>
+                      {rateSource ? `${rateSource.rentGrowthRate.toFixed(1)}%/year` : '___'} 
+                      <small>(national avg)</small>
                     </span>
-                  )}
-                </div>
-                <div className="reference-item">
-                  <span className="ref-label">⏰ Timeline:</span>
-                  {isEditMode ? (
-                    <div className="ref-input-container">
-                      <input
-                        type="number"
-                        value={editableValues?.timeHorizonYears || ''}
-                        onChange={(e) => setEditableValues(prev => prev ? {...prev, timeHorizonYears: parseInt(e.target.value) || null} : null)}
-                        className="ref-input"
-                        placeholder="Years"
-                        min="1"
-                        max="30"
-                      />
-                      <small>(you chose)</small>
-                    </div>
-                  ) : (
+                  </div>
+                  <div className="reference-item">
+                    <span className="ref-label">🏘️ Appreciation:</span>
                     <span className="ref-value">
-                      {userData.timeHorizonYears ? `${userData.timeHorizonYears} years` : '___'} 
-                      <small>(you chose)</small>
+                      {rateSource ? `${rateSource.homeAppreciationRate.toFixed(1)}%/year` : '___'} 
+                      <small>(based on timeline)</small>
                     </span>
-                  )}
-                </div>
-                <div className="reference-item">
-                  <span className="ref-label">🏛️ Tax:</span>
-                  <span className="ref-value">1.0% <small>(nat'l avg)</small></span>
-                </div>
-                <div className="reference-divider"></div>
-                <div className="reference-item">
-                  <span className="ref-label">📈 Rent growth:</span>
-                  <span className="ref-value">
-                    {userData.timeHorizonYears ? `${getZIPBasedRates(locationData, userData.timeHorizonYears).rentGrowthRate.toFixed(1)}%/year` : '___'} 
-                    <small>({locationData ? `${locationData.city} market` : 'nat\'l avg'})</small>
-                  </span>
-                </div>
-                <div className="reference-item">
-                  <span className="ref-label">🏘️ Appreciation:</span>
-                  <span className="ref-value">
-                    {userData.timeHorizonYears ? `${getZIPBasedRates(locationData, userData.timeHorizonYears).homeAppreciationRate.toFixed(1)}%/year` : '___'} 
-                    <small>({locationData ? `${locationData.city} market` : 'based on timeline'})</small>
-                  </span>
-                </div>
-                <div className="reference-item">
-                  <span className="ref-label">💹 Investment:</span>
-                  <span className="ref-value">
-                    {userData.timeHorizonYears ? `${getZIPBasedRates(locationData, userData.timeHorizonYears).investmentReturnRate}%/year` : '___'} 
-                    <small>(based on timeline)</small>
-                  </span>
-                </div>
-              </>
-            )}
+                  </div>
+                  <div className="reference-item">
+                    <span className="ref-label">💹 Investment:</span>
+                    <span className="ref-value">
+                      {rateSource ? `${rateSource.investmentReturnRate}%/year` : '___'} 
+                      <small>(based on timeline)</small>
+                    </span>
+                  </div>
+                </>
+              );
+            })()}
           </div>
           
           {/* Edit Mode Buttons */}
@@ -1780,6 +2066,42 @@ const handleChipClick = (message: string) => {
     <div className="chat-container">
       <div className="chat-header">
         <h1 className="app-title">RentVsBuy.ai</h1>
+        <div className="zip-toggle-container" style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          marginRight: 'auto', 
+          marginLeft: '20px',
+          opacity: 0.85
+        }}>
+          <label 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px', 
+              cursor: 'pointer', 
+              fontSize: '12px', 
+              color: '#718096',
+              fontWeight: 400,
+              transition: 'opacity 0.2s'
+            }}
+            title="When enabled, ZIP codes automatically fill home price and rent from market data. You can still override any values."
+            onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = '0.85'}
+          >
+            <input
+              type="checkbox"
+              checked={useZipAutoFill}
+              onChange={(e) => setUseZipAutoFill(e.target.checked)}
+              style={{ 
+                cursor: 'pointer', 
+                width: '14px', 
+                height: '14px',
+                accentColor: '#4299e1'
+              }}
+            />
+            <span style={{ userSelect: 'none' }}>ZIP auto-fill</span>
+          </label>
+        </div>
           <div className="header-buttons">
             <button 
               className="save-button"
@@ -1912,6 +2234,8 @@ Restart
             <button className="chart-nav-btn-sm" onClick={()=>handleChipClick('show me tax savings')}>🏛️ Tax Savings</button>
             <button className="chart-nav-btn-sm" onClick={()=>handleChipClick('show me break even heatmap')}>🟩 Heatmap</button>
             <button className="chart-nav-btn-sm" onClick={()=>handleChipClick('run monte carlo simulation')}>🎲 Monte Carlo</button>
+            <button className="chart-nav-btn-sm" onClick={()=>handleChipClick('show me sensitivity')}>📈 Sensitivity</button>
+            <button className="chart-nav-btn-sm" onClick={()=>handleChipClick('show me scenario overlay')}>🔀 Scenarios</button>
           </div>
               </div>
             )}
@@ -2019,13 +2343,103 @@ function buildLocalAnalysis(inputs: ScenarioInputs): CalculatorOutput {
     finalInvestmentValue: finalSnapshot.investedDownPayment
   };
 
+  // Calculate tax savings from monthly snapshots (group by year)
+  const taxSavings: TaxSavingsPoint[] = [];
+  const DEFAULT_TAX_BRACKET = 0.24; // 24% default tax bracket
+  
+  // Group snapshots by year
+  const snapshotsByYear = new Map<number, MonthlySnapshot[]>();
+  monthlySnapshots.forEach(snapshot => {
+    const year = Math.ceil(snapshot.month / 12);
+    if (!snapshotsByYear.has(year)) {
+      snapshotsByYear.set(year, []);
+    }
+    snapshotsByYear.get(year)!.push(snapshot);
+  });
+  
+  // Calculate tax savings for each year
+  snapshotsByYear.forEach((snapshots, year) => {
+    // Sum interest paid for the year
+    const totalInterest = snapshots.reduce((sum, s) => sum + s.interestPaid, 0);
+    
+    // Calculate property tax for the year (from monthly costs)
+    // Property tax monthly = (homePrice * propertyTaxRate / 100) / 12
+    const propertyTaxMonthly = (inputs.homePrice * inputs.propertyTaxRate / 100) / 12;
+    const totalPropertyTax = snapshots.length * propertyTaxMonthly;
+    
+    // Apply caps: $750k loan limit for interest deduction, $10k SALT limit for property tax
+    const deductibleInterest = Math.min(totalInterest, 750000);
+    const deductiblePropertyTax = Math.min(totalPropertyTax, 10000);
+    
+    // Calculate tax benefit: (deductible interest + deductible property tax) * tax bracket
+    const totalTaxBenefit = (deductibleInterest + deductiblePropertyTax) * DEFAULT_TAX_BRACKET;
+    
+    taxSavings.push({
+      year,
+      deductibleMortgageInterest: deductibleInterest,
+      deductiblePropertyTax: deductiblePropertyTax,
+      totalTaxBenefit: totalTaxBenefit,
+    });
+  });
+  
+  // Sort by year
+  taxSavings.sort((a, b) => a.year - b.year);
+
+  // Calculate cash flow, cumulative costs, and liquidity timeline from monthly snapshots
+  const cashFlow: CashFlowPoint[] = monthlySnapshots.map(s => ({
+    month: s.month,
+    homeownerCashFlow: s.monthlyRentingCosts - s.monthlyBuyingCosts, // Positive = homeowner saves vs renter
+    renterCashFlow: s.monthlyRentingCosts
+  }));
+
+  let cumulativeBuying = 0;
+  let cumulativeRenting = 0;
+  const cumulativeCosts: CumulativeCostPoint[] = monthlySnapshots.map(s => {
+    cumulativeBuying += s.monthlyBuyingCosts;
+    cumulativeRenting += s.monthlyRentingCosts;
+    return {
+      month: s.month,
+      cumulativeBuying,
+      cumulativeRenting
+    };
+  });
+
+  // Calculate liquidity timeline
+  // Buyer cash account: starts negative (money spent on down payment + closing), then tracks cash flow
+  // Renter investment balance: already in MonthlySnapshot as investedDownPayment
+  const downPaymentAmount = inputs.homePrice * (inputs.downPaymentPercent / 100);
+  const closingCostsBuy = inputs.homePrice * 0.03; // 3% closing costs
+  const monthlyInvestmentReturn = inputs.investmentReturnRate / 100 / 12;
+  
+  // Start with negative cash (money spent upfront)
+  let buyerCashAccount = -downPaymentAmount - closingCostsBuy;
+  
+  const liquidityTimeline: LiquidityPoint[] = monthlySnapshots.map(s => {
+    // Cash flow difference: renter pays rent, buyer pays mortgage + costs
+    // Positive cash flow diff = renter pays more = buyer saves cash
+    const cashFlowDiff = s.monthlyRentingCosts - s.monthlyBuyingCosts;
+    
+    // Buyer's cash account: previous balance + cash flow difference, with investment return
+    buyerCashAccount = (buyerCashAccount + cashFlowDiff) * (1 + monthlyInvestmentReturn);
+    
+    return {
+      month: s.month,
+      homeownerCashAccount: buyerCashAccount,
+      renterInvestmentBalance: s.investedDownPayment
+    };
+  });
+
   return {
     inputs,
     monthlySnapshots,
     summary,
     monthlyCosts,
     rentingCosts,
-    totals
+    totals,
+    taxSavings: taxSavings.length > 0 ? taxSavings : null,
+    cashFlow: cashFlow.length > 0 ? cashFlow : null,
+    cumulativeCosts: cumulativeCosts.length > 0 ? cumulativeCosts : null,
+    liquidityTimeline: liquidityTimeline.length > 0 ? liquidityTimeline : null
   };
 }
 

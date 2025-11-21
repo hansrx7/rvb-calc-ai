@@ -1,3 +1,4 @@
+
 """Pydantic models for finance analysis inputs and outputs."""
 
 from typing import List, Optional
