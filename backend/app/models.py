@@ -114,6 +114,7 @@ class CalculatorOutput(BaseModel):
 class AnalysisRequest(BaseModel):
     inputs: ScenarioInputs
     includeTimeline: bool = False
+    zipCode: Optional[str] = None
 
 
 class TimelinePoint(BaseModel):
@@ -151,12 +152,25 @@ class BreakEvenInfo(BaseModel):
     year: Optional[int]
 
 
+class HomePricePathSummary(BaseModel):
+    """Monte Carlo home price path summary with percentile bands."""
+    years: List[int]
+    p10: List[float]  # 10th percentile prices for each year
+    p50: List[float]  # 50th percentile (median) prices for each year
+    p90: List[float]  # 90th percentile prices for each year
+
+
 class AnalysisResult(BaseModel):
     """Unified analysis result - single source of truth for all charts."""
     timeline: List[TimelinePoint]
     break_even: BreakEvenInfo
     total_buy_cost: float
     total_rent_cost: float
+    # Rates actually used in calculations (for frontend display)
+    home_appreciation_rate: Optional[float] = None
+    rent_growth_rate: Optional[float] = None
+    # Monte Carlo home price path simulation (optional)
+    monte_carlo_home_prices: Optional[HomePricePathSummary] = None
 
 
 class AnalysisResponse(BaseModel):

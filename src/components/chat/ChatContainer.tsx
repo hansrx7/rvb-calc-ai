@@ -165,6 +165,7 @@ const [chartsReady, setChartsReady] = useState(false);
   
   // Location data state
   const [locationData, setLocationData] = useState<FormattedLocationData | null>(null);
+  const [currentZipCode, setCurrentZipCode] = useState<string | null>(null); // Track current ZIP code for ML predictions
   const [showLocationCard, setShowLocationCard] = useState(false);
   const [isLocationLocked, setIsLocationLocked] = useState(false); // Track if user made a choice
   const [usingZipData, setUsingZipData] = useState(false); // Track which scenario
@@ -203,6 +204,7 @@ const [chartsReady, setChartsReady] = useState(false);
   const [monteCarloData, setMonteCarloData] = useState<{ runs: MonteCarloRun[]; summary: MonteCarloSummary } | null>(null);
   const [sensitivityData, setSensitivityData] = useState<SensitivityResult[] | null>(null);
   const [scenarioOverlayData, setScenarioOverlayData] = useState<ScenarioResult[] | null>(null);
+  const [unifiedAnalysisResult, setUnifiedAnalysisResult] = useState<AnalysisResult | null>(null);
   
   // Handle save chat as PDF
   const handleSaveChat = async () => {
@@ -423,6 +425,7 @@ const [chartsReady, setChartsReady] = useState(false);
     setScenarioOverlayData(null);
     setShowRestartModal(false);
     setLocationData(null);
+    setCurrentZipCode(null); // Clear ZIP code
     setShowLocationCard(false);
     setIsLocationLocked(false);
     setUsingZipData(false);
@@ -577,9 +580,10 @@ const [chartsReady, setChartsReady] = useState(false);
       setShowLocationCard(false); // Hide the decision card
       
       // Clear location data so reference box uses custom values, not ZIP data
-      setLocationData(null);
-      
-      // Add AI message referencing the box
+        setLocationData(null);
+        setCurrentZipCode(null); // Clear ZIP code
+        
+        // Add AI message referencing the box
       const aiMessage: Message = {
       id: (Date.now() + 1).toString(),
       role: 'assistant',
@@ -639,6 +643,7 @@ function shouldShowChart(aiResponse: string): string | null {
         setIsLocationLocked(false);
         setUsingZipData(false);
         setLocationData(null);
+        setCurrentZipCode(null); // Clear ZIP code
         setUserData({ homePrice: null, monthlyRent: null, downPaymentPercent: null, timeHorizonYears: null });
         
         const changeMessage: Message = {
@@ -727,9 +732,11 @@ function shouldShowChart(aiResponse: string): string | null {
     setIsLoading(true);
     
     // Extract data from message using AI
+    console.log('🚨🚨🚨 [CRITICAL DEBUG] handleSendMessage STARTED - About to extract data');
     const { userData: newUserData, locationData: detectedLocationData } = await extractUserDataWithAI(content, userData);
     
     // Debug logging
+    console.log('🚨🚨🚨 [CRITICAL DEBUG] Data extracted:', { newUserData, detectedLocationData });
     console.log('ChatContainer Debug - newUserData:', newUserData);
     console.log('ChatContainer Debug - content:', content);
     
@@ -750,6 +757,7 @@ function shouldShowChart(aiResponse: string): string | null {
     // Handle location data if detected
     if (detectedLocationData) {
       setLocationData(detectedLocationData);
+      setCurrentZipCode(zipCode); // Store ZIP code for ML predictions
       
       // Check if user also provided custom values in the same message
       const hasCustomValues = newUserData.homePrice || newUserData.downPaymentPercent;
@@ -762,8 +770,32 @@ function shouldShowChart(aiResponse: string): string | null {
         // User provided their own home price + ZIP code
         setUserData(newUserData);
         setLocationData(detectedLocationData);
+        setCurrentZipCode(zipCode); // Store ZIP code for ML predictions
         setIsLocationLocked(true);
         setUsingZipData(true);
+        
+        // Check if we have ALL data - if so, run analysis immediately
+        const hasAllDataNow = newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent && newUserData.timeHorizonYears;
+        console.log('🚨🚨🚨 [CRITICAL DEBUG] PATH 10 - hasAllDataNow:', hasAllDataNow, newUserData);
+        
+        if (hasAllDataNow) {
+          console.log('🚨🚨🚨 [CRITICAL DEBUG] ALL DATA PRESENT - Running analysis immediately!');
+          // Run analysis in background
+          setTimeout(async () => {
+            const inputs = buildScenarioInputs(newUserData, detectedLocationData, null);
+            if (inputs) {
+              console.log('🚨🚨🚨 [CRITICAL DEBUG] Running analysis from PATH 10');
+              const result = await runAnalysis(inputs, zipCode);
+              console.log('🎲 [MC DEBUG] Setting unifiedAnalysisResult:', {
+                hasUnifiedAnalysis: !!result.unifiedAnalysis,
+                hasMonteCarlo: !!(result.unifiedAnalysis?.monteCarloHomePrices ?? (result.unifiedAnalysis as any)?.monte_carlo_home_prices),
+                mcData: result.unifiedAnalysis?.monteCarloHomePrices ?? (result.unifiedAnalysis as any)?.monte_carlo_home_prices
+              });
+              setUnifiedAnalysisResult(result.unifiedAnalysis ?? null);
+              applyAnalysis(result.analysis);
+            }
+          }, 100);
+        }
         
         const newFlowMessage: Message = {
           id: Date.now().toString(),
@@ -780,6 +812,7 @@ function shouldShowChart(aiResponse: string): string | null {
         // User provided their own rent + ZIP code
         setUserData(newUserData);
         setLocationData(detectedLocationData);
+        setCurrentZipCode(zipCode); // Store ZIP code for ML predictions
         setIsLocationLocked(true);
         setUsingZipData(true);
         
@@ -830,11 +863,26 @@ function shouldShowChart(aiResponse: string): string | null {
     // Check if we have all data and if it changed
     const hasAllData = newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent && newUserData.timeHorizonYears;
     console.log('ChatContainer Debug - hasAllData:', hasAllData);
+    console.log('🔍 [DEBUG] Checking dataChanged:', {
+      newUserData: {
+        homePrice: newUserData.homePrice,
+        monthlyRent: newUserData.monthlyRent,
+        downPaymentPercent: newUserData.downPaymentPercent,
+        timeHorizonYears: newUserData.timeHorizonYears
+      },
+      userData: {
+        homePrice: userData.homePrice,
+        monthlyRent: userData.monthlyRent,
+        downPaymentPercent: userData.downPaymentPercent,
+        timeHorizonYears: userData.timeHorizonYears
+      }
+    });
     const dataChanged = 
       newUserData.homePrice !== userData.homePrice ||
       newUserData.monthlyRent !== userData.monthlyRent ||
       newUserData.downPaymentPercent !== userData.downPaymentPercent ||
       newUserData.timeHorizonYears !== userData.timeHorizonYears;
+    console.log('🔍 [DEBUG] dataChanged result:', dataChanged);
     
     // If data changed, we need to recalculate charts BEFORE showing them
     let freshChartData = chartData;
@@ -842,20 +890,62 @@ function shouldShowChart(aiResponse: string): string | null {
     let freshTotalCostData = totalCostData;
     let analysisInputs: ScenarioInputs | null = null;
     let analysisResult: CalculatorOutput | null = null;
-    let unifiedAnalysisResult: AnalysisResult | null = null;
+    // unifiedAnalysisResult is now a state variable, so we update it instead of creating a local one
     let analysisSource: 'backend' | 'local' | null = null;
     let analysisApplied = false;
 
+    console.log('🚨🚨🚨 [CRITICAL DEBUG] About to check analysis trigger');
+    console.log('🔍 [DEBUG] Analysis trigger check:', {
+      hasAllData,
+      dataChanged,
+      willRunAnalysis: hasAllData && dataChanged,
+      newUserData: {
+        homePrice: newUserData.homePrice,
+        monthlyRent: newUserData.monthlyRent,
+        downPaymentPercent: newUserData.downPaymentPercent,
+        timeHorizonYears: newUserData.timeHorizonYears
+      },
+      locationData: locationData ? { city: locationData.city, state: locationData.state } : null,
+      currentZipCode,
+      userData: {
+        homePrice: userData.homePrice,
+        monthlyRent: userData.monthlyRent,
+        downPaymentPercent: userData.downPaymentPercent,
+        timeHorizonYears: userData.timeHorizonYears
+      }
+    });
+
     if (hasAllData && dataChanged) {
+      console.log('✅ [DEBUG] hasAllData && dataChanged is TRUE - About to run analysis');
       setHeatmapData(null);
-      const inputs = buildScenarioInputs(newUserData, locationData);
+      const inputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult);
+      console.log('🟡 [DEBUG] buildScenarioInputs returned:', { hasInputs: !!inputs, inputs });
 
       if (inputs) {
         analysisInputs = inputs;
+        console.log('🟡 [DEBUG] About to call runAnalysis with:', { zipCode: currentZipCode, inputs: { homePrice: inputs.homePrice, monthlyRent: inputs.monthlyRent } });
 
-        const { analysis, unifiedAnalysis, source } = await runAnalysis(inputs);
+        const { analysis, unifiedAnalysis, source } = await runAnalysis(inputs, currentZipCode);
         analysisResult = analysis;
-        unifiedAnalysisResult = unifiedAnalysis ?? null;
+        
+        console.log('🟣 [DEBUG] Setting unifiedAnalysisResult:', {
+          hasUnifiedAnalysis: !!unifiedAnalysis,
+          unifiedAnalysisKeys: unifiedAnalysis ? Object.keys(unifiedAnalysis) : [],
+          homeAppreciationRate: unifiedAnalysis ? ((unifiedAnalysis as any)?.home_appreciation_rate ?? unifiedAnalysis?.homeAppreciationRate) : null,
+          rentGrowthRate: unifiedAnalysis ? ((unifiedAnalysis as any)?.rent_growth_rate ?? unifiedAnalysis?.rentGrowthRate) : null,
+          fullUnifiedAnalysis: unifiedAnalysis
+        });
+        
+        setUnifiedAnalysisResult(unifiedAnalysis ?? null);
+        
+        // Verify it was set correctly
+        setTimeout(() => {
+          console.log('🔴 [DEBUG] unifiedAnalysisResult state after setState (checking via closure):', {
+            homeAppreciationRate: unifiedAnalysis ? ((unifiedAnalysis as any)?.home_appreciation_rate ?? unifiedAnalysis?.homeAppreciationRate) : null,
+            rentGrowthRate: unifiedAnalysis ? ((unifiedAnalysis as any)?.rent_growth_rate ?? unifiedAnalysis?.rentGrowthRate) : null
+          });
+        }, 100);
+        
         analysisSource = source;
         analysisApplied = true;
 
@@ -880,8 +970,16 @@ function shouldShowChart(aiResponse: string): string | null {
       }
     }
 
+    console.log('🔍 [DEBUG] Second analysis trigger check:', {
+      hasAllData,
+      analysisApplied,
+      willRunCalculateAndShowChart: hasAllData && !analysisApplied
+    });
+
     if (hasAllData && !analysisApplied) {
+      console.log('✅ [DEBUG] hasAllData && !analysisApplied is TRUE - About to call calculateAndShowChart');
       const calcResult = await calculateAndShowChart(newUserData, locationData);
+      console.log('🟡 [DEBUG] calculateAndShowChart returned:', { hasResult: !!calcResult });
 
       if (calcResult) {
         analysisInputs = analysisInputs ?? calcResult.inputs;
@@ -916,7 +1014,7 @@ function shouldShowChart(aiResponse: string): string | null {
     if (chartToShow === 'breakEvenHeatmap') {
       // Always build fresh inputs from current user data to ensure heatmap uses latest values
       setHeatmapData(null); // Clear old cached data
-      const baseInputs = buildScenarioInputs(newUserData, locationData);
+      const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult);
       if (baseInputs) {
         heatmapPointsResult = await loadHeatmapData(baseInputs);
       }
@@ -925,7 +1023,7 @@ function shouldShowChart(aiResponse: string): string | null {
     if (chartToShow === 'monteCarlo') {
       // Load Monte Carlo simulation data
       setMonteCarloData(null); // Clear old cached data
-      const baseInputs = buildScenarioInputs(newUserData, locationData);
+      const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult);
       if (baseInputs) {
         monteCarloResult = await loadMonteCarloData(baseInputs, 500);
       }
@@ -934,7 +1032,7 @@ function shouldShowChart(aiResponse: string): string | null {
     if (chartToShow === 'sensitivity') {
       // Load sensitivity analysis data (default deltas: ±1% interest, ±10% price, ±10% rent)
       setSensitivityData(null); // Clear old cached data
-      const baseInputs = buildScenarioInputs(newUserData, locationData);
+      const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult);
       if (baseInputs) {
         sensitivityResult = await loadSensitivityData(baseInputs, 1.0, 0.1, 0.1);
       }
@@ -944,7 +1042,7 @@ function shouldShowChart(aiResponse: string): string | null {
       // Load scenario overlay data (for now, use current scenario as single scenario)
       // TODO: Allow users to specify multiple scenarios
       setScenarioOverlayData(null); // Clear old cached data
-      const baseInputs = buildScenarioInputs(newUserData, locationData);
+      const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult);
       if (baseInputs) {
         // For now, just use the current scenario. Later we can allow multiple scenarios
         scenarioOverlayResult = await loadScenarioOverlayData([baseInputs]);
@@ -1038,10 +1136,77 @@ const handleChipClick = (message: string) => {
 };
 
   // Converter: Transform new unified AnalysisResult to old CalculatorOutput format for backward compatibility
+  // Helper to convert snake_case timeline point to camelCase
+  const normalizeTimelinePoint = (point: any): TimelinePoint => {
+    return {
+      monthIndex: point.month_index ?? point.monthIndex ?? 0,
+      year: point.year ?? 0,
+      netWorthBuy: point.net_worth_buy ?? point.netWorthBuy ?? 0,
+      netWorthRent: point.net_worth_rent ?? point.netWorthRent ?? 0,
+      totalCostBuyToDate: point.total_cost_buy_to_date ?? point.totalCostBuyToDate ?? 0,
+      totalCostRentToDate: point.total_cost_rent_to_date ?? point.totalCostRentToDate ?? 0,
+      buyMonthlyOutflow: point.buy_monthly_outflow ?? point.buyMonthlyOutflow ?? 0,
+      rentMonthlyOutflow: point.rent_monthly_outflow ?? point.rentMonthlyOutflow ?? 0,
+      mortgagePayment: point.mortgage_payment ?? point.mortgagePayment ?? 0,
+      propertyTaxMonthly: point.property_tax_monthly ?? point.propertyTaxMonthly ?? 0,
+      insuranceMonthly: point.insurance_monthly ?? point.insuranceMonthly ?? 0,
+      maintenanceMonthly: point.maintenance_monthly ?? point.maintenanceMonthly ?? 0,
+      hoaMonthly: point.hoa_monthly ?? point.hoaMonthly ?? 0,
+      principalPaid: point.principal_paid ?? point.principalPaid ?? 0,
+      interestPaid: point.interest_paid ?? point.interestPaid ?? 0,
+      remainingBalance: point.remaining_balance ?? point.remainingBalance ?? 0,
+      homeValue: point.home_value ?? point.homeValue ?? 0,
+      homeEquity: point.home_equity ?? point.homeEquity ?? 0,
+      renterInvestmentBalance: point.renter_investment_balance ?? point.renterInvestmentBalance ?? 0,
+      buyerCashAccount: point.buyer_cash_account ?? point.buyerCashAccount ?? 0,
+    };
+  };
+
+  // Helper to normalize entire AnalysisResult (convert snake_case to camelCase)
+  const normalizeAnalysisResult = (analysis: any): AnalysisResult | null => {
+    if (!analysis) return null;
+    
+    return {
+      timeline: analysis.timeline?.map(normalizeTimelinePoint) ?? [],
+      breakEven: analysis.breakEven ? {
+        monthIndex: (analysis.breakEven as any).month_index ?? analysis.breakEven.monthIndex ?? null,
+        year: (analysis.breakEven as any).year ?? analysis.breakEven.year ?? null
+      } : { monthIndex: null, year: null },
+      totalBuyCost: (analysis as any).total_buy_cost ?? analysis.totalBuyCost ?? 0,
+      totalRentCost: (analysis as any).total_rent_cost ?? analysis.totalRentCost ?? 0,
+      homeAppreciationRate: (analysis as any).home_appreciation_rate ?? analysis.homeAppreciationRate,
+      rentGrowthRate: (analysis as any).rent_growth_rate ?? analysis.rentGrowthRate,
+      home_appreciation_rate: (analysis as any).home_appreciation_rate ?? analysis.homeAppreciationRate,
+      rent_growth_rate: (analysis as any).rent_growth_rate ?? analysis.rentGrowthRate,
+    };
+  };
+
   const convertAnalysisResultToCalculatorOutput = (result: AnalysisResult, inputs: ScenarioInputs): CalculatorOutput => {
-    const timeline = result.timeline;
+    console.log('🔄 [CONVERT DEBUG] Starting conversion:', {
+      timelineLength: result.timeline?.length,
+      firstPointRaw: result.timeline?.[0],
+      hasBreakEven: !!result.breakEven,
+      totalBuyCost: result.totalBuyCost,
+      totalRentCost: result.totalRentCost
+    });
+    
+    // Normalize timeline points (convert snake_case to camelCase)
+    const timeline = result.timeline.map(normalizeTimelinePoint);
     const firstPoint = timeline[0];
     const lastPoint = timeline[timeline.length - 1];
+    
+    console.log('🔄 [CONVERT DEBUG] First point after normalization:', {
+      monthIndex: firstPoint?.monthIndex,
+      netWorthBuy: firstPoint?.netWorthBuy,
+      netWorthRent: firstPoint?.netWorthRent,
+      principalPaid: firstPoint?.principalPaid,
+      interestPaid: firstPoint?.interestPaid,
+      homeValue: firstPoint?.homeValue,
+      homeEquity: firstPoint?.homeEquity,
+      buyerCashAccount: firstPoint?.buyerCashAccount,
+      renterInvestmentBalance: firstPoint?.renterInvestmentBalance,
+      hasNaN: Object.values(firstPoint || {}).some(v => typeof v === 'number' && isNaN(v))
+    });
 
     // Convert TimelinePoint[] to MonthlySnapshot[]
     const monthlySnapshots: MonthlySnapshot[] = timeline.map(point => ({
@@ -1092,7 +1257,7 @@ const handleChipClick = (message: string) => {
     const summary: CalculatorSummary = {
       totalInterestPaid: timeline.reduce((sum, p) => sum + p.interestPaid, 0),
       totalPrincipalPaid: timeline.reduce((sum, p) => sum + p.principalPaid, 0),
-      breakevenMonth: result.breakEven.monthIndex,
+      breakevenMonth: result.breakEven?.monthIndex ?? null,
       finalBuyerNetWorth: lastPoint.netWorthBuy,
       finalRenterNetWorth: lastPoint.netWorthRent,
       finalNetWorthDelta: lastPoint.netWorthBuy - lastPoint.netWorthRent,
@@ -1105,17 +1270,35 @@ const handleChipClick = (message: string) => {
       renterCashFlow: p.rentMonthlyOutflow,
     }));
 
-    const cumulativeCosts: CumulativeCostPoint[] = timeline.map(p => ({
-      month: p.monthIndex,
-      cumulativeBuying: p.totalCostBuyToDate,
-      cumulativeRenting: p.totalCostRentToDate,
-    }));
+    const cumulativeCosts: CumulativeCostPoint[] = timeline.map(p => {
+      if (isNaN(p.totalCostBuyToDate) || isNaN(p.totalCostRentToDate)) {
+        console.warn('⚠️ [CONVERT DEBUG] NaN in cumulativeCosts:', {
+          month: p.monthIndex,
+          totalCostBuyToDate: p.totalCostBuyToDate,
+          totalCostRentToDate: p.totalCostRentToDate
+        });
+      }
+      return {
+        month: p.monthIndex,
+        cumulativeBuying: p.totalCostBuyToDate,
+        cumulativeRenting: p.totalCostRentToDate,
+      };
+    });
 
-    const liquidityTimeline: LiquidityPoint[] = timeline.map(p => ({
-      month: p.monthIndex,
-      homeownerCashAccount: p.buyerCashAccount,
-      renterInvestmentBalance: p.renterInvestmentBalance,
-    }));
+    const liquidityTimeline: LiquidityPoint[] = timeline.map(p => {
+      if (isNaN(p.buyerCashAccount) || isNaN(p.renterInvestmentBalance)) {
+        console.warn('⚠️ [CONVERT DEBUG] NaN in liquidityTimeline:', {
+          month: p.monthIndex,
+          buyerCashAccount: p.buyerCashAccount,
+          renterInvestmentBalance: p.renterInvestmentBalance
+        });
+      }
+      return {
+        month: p.monthIndex,
+        homeownerCashAccount: p.buyerCashAccount,
+        renterInvestmentBalance: p.renterInvestmentBalance,
+      };
+    });
 
     // Calculate tax savings: group by year, sum interest + property tax, apply caps and tax bracket
     const taxSavings: TaxSavingsPoint[] = [];
@@ -1171,17 +1354,68 @@ const handleChipClick = (message: string) => {
     };
   };
 
-  const runAnalysis = async (inputs: ScenarioInputs): Promise<{ analysis: CalculatorOutput; unifiedAnalysis?: AnalysisResult; source: 'backend' | 'local'; }> => {
+  const runAnalysis = async (inputs: ScenarioInputs, zipCode?: string | null): Promise<{ analysis: CalculatorOutput; unifiedAnalysis?: AnalysisResult; source: 'backend' | 'local'; }> => {
+    console.log('🔵 [DEBUG] runAnalysis called with:', { zipCode, inputs: { homePrice: inputs.homePrice, monthlyRent: inputs.monthlyRent } });
     try {
-      const { analysis } = await analyzeScenario(inputs);
+      
+      const response = await analyzeScenario(inputs, false, zipCode || undefined);
+      const { analysis } = response;
+      
+      // Check for Monte Carlo data in the response
+      const mcData = (analysis as any)?.monte_carlo_home_prices ?? analysis?.monteCarloHomePrices;
+      console.log('🎲 [MC DEBUG] Frontend received analysis response:', {
+        hasAnalysis: !!analysis,
+        analysisKeys: analysis ? Object.keys(analysis) : [],
+        hasMonteCarloData: !!mcData,
+        mcDataKeys: mcData ? Object.keys(mcData) : [],
+        mcYearsLength: mcData?.years?.length,
+        mcP10Length: mcData?.p10?.length,
+        mcP50Length: mcData?.p50?.length,
+        mcP90Length: mcData?.p90?.length,
+        mcSampleYear0: mcData?.years?.[0],
+        mcSampleP10_0: mcData?.p10?.[0],
+        mcSampleP50_0: mcData?.p50?.[0],
+        mcSampleP90_0: mcData?.p90?.[0],
+        mcFinalYear: mcData?.years?.[mcData?.years?.length - 1],
+        mcFinalP50: mcData?.p50?.[mcData?.p50?.length - 1]
+      });
+      
+      console.log('🟢 [DEBUG] Backend response received:', {
+        hasAnalysis: !!analysis,
+        analysisKeys: analysis ? Object.keys(analysis) : [],
+        homeAppreciationRate: (analysis as any)?.home_appreciation_rate ?? analysis?.homeAppreciationRate,
+        rentGrowthRate: (analysis as any)?.rent_growth_rate ?? analysis?.rentGrowthRate,
+        fullAnalysis: analysis
+      });
+      
+      // EXPECTED VALUES (what backend should return for ML predictions)
+      const expectedHomeRate = zipCode ? 'ML prediction (varies by ZIP)' : inputs.homeAppreciationRate;
+      const expectedRentRate = zipCode ? 'ML prediction (varies by ZIP)' : inputs.rentGrowthRate;
+      
+      console.log('📊 [DEBUG] EXPECTED VALUES:', {
+        zipCode,
+        expectedHomeRate,
+        expectedRentRate,
+        inputHomeRate: inputs.homeAppreciationRate,
+        inputRentRate: inputs.rentGrowthRate
+      });
+      
       if (!isBackendAvailable) {
         setIsBackendAvailable(true);
       }
       // Convert new unified structure to old format for backward compatibility
       const converted = convertAnalysisResultToCalculatorOutput(analysis, inputs);
+      
+      console.log('🟡 [DEBUG] Returning from runAnalysis:', {
+        hasUnifiedAnalysis: !!analysis,
+        unifiedAnalysisKeys: analysis ? Object.keys(analysis) : [],
+        homeAppreciationRate: (analysis as any)?.home_appreciation_rate ?? analysis?.homeAppreciationRate,
+        rentGrowthRate: (analysis as any)?.rent_growth_rate ?? analysis?.rentGrowthRate
+      });
+      
       return { analysis: converted, unifiedAnalysis: analysis, source: 'backend' };
     } catch (error) {
-      console.error('Failed to analyze scenario via backend:', error);
+      console.error('❌ [DEBUG] Failed to analyze scenario via backend:', error);
       if (isBackendAvailable) {
         setIsBackendAvailable(false);
       }
@@ -1247,11 +1481,33 @@ const handleChipClick = (message: string) => {
     data: UserData,
     currentLocationData?: FormattedLocationData | null
   ) => {
-    const inputs = buildScenarioInputs(data, currentLocationData);
+    console.log('🟡 [DEBUG] calculateAndShowChart called with:', { 
+      hasData: !!data, 
+      hasLocationData: !!currentLocationData,
+      currentZipCode 
+    });
+    const inputs = buildScenarioInputs(data, currentLocationData, unifiedAnalysisResult ?? null);
+    console.log('🟡 [DEBUG] buildScenarioInputs in calculateAndShowChart returned:', { hasInputs: !!inputs });
     if (!inputs) return null;
 
-    const result = await runAnalysis(inputs);
+    console.log('🟡 [DEBUG] About to call runAnalysis from calculateAndShowChart');
+    const result = await runAnalysis(inputs, currentZipCode);
+    console.log('🟡 [DEBUG] runAnalysis returned from calculateAndShowChart:', {
+      hasAnalysis: !!result.analysis,
+      hasUnifiedAnalysis: !!result.unifiedAnalysis,
+      source: result.source
+    });
     applyAnalysis(result.analysis);
+    // Update unified analysis result
+    if (result.unifiedAnalysis) {
+      console.log('🟡 [DEBUG] Setting unifiedAnalysisResult from calculateAndShowChart:', {
+        homeAppreciationRate: (result.unifiedAnalysis as any)?.home_appreciation_rate ?? result.unifiedAnalysis?.homeAppreciationRate,
+        rentGrowthRate: (result.unifiedAnalysis as any)?.rent_growth_rate ?? result.unifiedAnalysis?.rentGrowthRate
+      });
+      setUnifiedAnalysisResult(result.unifiedAnalysis);
+    } else {
+      console.log('⚠️ [DEBUG] result.unifiedAnalysis is null/undefined in calculateAndShowChart');
+    }
 
     // Automatically show the Net Worth chart when all data is collected
     setVisibleCharts(prev => ({
@@ -1268,14 +1524,12 @@ const handleChipClick = (message: string) => {
   
   const buildScenarioInputs = (
     data: UserData,
-    currentLocationData?: FormattedLocationData | null
+    currentLocationData?: FormattedLocationData | null,
+    analysisResult?: AnalysisResult | null
   ): ScenarioInputs | null => {
-    if (
-      data.homePrice == null ||
-      data.monthlyRent == null ||
-      data.downPaymentPercent == null ||
-      data.timeHorizonYears == null
-    ) {
+    // Safety check - if data is incomplete, return null early
+    if (!data || data.homePrice == null || data.monthlyRent == null || 
+        data.downPaymentPercent == null || data.timeHorizonYears == null) {
       return null;
     }
 
@@ -1284,9 +1538,24 @@ const handleChipClick = (message: string) => {
       ? locationDataToUse.propertyTaxRate * 100
       : 1.0;
 
-    const rateSource = locationDataToUse
+    // Use rates from analysis result if available (ML predictions), otherwise fall back to ZIP/timeline rates
+    let rateSource = locationDataToUse
       ? getZIPBasedRates(locationDataToUse, data.timeHorizonYears)
       : getTimelineBasedRates(data.timeHorizonYears);
+    
+    // Override with rates from analysis if available (these are the actual rates used in calculations)
+    // This ensures frontend display matches backend calculations
+    // Backend returns snake_case, so we need to check both formats
+    const mlHomeRate = (analysisResult as any)?.home_appreciation_rate ?? analysisResult?.homeAppreciationRate;
+    const mlRentRate = (analysisResult as any)?.rent_growth_rate ?? analysisResult?.rentGrowthRate;
+    
+    if (mlHomeRate !== undefined && mlRentRate !== undefined && rateSource) {
+      rateSource = {
+        ...rateSource,
+        homeAppreciationRate: mlHomeRate,
+        rentGrowthRate: mlRentRate
+      };
+    }
 
     return {
       homePrice: data.homePrice,
@@ -1308,10 +1577,28 @@ const handleChipClick = (message: string) => {
   
   // Helper function to render chart based on type - uses message's snapshot data
   const renderChart = (chartType: ChartType, snapshotData?: Message['snapshotData']) => {
+    console.log('🎯 [CHART DEBUG] renderChart called:', {
+      chartType,
+      hasSnapshotData: !!snapshotData,
+      snapshotDataKeys: snapshotData ? Object.keys(snapshotData) : []
+    });
+    
     // Use new unified structure if available, otherwise fall back to legacy
     const analysis = snapshotData?.analysis;
-    const timeline = analysis?.timeline;
-    const breakEven = analysis?.breakEven;
+    // Normalize timeline points (convert snake_case to camelCase if needed)
+    const timeline = analysis?.timeline?.map(normalizeTimelinePoint);
+    const breakEven = analysis?.breakEven ? {
+      monthIndex: (analysis.breakEven as any).month_index ?? analysis.breakEven.monthIndex ?? null,
+      year: (analysis.breakEven as any).year ?? analysis.breakEven.year ?? null
+    } : null;
+    
+    console.log('🎯 [CHART DEBUG] Data availability:', {
+      hasAnalysis: !!analysis,
+      hasTimeline: !!timeline,
+      timelineLength: timeline?.length,
+      timelineFirstPoint: timeline?.[0],
+      hasBreakEven: !!breakEven
+    });
     
     // Legacy fallbacks
     const data = snapshotData?.chartData || chartData;
@@ -1325,6 +1612,17 @@ const handleChipClick = (message: string) => {
     const monteCarlo = snapshotData?.monteCarlo ?? monteCarloData;
     const sensitivity = snapshotData?.sensitivity ?? sensitivityData;
     const scenarioOverlay = snapshotData?.scenarioOverlay ?? scenarioOverlayData;
+    
+    console.log('🎯 [CHART DEBUG] Advanced metrics:', {
+      cashFlowLength: cashFlowSeries?.length,
+      cumulativeLength: cumulativeSeries?.length,
+      liquidityLength: liquiditySeries?.length,
+      taxLength: taxSeries?.length,
+      hasHeatmap: !!heatmapPoints,
+      hasMonteCarlo: !!monteCarlo,
+      hasSensitivity: !!sensitivity,
+      hasScenarioOverlay: !!scenarioOverlay
+    });
     
     const renderUnavailable = (label: string) => (
       <div className="chart-wrapper">
@@ -1340,6 +1638,13 @@ const handleChipClick = (message: string) => {
     
     switch (chartType) {
       case 'netWorth':
+        console.log('📊 [CHART DEBUG] netWorth:', {
+          hasTimeline: !!timeline,
+          timelineLength: timeline?.length,
+          firstPoint: timeline?.[0],
+          hasData: !!data,
+          dataLength: data?.length
+        });
         return timeline ? (
           <div className="chart-wrapper">
             <NetWorthChart timeline={timeline} />
@@ -1371,6 +1676,13 @@ const handleChipClick = (message: string) => {
           </div>
         ) : null;
       case 'monthlyCost':
+        console.log('📊 [CHART DEBUG] monthlyCost:', {
+          hasTimeline: !!timeline,
+          timelineLength: timeline?.length,
+          firstPoint: timeline?.[0],
+          hasCosts: !!costs,
+          costs
+        });
         return timeline ? (
           <div className="chart-wrapper">
             <MonthlyCostChart timeline={timeline} />
@@ -1395,9 +1707,23 @@ const handleChipClick = (message: string) => {
           </div>
         ) : null;
       case 'totalCost':
-        return analysis ? (
+        console.log('📊 [CHART DEBUG] totalCost:', {
+          hasAnalysis: !!analysis,
+          analysisKeys: analysis ? Object.keys(analysis) : [],
+          timelineLength: analysis?.timeline?.length,
+          totalBuyCost: analysis?.totalBuyCost,
+          totalRentCost: analysis?.totalRentCost,
+          lastPoint: analysis?.timeline?.[analysis?.timeline?.length - 1],
+          hasTotalData: !!totalData,
+          totalData
+        });
+        
+        // Normalize analysis if it exists (convert snake_case to camelCase)
+        const normalizedAnalysis = normalizeAnalysisResult(analysis);
+        
+        return normalizedAnalysis ? (
           <div className="chart-wrapper">
-            <TotalCostChart analysis={analysis} />
+            <TotalCostChart analysis={normalizedAnalysis} />
           </div>
         ) : totalData ? (
           <div className="chart-wrapper">
@@ -1410,6 +1736,13 @@ const handleChipClick = (message: string) => {
           </div>
         ) : null;
       case 'equity':
+        console.log('📊 [CHART DEBUG] equity:', {
+          hasTimeline: !!timeline,
+          timelineLength: timeline?.length,
+          firstPoint: timeline?.[0],
+          homeEquityValues: timeline?.slice(0, 5).map(p => p.homeEquity),
+          hasData: !!data
+        });
         return timeline ? (
           <div className="chart-wrapper">
             <EquityBuildupChart timeline={timeline} />
@@ -1441,6 +1774,13 @@ const handleChipClick = (message: string) => {
           </div>
         ) : null;
       case 'rentGrowth':
+        console.log('📊 [CHART DEBUG] rentGrowth:', {
+          hasTimeline: !!timeline,
+          timelineLength: timeline?.length,
+          firstPoint: timeline?.[0],
+          sampleRent: timeline?.[0]?.rentMonthlyOutflow,
+          sampleMortgage: timeline?.[0]?.mortgagePayment
+        });
         return timeline ? (
           <div className="chart-wrapper">
             <RentGrowthChart timeline={timeline} />
@@ -1472,9 +1812,20 @@ const handleChipClick = (message: string) => {
           </div>
         ) : null;
       case 'breakEven':
-        return analysis ? (
+        console.log('📊 [CHART DEBUG] breakEven:', {
+          hasAnalysis: !!analysis,
+          timelineLength: analysis?.timeline?.length,
+          breakEven: analysis?.breakEven,
+          breakEvenMonth: analysis?.breakEven?.monthIndex,
+          hasData: !!data
+        });
+        
+        // Normalize analysis if it exists (convert snake_case to camelCase)
+        const normalizedBreakEvenAnalysis = normalizeAnalysisResult(analysis);
+        
+        return normalizedBreakEvenAnalysis ? (
           <div className="chart-wrapper">
-            <BreakEvenChart analysis={analysis} />
+            <BreakEvenChart analysis={normalizedBreakEvenAnalysis} />
           </div>
         ) : data ? (
           <div className="chart-wrapper">
@@ -1508,24 +1859,50 @@ const handleChipClick = (message: string) => {
           </div>
         ) : null;
       case 'cashFlow':
+        console.log('📊 [CHART DEBUG] cashFlow:', {
+          hasCashFlowSeries: !!cashFlowSeries,
+          cashFlowLength: cashFlowSeries?.length,
+          firstFew: cashFlowSeries?.slice(0, 3),
+          hasNaN: cashFlowSeries?.some(p => isNaN(p.homeownerCashFlow) || isNaN(p.renterCashFlow))
+        });
         return cashFlowSeries && cashFlowSeries.length ? (
           <div className="chart-wrapper">
             <CashFlowChart data={cashFlowSeries} />
           </div>
         ) : renderUnavailable('Cash flow');
       case 'cumulativeCost':
+        console.log('📊 [CHART DEBUG] cumulativeCost:', {
+          hasCumulativeSeries: !!cumulativeSeries,
+          cumulativeLength: cumulativeSeries?.length,
+          firstCumulative: cumulativeSeries?.[0],
+          sampleData: cumulativeSeries?.slice(0, 3),
+          hasNaN: cumulativeSeries?.some(p => isNaN(p.cumulativeBuying) || isNaN(p.cumulativeRenting))
+        });
         return cumulativeSeries && cumulativeSeries.length ? (
           <div className="chart-wrapper">
             <CumulativeCostChart data={cumulativeSeries} />
           </div>
         ) : renderUnavailable('Cumulative cost');
       case 'liquidity':
+        console.log('📊 [CHART DEBUG] liquidity:', {
+          hasLiquiditySeries: !!liquiditySeries,
+          liquidityLength: liquiditySeries?.length,
+          firstLiquidity: liquiditySeries?.[0],
+          sampleData: liquiditySeries?.slice(0, 3)
+        });
         return liquiditySeries && liquiditySeries.length ? (
           <div className="chart-wrapper">
             <LiquidityTimeline data={liquiditySeries} />
           </div>
         ) : renderUnavailable('Liquidity timeline');
       case 'taxSavings':
+        console.log('📊 [CHART DEBUG] taxSavings:', {
+          hasTaxSeries: !!taxSeries,
+          taxLength: taxSeries?.length,
+          firstTax: taxSeries?.[0],
+          sampleData: taxSeries?.slice(0, 3),
+          hasNaN: taxSeries?.some(p => isNaN(p.totalTaxBenefit) || isNaN(p.deductibleMortgageInterest))
+        });
         return taxSeries && taxSeries.length ? (
           <div className="chart-wrapper">
             <TaxSavingsChart data={taxSeries} />
@@ -1538,18 +1915,54 @@ const handleChipClick = (message: string) => {
           </div>
         ) : renderUnavailable('Break-Even heatmap');
       case 'monteCarlo':
-        return monteCarlo && monteCarlo.runs && monteCarlo.runs.length > 0 ? (
-          <div className="chart-wrapper">
-            <MonteCarloChart runs={monteCarlo.runs} summary={monteCarlo.summary} />
-          </div>
-        ) : renderUnavailable('Monte Carlo simulation');
+        // Get Monte Carlo home price paths from analysis result
+        const monteCarloHomePrices = analysis?.monteCarloHomePrices ?? 
+                                     (analysis as any)?.monte_carlo_home_prices ?? 
+                                     null;
+        
+        console.log('📊 [CHART DEBUG] monteCarlo:', {
+          hasAnalysis: !!analysis,
+          hasMonteCarloHomePrices: !!monteCarloHomePrices,
+          yearsLength: monteCarloHomePrices?.years?.length,
+          hasP10: !!monteCarloHomePrices?.p10,
+          hasP50: !!monteCarloHomePrices?.p50,
+          hasP90: !!monteCarloHomePrices?.p90,
+          // Legacy support (old format)
+          hasLegacyMonteCarlo: !!monteCarlo,
+          hasRuns: !!monteCarlo?.runs,
+          runsLength: monteCarlo?.runs?.length
+        });
+        
+        // Use new home price paths if available, otherwise fall back to legacy format
+        if (monteCarloHomePrices && monteCarloHomePrices.years && monteCarloHomePrices.years.length > 0) {
+          return (
+            <div className="chart-wrapper">
+              <MonteCarloChart monteCarloHomePrices={monteCarloHomePrices} />
+            </div>
+          );
+        } else if (monteCarlo && monteCarlo.runs && monteCarlo.runs.length > 0) {
+          // Legacy format support (if old endpoint is still used)
+          return renderUnavailable('Monte Carlo simulation (legacy format not supported - please use new analysis endpoint)');
+        } else {
+          return renderUnavailable('Monte Carlo simulation');
+        }
       case 'sensitivity':
+        console.log('📊 [CHART DEBUG] sensitivity:', {
+          hasSensitivity: !!sensitivity,
+          sensitivityLength: sensitivity?.length,
+          firstSensitivity: sensitivity?.[0]
+        });
         return sensitivity && sensitivity.length > 0 ? (
           <div className="chart-wrapper">
             <SensitivityChart results={sensitivity} />
           </div>
         ) : renderUnavailable('Sensitivity analysis');
       case 'scenarioOverlay':
+        console.log('📊 [CHART DEBUG] scenarioOverlay:', {
+          hasScenarioOverlay: !!scenarioOverlay,
+          scenarioOverlayLength: scenarioOverlay?.length,
+          firstScenario: scenarioOverlay?.[0]
+        });
         return scenarioOverlay && scenarioOverlay.length > 0 ? (
           <div className="chart-wrapper">
             <ScenarioOverlayChart results={scenarioOverlay} />
@@ -1670,6 +2083,120 @@ const handleChipClick = (message: string) => {
         </div>
       )}
       
+      {/* TEST ML RATES BOX - REMOVED (ML rates are now working!) */}
+      {/* 
+      <div style={{
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        width: '350px',
+        backgroundColor: '#fef3c7',
+        border: '4px solid #f59e0b',
+        borderRadius: '8px',
+        padding: '20px',
+        zIndex: 10000,
+        boxShadow: '0 8px 16px rgba(0,0,0,0.3)',
+        maxHeight: '80vh',
+        overflow: 'auto'
+      }}>
+        <div style={{ fontWeight: 'bold', marginBottom: '12px', color: '#92400e', fontSize: '16px' }}>
+          🧪 ML RATES TEST BOX (ALWAYS VISIBLE)
+        </div>
+        <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #f59e0b' }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>unifiedAnalysisResult exists:</div>
+          <div style={{ fontSize: '18px', color: unifiedAnalysisResult ? '#059669' : '#dc2626', fontWeight: 'bold' }}>
+            {unifiedAnalysisResult ? '✅ YES' : '❌ NO - NULL'}
+          </div>
+        </div>
+        {unifiedAnalysisResult ? (
+          <>
+            <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #f59e0b' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Home Appreciation (ML):</div>
+              <div style={{ fontSize: '24px', color: '#059669', fontWeight: 'bold' }}>
+                {(unifiedAnalysisResult as any)?.home_appreciation_rate ?? unifiedAnalysisResult?.homeAppreciationRate ?? '❌ NOT FOUND'}
+              </div>
+              {(unifiedAnalysisResult as any)?.home_appreciation_rate !== undefined && (
+                <div style={{ fontSize: '12px', color: '#666' }}>
+                  Value: {(unifiedAnalysisResult as any).home_appreciation_rate}
+                </div>
+              )}
+            </div>
+            <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #f59e0b' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Rent Growth (ML):</div>
+              <div style={{ fontSize: '24px', color: '#059669', fontWeight: 'bold' }}>
+                {(unifiedAnalysisResult as any)?.rent_growth_rate ?? unifiedAnalysisResult?.rentGrowthRate ?? '❌ NOT FOUND'}
+              </div>
+              {(unifiedAnalysisResult as any)?.rent_growth_rate !== undefined && (
+                <div style={{ fontSize: '12px', color: '#666' }}>
+                  Value: {(unifiedAnalysisResult as any).rent_growth_rate}
+                </div>
+              )}
+            </div>
+            <div style={{ marginTop: '12px', padding: '8px', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #f59e0b' }}>
+              <strong style={{ fontSize: '12px' }}>All Keys in unifiedAnalysisResult:</strong>
+              <pre style={{ fontSize: '10px', overflow: 'auto', maxHeight: '150px', marginTop: '4px' }}>
+                {Object.keys(unifiedAnalysisResult).join(', ')}
+              </pre>
+            </div>
+          </>
+        ) : (
+          <div style={{ padding: '8px', backgroundColor: '#fee2e2', borderRadius: '4px', border: '1px solid #dc2626' }}>
+            <div style={{ color: '#dc2626', fontWeight: 'bold' }}>⚠️ unifiedAnalysisResult is NULL</div>
+            <div style={{ fontSize: '12px', marginTop: '4px' }}>This means the analysis hasn't run yet or failed.</div>
+          </div>
+        )}
+      </div>
+
+      {/* DUPLICATE REMOVED */}
+      {false && unifiedAnalysisResult && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          width: '350px',
+          backgroundColor: '#fef3c7',
+          border: '4px solid #f59e0b',
+          borderRadius: '8px',
+          padding: '20px',
+          zIndex: 10000,
+          boxShadow: '0 8px 16px rgba(0,0,0,0.3)',
+          maxHeight: '80vh',
+          overflow: 'auto'
+        }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '12px', color: '#92400e', fontSize: '16px' }}>
+            🧪 ML RATES TEST BOX (ALWAYS VISIBLE)
+          </div>
+          <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #f59e0b' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Home Appreciation (ML):</div>
+            <div style={{ fontSize: '24px', color: '#059669', fontWeight: 'bold' }}>
+              {(unifiedAnalysisResult as any)?.home_appreciation_rate ?? unifiedAnalysisResult?.homeAppreciationRate ?? '❌ NOT FOUND'}
+            </div>
+            {(unifiedAnalysisResult as any)?.home_appreciation_rate !== undefined && (
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                Value: {(unifiedAnalysisResult as any).home_appreciation_rate}
+              </div>
+            )}
+          </div>
+          <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #f59e0b' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Rent Growth (ML):</div>
+            <div style={{ fontSize: '24px', color: '#059669', fontWeight: 'bold' }}>
+              {(unifiedAnalysisResult as any)?.rent_growth_rate ?? unifiedAnalysisResult?.rentGrowthRate ?? '❌ NOT FOUND'}
+            </div>
+            {(unifiedAnalysisResult as any)?.rent_growth_rate !== undefined && (
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                Value: {(unifiedAnalysisResult as any).rent_growth_rate}
+              </div>
+            )}
+          </div>
+          <div style={{ marginTop: '12px', padding: '8px', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #f59e0b' }}>
+            <strong style={{ fontSize: '12px' }}>All Keys in unifiedAnalysisResult:</strong>
+            <pre style={{ fontSize: '10px', overflow: 'auto', maxHeight: '150px', marginTop: '4px' }}>
+              {unifiedAnalysisResult ? Object.keys(unifiedAnalysisResult).join(', ') : 'null'}
+            </pre>
+          </div>
+        </div>
+      )}
+      
       {/* Reference Box: Show after user makes choice */}
       {isLocationLocked && isReferenceBoxVisible && (
         <div 
@@ -1695,17 +2222,80 @@ const handleChipClick = (message: string) => {
               ×
             </button>
           </div>
+
           <div className="reference-box-content">
             {(() => {
-              const currentInputs = buildScenarioInputs(userData, locationData);
+              const currentInputs = buildScenarioInputs(userData, locationData, unifiedAnalysisResult);
               const downPaymentAmount = userData.homePrice && userData.downPaymentPercent 
                 ? (userData.homePrice * userData.downPaymentPercent / 100) 
                 : null;
-              const rateSource = locationData && userData.timeHorizonYears
+              // Use rates from analysis result if available (ML predictions), otherwise fall back
+              let rateSource = locationData && userData.timeHorizonYears
                 ? getZIPBasedRates(locationData, userData.timeHorizonYears)
                 : userData.timeHorizonYears
                 ? getTimelineBasedRates(userData.timeHorizonYears)
                 : null;
+              
+              // Override with rates from analysis if available (these are the actual rates used)
+              // Backend returns snake_case, so we need to check both formats
+              const mlHomeRate = (unifiedAnalysisResult as any)?.home_appreciation_rate ?? unifiedAnalysisResult?.homeAppreciationRate;
+              const mlRentRate = (unifiedAnalysisResult as any)?.rent_growth_rate ?? unifiedAnalysisResult?.rentGrowthRate;
+              
+              // COMPREHENSIVE DEBUG LOGGING
+              console.log('🟠 [DEBUG] Reference Box Rendering - Checking ML Rates:', {
+                hasUnifiedAnalysisResult: !!unifiedAnalysisResult,
+                unifiedAnalysisResultType: unifiedAnalysisResult ? typeof unifiedAnalysisResult : 'null',
+                unifiedAnalysisResultKeys: unifiedAnalysisResult ? Object.keys(unifiedAnalysisResult) : [],
+                snakeCaseHome: (unifiedAnalysisResult as any)?.home_appreciation_rate,
+                camelCaseHome: unifiedAnalysisResult?.homeAppreciationRate,
+                snakeCaseRent: (unifiedAnalysisResult as any)?.rent_growth_rate,
+                camelCaseRent: unifiedAnalysisResult?.rentGrowthRate,
+                extractedMlHomeRate: mlHomeRate,
+                extractedMlRentRate: mlRentRate,
+                hasRateSource: !!rateSource,
+                rateSourceHome: rateSource?.homeAppreciationRate,
+                rateSourceRent: rateSource?.rentGrowthRate
+              });
+              
+              // TEST: Compare expected vs actual
+              if (unifiedAnalysisResult) {
+                const expectedHome = (unifiedAnalysisResult as any)?.home_appreciation_rate ?? unifiedAnalysisResult?.homeAppreciationRate;
+                const expectedRent = (unifiedAnalysisResult as any)?.rent_growth_rate ?? unifiedAnalysisResult?.rentGrowthRate;
+                const actualHome = rateSource?.homeAppreciationRate;
+                const actualRent = rateSource?.rentGrowthRate;
+                
+                console.log('🧪 [DEBUG] EXPECTED vs ACTUAL COMPARISON:', {
+                  expectedHomeRate: expectedHome,
+                  actualHomeRate: actualHome,
+                  homeRateMatch: expectedHome === actualHome,
+                  expectedRentRate: expectedRent,
+                  actualRentRate: actualRent,
+                  rentRateMatch: expectedRent === actualRent,
+                  willOverride: mlHomeRate !== undefined && mlRentRate !== undefined && rateSource
+                });
+              }
+              
+              if (mlHomeRate !== undefined && mlRentRate !== undefined && rateSource) {
+                console.log('✅ [DEBUG] Overriding rates with ML predictions:', { 
+                  old: { home: rateSource.homeAppreciationRate, rent: rateSource.rentGrowthRate },
+                  new: { home: mlHomeRate, rent: mlRentRate }
+                });
+                rateSource = {
+                  ...rateSource,
+                  homeAppreciationRate: mlHomeRate,
+                  rentGrowthRate: mlRentRate
+                };
+                console.log('✅ [DEBUG] rateSource after override:', rateSource);
+              } else if (unifiedAnalysisResult) {
+                console.log('⚠️ [DEBUG] ML rates not found in unifiedAnalysisResult, using fallback rates');
+                console.log('⚠️ [DEBUG] Why ML rates not used:', {
+                  mlHomeRateUndefined: mlHomeRate === undefined,
+                  mlRentRateUndefined: mlRentRate === undefined,
+                  rateSourceNull: !rateSource
+                });
+              } else {
+                console.log('⚠️ [DEBUG] unifiedAnalysisResult is null/undefined');
+              }
               
               return usingZipData && locationData ? (
                 // Scenario 1: Using ZIP data
@@ -1851,15 +2441,25 @@ const handleChipClick = (message: string) => {
                   <div className="reference-item">
                     <span className="ref-label">📈 Rent growth:</span>
                     <span className="ref-value">
-                      {rateSource ? `${rateSource.rentGrowthRate.toFixed(1)}%/year` : '___'} 
-                      <small>({locationData ? `${locationData.city} market` : 'national avg'})</small>
+                      {(() => {
+                        const displayRate = mlRentRate !== undefined ? mlRentRate : (rateSource?.rentGrowthRate ?? 0);
+                        const displayLabel = mlRentRate !== undefined ? 'ML prediction' : (locationData ? `${locationData.city} market` : 'national avg');
+                        console.log('📊 [REF BOX] Rent growth display:', { mlRentRate, rateSourceRent: rateSource?.rentGrowthRate, displayRate, displayLabel });
+                        return `${displayRate.toFixed(1)}%/year`;
+                      })()}
+                      <small>({mlRentRate !== undefined ? 'ML prediction' : locationData ? `${locationData.city} market` : 'national avg'})</small>
                     </span>
                   </div>
                   <div className="reference-item">
                     <span className="ref-label">🏘️ Appreciation:</span>
                     <span className="ref-value">
-                      {rateSource ? `${rateSource.homeAppreciationRate.toFixed(1)}%/year` : '___'} 
-                      <small>({locationData ? `${locationData.city} market` : 'based on timeline'})</small>
+                      {(() => {
+                        const displayRate = mlHomeRate !== undefined ? mlHomeRate : (rateSource?.homeAppreciationRate ?? 0);
+                        const displayLabel = mlHomeRate !== undefined ? 'ML prediction' : (locationData ? `${locationData.city} market` : 'based on timeline');
+                        console.log('📊 [REF BOX] Appreciation display:', { mlHomeRate, rateSourceHome: rateSource?.homeAppreciationRate, displayRate, displayLabel });
+                        return `${displayRate.toFixed(1)}%/year`;
+                      })()}
+                      <small>({mlHomeRate !== undefined ? 'ML prediction' : locationData ? `${locationData.city} market` : 'based on timeline'})</small>
                     </span>
                   </div>
                   <div className="reference-item">

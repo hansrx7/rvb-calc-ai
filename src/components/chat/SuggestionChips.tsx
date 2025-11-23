@@ -5,14 +5,7 @@ import './SuggestionChips.css';
 
 interface SuggestionChipsProps {
   onChipClick: (message: string) => void;
-  visibleCharts: {
-    netWorth: boolean;
-    monthlyCost: boolean;
-    totalCost: boolean;
-    equity: boolean;
-    rentGrowth: boolean;
-    breakEven: boolean;
-  };
+  visibleCharts: Record<string, boolean>;
 }
 
 interface Suggestion {
@@ -102,7 +95,7 @@ export function SuggestionChips({ onChipClick, visibleCharts }: SuggestionChipsP
     // Show first 2, keep rest in queue
     setDisplayedChips(shuffled.slice(0, 2));
     setRemainingChips(shuffled.slice(2));
-  }, [visibleCharts.netWorth, visibleCharts.monthlyCost, visibleCharts.totalCost, visibleCharts.equity, visibleCharts.rentGrowth, visibleCharts.breakEven]);
+  }, [visibleCharts]);
 
   const handleChipClick = (chip: Suggestion) => {
     // Send the message

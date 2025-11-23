@@ -206,11 +206,27 @@ export interface BreakEvenInfo {
   year: number | null;
 }
 
+export interface HomePricePathSummary {
+  years: number[];
+  p10: number[];  // 10th percentile prices for each year
+  p50: number[];  // 50th percentile (median) prices for each year
+  p90: number[];  // 90th percentile prices for each year
+}
+
 export interface AnalysisResult {
   timeline: TimelinePoint[];
   breakEven: BreakEvenInfo;
   totalBuyCost: number;
   totalRentCost: number;
+  // Rates actually used in calculations (from ML or fallback)
+  // Backend returns snake_case, so we support both formats
+  homeAppreciationRate?: number;
+  rentGrowthRate?: number;
+  home_appreciation_rate?: number; // snake_case from backend
+  rent_growth_rate?: number; // snake_case from backend
+  // Monte Carlo home price path simulation (optional)
+  monteCarloHomePrices?: HomePricePathSummary;
+  monte_carlo_home_prices?: HomePricePathSummary; // snake_case from backend
 }
 
 export interface AnalysisResponse {

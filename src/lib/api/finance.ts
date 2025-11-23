@@ -1,13 +1,13 @@
 import type { AnalysisResponse, ScenarioInputs, BreakEvenHeatmapPoint, MonteCarloResponse, SensitivityRequest, SensitivityResult, ScenarioRequest, ScenarioResult } from '../../types/calculator';
 import { apiFetch } from './client';
 
-export function analyzeScenario(inputs: ScenarioInputs, includeTimeline = false): Promise<AnalysisResponse> {
+export function analyzeScenario(inputs: ScenarioInputs, includeTimeline = false, zipCode?: string): Promise<AnalysisResponse> {
   return apiFetch<AnalysisResponse>('/api/finance/analyze', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ inputs, includeTimeline })
+    body: JSON.stringify({ inputs, includeTimeline, zipCode })
   });
 }
 

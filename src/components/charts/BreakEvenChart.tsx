@@ -8,16 +8,36 @@ interface BreakEvenChartProps {
 }
 
 export function BreakEvenChart({ analysis }: BreakEvenChartProps) {
+  // Safety checks
+  if (!analysis || !analysis.timeline || analysis.timeline.length === 0) {
+    console.error('❌ [BreakEvenChart] Invalid analysis data:', { analysis });
+    return (
+      <div className="chart-container">
+        <div className="chart-placeholder">Break-even data is not available.</div>
+      </div>
+    );
+  }
+  
   const { timeline, breakEven } = analysis;
+  
+  console.log('📊 [BreakEvenChart] Rendering with:', {
+    timelineLength: timeline.length,
+    breakEven,
+    firstPoint: timeline[0],
+    hasNaN: timeline.some(p => 
+      typeof p.netWorthBuy === 'number' && isNaN(p.netWorthBuy) ||
+      typeof p.netWorthRent === 'number' && isNaN(p.netWorthRent)
+    )
+  });
   
   // Transform data for the chart - show net worth difference over time
   const chartData = timeline
     .filter((_, index) => index % 12 === 0 || index === timeline.length - 1) // Every year + final month
     .map(point => ({
-      year: point.year,
-      netWorthDifference: Math.round(point.netWorthBuy - point.netWorthRent),
-      buyerNetWorth: Math.round(point.netWorthBuy),
-      renterNetWorth: Math.round(point.netWorthRent)
+      year: point.year ?? 0,
+      netWorthDifference: Math.round((point.netWorthBuy ?? 0) - (point.netWorthRent ?? 0)),
+      buyerNetWorth: Math.round(point.netWorthBuy ?? 0),
+      renterNetWorth: Math.round(point.netWorthRent ?? 0)
     }));
 
   // Add a starting point at year 0 with the actual month-0 values
@@ -36,7 +56,7 @@ export function BreakEvenChart({ analysis }: BreakEvenChartProps) {
   }
 
   // Use break-even from analysis result
-  const breakEvenYear = breakEven.year;
+  const breakEvenYear = breakEven?.year ?? null;
   
   // Calculate final difference
   

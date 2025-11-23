@@ -1,48 +1,166 @@
-import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
+import { Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import type { HomePricePathSummary } from '../../types/calculator';
 
-interface MonteCarloRun {
-  run: number;
-  finalBuyerNetWorth: number;
-  finalRenterNetWorth: number;
-  breakevenMonth: number | null;
-}
-interface MonteCarloSummary {
-  percentile10: number;
-  percentile50: number;
-  percentile90: number;
-}
 interface MonteCarloChartProps {
-  runs: MonteCarloRun[];
-  summary: MonteCarloSummary;
+  monteCarloHomePrices?: HomePricePathSummary | null;
 }
 
-export function MonteCarloChart({ runs, summary }: MonteCarloChartProps) {
-  // compute net worth delta for each run
-  const data = runs.map(run => ({
-    run: run.run,
-    netWorthDelta: run.finalBuyerNetWorth - run.finalRenterNetWorth
+export function MonteCarloChart({ monteCarloHomePrices }: MonteCarloChartProps) {
+  console.log('🎲 [MC DEBUG] MonteCarloChart render:', {
+    hasProps: !!monteCarloHomePrices,
+    hasYears: !!monteCarloHomePrices?.years,
+    yearsLength: monteCarloHomePrices?.years?.length,
+    hasP10: !!monteCarloHomePrices?.p10,
+    p10Length: monteCarloHomePrices?.p10?.length,
+    hasP50: !!monteCarloHomePrices?.p50,
+    p50Length: monteCarloHomePrices?.p50?.length,
+    hasP90: !!monteCarloHomePrices?.p90,
+    p90Length: monteCarloHomePrices?.p90?.length,
+    sampleData: monteCarloHomePrices ? {
+      firstYear: monteCarloHomePrices.years?.[0],
+      firstP10: monteCarloHomePrices.p10?.[0],
+      firstP50: monteCarloHomePrices.p50?.[0],
+      firstP90: monteCarloHomePrices.p90?.[0],
+      lastYear: monteCarloHomePrices.years?.[monteCarloHomePrices.years?.length - 1],
+      lastP50: monteCarloHomePrices.p50?.[monteCarloHomePrices.p50?.length - 1]
+    } : null
+  });
+  
+  // Check if data is available
+  if (!monteCarloHomePrices || 
+      !monteCarloHomePrices.years || 
+      monteCarloHomePrices.years.length === 0 ||
+      !monteCarloHomePrices.p10 || 
+      !monteCarloHomePrices.p50 || 
+      !monteCarloHomePrices.p90) {
+    console.log('🎲 [MC DEBUG] MonteCarloChart: No data available, showing placeholder');
+    return (
+      <div className="chart-container">
+        <div className="chart-placeholder">
+          No Monte Carlo data available.
+        </div>
+      </div>
+    );
+  }
+
+  // Transform data for the chart
+  const chartData = monteCarloHomePrices.years.map((year, index) => ({
+    year,
+    p10: Math.round(monteCarloHomePrices.p10[index]),
+    p50: Math.round(monteCarloHomePrices.p50[index]),
+    p90: Math.round(monteCarloHomePrices.p90[index])
   }));
+  
+  console.log('🎲 [MC DEBUG] MonteCarloChart: Chart data prepared:', {
+    chartDataLength: chartData.length,
+    firstPoint: chartData[0],
+    lastPoint: chartData[chartData.length - 1]
+  });
+
+  const finalYear = chartData[chartData.length - 1]?.year ?? 0;
+  const initialPrice = chartData[0]?.p50 ?? 0;
+  const finalPriceP50 = chartData[chartData.length - 1]?.p50 ?? 0;
+  const priceChange = finalPriceP50 - initialPrice;
+  const priceChangePct = initialPrice > 0 ? ((priceChange / initialPrice) * 100) : 0;
+
   return (
     <div className="chart-container">
-      <h3 className="chart-title">Monte Carlo Simulation: Outcome Spread</h3>
+      <h3 className="chart-title">Simulated Home Value Range</h3>
       <div style={{marginBottom: '16px', background: '#f7fafc', padding: '12px', borderRadius: '8px'}}>
-        <strong>Interpretation:</strong> Shows how random market shifts affect the results. Most likely outcome is at the 50th percentile line (median). If most bars are above zero, buying usually "wins." Wide spread means more uncertainty.
+        <p style={{margin: 0, fontSize: '14px', color: '#2d3748'}}>
+          <strong>Based on ML-estimated appreciation and ZIP-level volatility.</strong> This chart shows the range of possible home values over {finalYear} years. The shaded area represents the 10th to 90th percentile range, with the median (50th percentile) shown as a line.
+        </p>
       </div>
-      <ResponsiveContainer width="100%" height={350}>
-        <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="run" hide />
-          <YAxis label={{ value: 'Net Worth Δ ($)', angle: -90, position: 'insideLeft' }} />
-          <Tooltip formatter={(value: number) => `$${value.toLocaleString()}`} />
-          <Bar dataKey="netWorthDelta" fill="#805ad5" />
-          <ReferenceLine y={summary.percentile10} label="10th %" stroke="#e53e3e" strokeDasharray="3 3" />
-          <ReferenceLine y={summary.percentile50} label="Median" stroke="#38a169" strokeDasharray="3 3" />
-          <ReferenceLine y={summary.percentile90} label="90th %" stroke="#3182ce" strokeDasharray="3 3" />
-        </BarChart>
+      
+      <ResponsiveContainer width="100%" height={400}>
+        <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+          <defs>
+            <linearGradient id="colorBand" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#3182ce" stopOpacity={0.3}/>
+              <stop offset="95%" stopColor="#3182ce" stopOpacity={0.1}/>
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+          <XAxis 
+            dataKey="year" 
+            label={{ value: 'Years', position: 'insideBottom', offset: -5 }}
+          />
+          <YAxis 
+            label={{ value: 'Home Value ($)', angle: -90, position: 'insideLeft' }}
+            tickFormatter={(value) => {
+              if (Math.abs(value) >= 1000000) {
+                return `$${(value / 1000000).toFixed(1)}M`;
+              } else if (Math.abs(value) >= 1000) {
+                return `$${(value / 1000).toFixed(0)}k`;
+              }
+              return `$${value}`;
+            }}
+          />
+          <Tooltip 
+            formatter={(value: number) => `$${value.toLocaleString()}`}
+            contentStyle={{ backgroundColor: 'white', border: '2px solid #3182ce', borderRadius: '8px' }}
+            labelFormatter={(year) => `Year ${year}`}
+          />
+          <Legend />
+          
+          {/* Shaded area between p10 and p90 */}
+          <Area
+            type="monotone"
+            dataKey="p90"
+            stroke="none"
+            fill="url(#colorBand)"
+            fillOpacity={0.3}
+            connectNulls
+          />
+          <Area
+            type="monotone"
+            dataKey="p10"
+            stroke="none"
+            fill="#fff"
+            fillOpacity={1}
+            connectNulls
+          />
+          
+          {/* Median line (p50) */}
+          <Line 
+            type="monotone" 
+            dataKey="p50" 
+            stroke="#38a169" 
+            strokeWidth={3}
+            dot={false}
+            name="Median (50th percentile)"
+          />
+          
+          {/* Upper and lower bounds as lines */}
+          <Line 
+            type="monotone" 
+            dataKey="p90" 
+            stroke="#3182ce" 
+            strokeWidth={2}
+            strokeDasharray="5 5"
+            dot={false}
+            name="90th percentile"
+          />
+          <Line 
+            type="monotone" 
+            dataKey="p10" 
+            stroke="#e53e3e" 
+            strokeWidth={2}
+            strokeDasharray="5 5"
+            dot={false}
+            name="10th percentile"
+          />
+        </AreaChart>
       </ResponsiveContainer>
+      
       <div className="chart-description" style={{marginTop: '16px'}}>
-        <strong>Percentiles (horizontal lines):</strong> 10th: ${Math.round(summary.percentile10).toLocaleString()}, 50th: ${Math.round(summary.percentile50).toLocaleString()}, 90th: ${Math.round(summary.percentile90).toLocaleString()}.
+        <p style={{marginBottom: '8px', lineHeight: '1.6', color: '#2d3748'}}>
+          <strong>Projected median value after {finalYear} years:</strong> ${finalPriceP50.toLocaleString()} 
+          ({priceChange >= 0 ? '+' : ''}{priceChangePct.toFixed(1)}% from initial ${initialPrice.toLocaleString()})
+        </p>
+        <p style={{margin: 0, fontSize: '12px', color: '#718096', fontStyle: 'italic'}}>
+          The 10th percentile represents a conservative scenario (lower prices), while the 90th percentile represents an optimistic scenario (higher prices). The median shows the most likely outcome.
+        </p>
       </div>
     </div>
   );

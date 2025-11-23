@@ -8,15 +8,33 @@ interface TotalCostChartProps {
 }
 
 export function TotalCostChart({ analysis }: TotalCostChartProps) {
+  // Safety checks
+  if (!analysis || !analysis.timeline || analysis.timeline.length === 0) {
+    console.error('❌ [TotalCostChart] Invalid analysis data:', { analysis });
+    return (
+      <div className="chart-container">
+        <div className="chart-placeholder">Total cost data is not available.</div>
+      </div>
+    );
+  }
+  
   const lastPoint = analysis.timeline[analysis.timeline.length - 1];
   const timelineYears = Math.ceil(analysis.timeline.length / 12);
   
-  const buyerFinalNetWorth = lastPoint.netWorthBuy;
-  const renterFinalNetWorth = lastPoint.netWorthRent;
-  const totalBuyingCosts = analysis.totalBuyCost;
-  const totalRentingCosts = analysis.totalRentCost;
-  const finalHomeValue = lastPoint.homeValue;
-  const finalInvestmentValue = lastPoint.renterInvestmentBalance;
+  console.log('📊 [TotalCostChart] Rendering with:', {
+    timelineLength: analysis.timeline.length,
+    lastPoint,
+    totalBuyCost: analysis.totalBuyCost,
+    totalRentCost: analysis.totalRentCost,
+    hasNaN: Object.values(lastPoint || {}).some(v => typeof v === 'number' && isNaN(v))
+  });
+  
+  const buyerFinalNetWorth = lastPoint?.netWorthBuy ?? 0;
+  const renterFinalNetWorth = lastPoint?.netWorthRent ?? 0;
+  const totalBuyingCosts = analysis.totalBuyCost ?? 0;
+  const totalRentingCosts = analysis.totalRentCost ?? 0;
+  const finalHomeValue = lastPoint?.homeValue ?? 0;
+  const finalInvestmentValue = lastPoint?.renterInvestmentBalance ?? 0;
   
   // Calculate net cost (what you spent minus what you have)
   const buyingNetCost = totalBuyingCosts - finalHomeValue;
