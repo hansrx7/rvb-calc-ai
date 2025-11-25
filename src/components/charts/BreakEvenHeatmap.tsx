@@ -1,4 +1,3 @@
-import React from 'react';
 import type { BreakEvenHeatmapPoint } from '../../types/calculator';
 
 interface BreakEvenHeatmapProps {
@@ -21,6 +20,9 @@ export function BreakEvenHeatmap({ points }: BreakEvenHeatmapProps) {
   return (
     <div className="chart-container">
       <h3 className="chart-title">Break-Even Heatmap (Timeline × Down Payment)</h3>
+      <p className="chart-caption" style={{ marginBottom: '16px', fontSize: '14px', color: '#4a5568', lineHeight: '1.5' }}>
+        This shows when buying starts to financially beat renting under different conditions. Greener cells mean faster break-even (better).
+      </p>
       <div style={{marginBottom: '12px', background: '#f7fafc', padding: '12px', borderRadius: '8px', color: '#1a202c'}}>
         <strong>Interpretation:</strong> Each cell shows after how many months buying "breaks even" vs renting for a given timeline and down payment. Earlier = greener!
       </div>

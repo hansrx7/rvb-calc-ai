@@ -21,12 +21,16 @@ export function NetWorthChart({ timeline }: NetWorthChartProps) {
   return (
     <div className="chart-container">
       <h3 className="chart-title">Net Worth Comparison Over {Math.ceil(timeline.length / 12)} Years</h3>
+      <p className="chart-caption" style={{ marginBottom: '16px', fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.5' }}>
+        This shows how your net worth changes over time if you buy versus rent. Higher lines are better.
+      </p>
       <ResponsiveContainer width="100%" height={400}>
         <LineChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
           <XAxis 
             dataKey="year" 
             label={{ value: 'Years', position: 'insideBottom', offset: -5 }}
+            stroke="rgba(255, 255, 255, 0.7)"
           />
             <YAxis 
             label={{ value: 'Net Worth ($)', angle: -90, position: 'insideLeft' }}
@@ -38,16 +42,18 @@ export function NetWorthChart({ timeline }: NetWorthChartProps) {
                 }
                 return `$${value}`;
             }}
+            stroke="rgba(255, 255, 255, 0.7)"
             />
           <Tooltip 
             formatter={(value: number) => `$${value.toLocaleString()}`}
             labelFormatter={(label) => `Year ${label}`}
+            contentStyle={{ backgroundColor: 'rgba(30, 30, 40, 0.95)', border: '1px solid rgba(139, 92, 246, 0.5)', borderRadius: '8px', color: 'white' }}
           />
-          <Legend />
+          <Legend wrapperStyle={{ color: 'rgba(255, 255, 255, 0.9)' }} />
           <Line 
             type="monotone" 
             dataKey="buying" 
-            stroke="#667eea" 
+            stroke="#8b5cf6" 
             strokeWidth={3}
             name="Buying"
             dot={false}
@@ -55,7 +61,7 @@ export function NetWorthChart({ timeline }: NetWorthChartProps) {
           <Line 
             type="monotone" 
             dataKey="renting" 
-            stroke="#f56565" 
+            stroke="#60a5fa" 
             strokeWidth={3}
             name="Renting"
             dot={false}
@@ -63,8 +69,8 @@ export function NetWorthChart({ timeline }: NetWorthChartProps) {
         </LineChart>
       </ResponsiveContainer>
       <p className="chart-description">
-        Blue line = Your net worth if you buy the house<br/>
-        Red line = Your net worth if you rent and invest the down payment
+        Purple line = Your net worth if you buy the house<br/>
+        Blue line = Your net worth if you rent and invest the down payment
       </p>
     </div>
   );

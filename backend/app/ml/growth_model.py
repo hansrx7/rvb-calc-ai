@@ -14,6 +14,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Import ZIP similarity function for fallback predictions
+from .zip_similarity import find_similar_zips
+
 # Paths
 # __file__ is backend/app/ml/growth_model.py
 # So parent.parent.parent = backend/
@@ -205,6 +208,117 @@ def predict_zip_growth(
     except Exception as e:
         logger.error(f"Error predicting growth for ZIP {zip_code}: {e}")
         return (fallback_home, fallback_rent)
+
+
+def predict_zip_growth_with_fallback(
+    zip_code: str,
+    fallback_home_rate: float,
+    fallback_rent_rate: float,
+    k: int = 10,
+) -> Tuple[float, float]:
+    """
+    Improve ML predictions by using ZIP embeddings and similar ZIP codes.
+    
+    This function first tries the standard ML prediction. If that fails or the ZIP
+    is not found, it falls back to averaging predictions from similar ZIP codes
+    based on feature embeddings.
+    
+    Args:
+        zip_code: ZIP code string (will be normalized)
+        fallback_home_rate: Fallback home appreciation rate in decimal form (e.g., 0.04 for 4%)
+        fallback_rent_rate: Fallback rent growth rate in decimal form (e.g., 0.03 for 3%)
+        k: Number of similar ZIPs to consider for fallback (default: 10)
+    
+    Returns:
+        Tuple[float, float]: (home_appreciation_rate, rent_growth_rate) in decimal form.
+            Returns fallback values if all prediction methods fail.
+    
+    Steps:
+        1. Try normal ML prediction using predict_zip_growth().
+        2. If the ZIP is missing OR ML returns None/NaN, fall back to:
+           - Find k similar ZIPs using find_similar_zips()
+           - For those similar ZIPs, fetch their ML predictions
+           - Ignore ZIPs whose ML predictions fail
+           - Average the successful predictions
+        3. If no neighbors provide valid predictions, return fallback rates.
+    """
+    # Normalize ZIP code
+    zip_code_str = str(zip_code).strip()
+    
+    # Step A: Try normal ML prediction first
+    # First check if ZIP exists in training data
+    from .zip_similarity import get_zip_index
+    zip_index = get_zip_index(zip_code_str)
+    
+    if zip_index != -1:
+        # ZIP exists - try ML prediction
+        try:
+            home_ml, rent_ml = predict_zip_growth(
+                zip_code_str,
+                fallback_home_rate,
+                fallback_rent_rate
+            )
+            
+            # Check if ML prediction is valid (non-NaN)
+            if not (np.isnan(home_ml) or np.isnan(rent_ml)):
+                # Valid ML prediction - return it
+                print(f"[FALLBACK DEBUG] ZIP {zip_code_str}: Using direct ML prediction (home={home_ml:.6f}, rent={rent_ml:.6f})")
+                return float(home_ml), float(rent_ml)
+            else:
+                print(f"[FALLBACK DEBUG] ZIP {zip_code_str}: ML prediction returned NaN, using fallback method")
+        except Exception as e:
+            print(f"[FALLBACK DEBUG] ZIP {zip_code_str}: Error in direct ML prediction: {e}, using fallback method")
+    else:
+        print(f"[FALLBACK DEBUG] ZIP {zip_code_str}: Not found in training data, using fallback method")
+    
+    # Step B: Fallback to similar ZIPs
+    try:
+        neighbors = find_similar_zips(zip_code_str, k=k)
+        print(f"[FALLBACK DEBUG] ZIP {zip_code_str}: Found {len(neighbors)} similar ZIPs")
+        
+        if not neighbors:
+            print(f"[FALLBACK DEBUG] ZIP {zip_code_str}: No similar ZIPs found, using fallback rates")
+            return fallback_home_rate, fallback_rent_rate
+        
+        # Collect predictions from neighbors
+        home_predictions = []
+        rent_predictions = []
+        
+        for neighbor_zip, distance in neighbors:
+            try:
+                neighbor_home, neighbor_rent = predict_zip_growth(
+                    neighbor_zip,
+                    fallback_home_rate,
+                    fallback_rent_rate
+                )
+                
+                # Only use predictions that are valid (non-NaN)
+                if not (np.isnan(neighbor_home) or np.isnan(neighbor_rent)):
+                    home_predictions.append(neighbor_home)
+                    rent_predictions.append(neighbor_rent)
+            
+            except Exception as e:
+                # Skip this neighbor if prediction fails
+                print(f"[FALLBACK DEBUG] ZIP {zip_code_str}: Neighbor {neighbor_zip} prediction failed: {e}")
+                continue
+        
+        # Step C: Check if we have any valid predictions
+        if len(home_predictions) > 0 and len(rent_predictions) > 0:
+            # Average the successful predictions
+            avg_home = float(np.mean(home_predictions))
+            avg_rent = float(np.mean(rent_predictions))
+            
+            print(f"[FALLBACK DEBUG] ZIP {zip_code_str}: Using {len(home_predictions)} neighbor predictions "
+                  f"(home={avg_home:.6f}, rent={avg_rent:.6f})")
+            return avg_home, avg_rent
+        else:
+            print(f"[FALLBACK DEBUG] ZIP {zip_code_str}: No valid neighbor predictions, using fallback rates")
+            return fallback_home_rate, fallback_rent_rate
+    
+    except Exception as e:
+        # Total failure - return fallback rates
+        print(f"[FALLBACK DEBUG] ZIP {zip_code_str}: Error in fallback method: {e}, using fallback rates")
+        return fallback_home_rate, fallback_rent_rate
 
 
 # Lazy load models on first import (optional - can be called explicitly)

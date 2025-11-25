@@ -10,7 +10,14 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     api_prefix: str = Field(default="/api")
-    cors_origins: List[str] = Field(default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"])
+    cors_origins: List[str] = Field(
+        default_factory=lambda: [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5174",
+        ]
+    )
     openai_api_key: str | None = None
 
     class Config:

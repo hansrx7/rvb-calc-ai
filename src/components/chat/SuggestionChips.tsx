@@ -16,8 +16,20 @@ interface Suggestion {
 }
 
 export function SuggestionChips({ onChipClick, visibleCharts }: SuggestionChipsProps) {
-  // All possible suggestions - only general questions now (charts have dedicated buttons)
+  // All possible suggestions - prioritize ZIP code entry, then general questions
   const allSuggestions: Suggestion[] = [
+    {
+      id: 'zipCode',
+      text: '📍 Start with my ZIP code',
+      message: 'I\'m in 92127',
+      type: 'general'
+    },
+    {
+      id: 'example',
+      text: '💡 Try an example scenario',
+      message: 'I want to buy a $500k home, rent is $3k, 20% down, 10 years',
+      type: 'general'
+    },
     {
       id: 'advice',
       text: '💡 Should I buy in my situation?',

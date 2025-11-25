@@ -33,8 +33,8 @@ button:hover {
 
 /* Style for Pro tip text */
 .pro-tip {
-  background-color: rgba(16, 185, 129, 0.15);
-  color: #059669;
+  background-color: rgba(139, 92, 246, 0.2);
+  color: rgba(139, 92, 246, 0.9);
   padding: 2px 4px;
   border-radius: 3px;
 }
@@ -42,13 +42,17 @@ button:hover {
 /* Edit mode styles */
 .reference-box-actions {
   padding: 12px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(139, 92, 246, 0.2);
   display: flex;
   justify-content: center;
+  border-radius: 0 0 16px 16px;
+  margin: 12px -16px -16px -16px;
+  padding: 12px 16px;
+  background: rgba(30, 30, 40, 0.95);
 }
 
 .edit-values-btn {
-  background: linear-gradient(135deg, #1e293b 0%, #064e3b 100%);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%);
   color: white;
   border: none;
   padding: 8px 16px;
@@ -62,7 +66,7 @@ button:hover {
 
 .edit-values-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(30, 41, 59, 0.4);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
 }
 
 .edit-actions {
@@ -71,7 +75,7 @@ button:hover {
 }
 
 .save-edit-btn {
-  background: linear-gradient(135deg, #1e293b 0%, #064e3b 100%);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%);
   color: white;
   border: none;
   padding: 8px 16px;
@@ -85,11 +89,11 @@ button:hover {
 
 .save-edit-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(30, 41, 59, 0.4);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
 }
 
 .cancel-edit-btn {
-  background: linear-gradient(135deg, #1e293b 0%, #064e3b 100%);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%);
   color: white;
   border: none;
   padding: 8px 16px;
@@ -103,7 +107,7 @@ button:hover {
 
 .cancel-edit-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(30, 41, 59, 0.4);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
 }
 
 /* Edit mode input styles */
@@ -116,7 +120,7 @@ button:hover {
 .ref-input {
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
+  border-radius: 8px;
   padding: 6px 8px;
   color: white;
   font-size: 14px;
@@ -132,9 +136,9 @@ button:hover {
 
 .ref-input:focus {
   outline: none;
-  border-color: rgba(16, 185, 129, 0.8);
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
-  background: rgba(0, 0, 0, 0.5);
+  border-color: rgba(139, 92, 246, 0.8);
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.3);
+  background: rgba(30, 30, 40, 0.9);
 }
 
 .ref-input::placeholder {
@@ -148,19 +152,18 @@ body {
 
 .app {
   min-height: 100vh;
-  height: 100%;
+  height: 100vh;
   width: 100%;
   position: fixed;
   top: 0;
   left: 0;
   display: flex;
   justify-content: center;
-  align-items: center;
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 33%, #064e3b 66%, #022c22 100%);
-  background-size: 400% 400%;
-  animation: subtleGradient 15s ease infinite;
-  padding: 20px;
-  overflow: hidden;
+  align-items: flex-start;
+  background: transparent;
+  padding: 0;
+  overflow-x: visible;
+  overflow-y: hidden;
 }
 
 .app-layout {
@@ -170,22 +173,29 @@ body {
   height: 100vh;
   padding: 20px;
   box-sizing: border-box;
+  overflow: visible;
 }
 
 .chat-container {
   width: 100%;
-  max-width: 1000px;
-  height: calc(100vh - 40px);
+  max-width: 1400px;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  background: white;
+  background: #1a1d29;
   border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  overflow-x: visible;
+  overflow-y: hidden;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  margin: 0 auto;
+  border: 1px solid rgba(139, 92, 246, 0.2);
 }
 
 .chat-header {
-  background: linear-gradient(135deg, #1e293b 0%, #064e3b 100%);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.3) 0%, rgba(59, 130, 246, 0.3) 100%);
   color: white;
   padding: 20px;
   text-align: center;
@@ -193,6 +203,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.2);
 }
 
 .chat-header h1 {
@@ -209,9 +220,9 @@ body {
 
 .save-button {
   padding: 8px 16px;
-  background: rgba(56, 161, 105, 0.8);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%);
   color: white;
-  border: 2px solid rgba(56, 161, 105, 0.6);
+  border: 2px solid rgba(139, 92, 246, 0.6);
   border-radius: 20px;
   font-size: 14px;
   font-weight: 600;
@@ -221,21 +232,21 @@ body {
 }
 
 .save-button:hover {
-  background: rgba(56, 161, 105, 1);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 1) 0%, rgba(59, 130, 246, 1) 100%);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(30, 41, 59, 0.4);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
 }
 
 .save-button:focus {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(56, 161, 105, 0.5);
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.5);
 }
 
 .restart-button {
   padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%);
   color: white;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  border: 2px solid rgba(139, 92, 246, 0.6);
   border-radius: 20px;
   font-size: 14px;
   font-weight: 600;
@@ -245,14 +256,14 @@ body {
 }
 
 .restart-button:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 1) 0%, rgba(59, 130, 246, 1) 100%);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(30, 41, 59, 0.4);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
 }
 
 .restart-button:focus {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.5);
 }
 
 .restart-button:active {
@@ -266,10 +277,11 @@ body {
   gap: 12px;
   padding: 16px 20px;
   margin: 12px 0;
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(30, 30, 40, 0.8);
   border-radius: 12px;
   font-size: 14px;
-  color: #6b7280;
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(139, 92, 246, 0.2);
 }
 
 .typing-dots {
@@ -281,7 +293,7 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #9ca3af;
+  background: rgba(139, 92, 246, 0.8);
   animation: typing 1.4s infinite ease-in-out;
 }
 
@@ -304,6 +316,98 @@ body {
   }
 }
 
+/* Joyride Tour Animations - Enhanced fade effects */
+@keyframes tooltipFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.92);
+  }
+  50% {
+    opacity: 0.5;
+    transform: translateY(5px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes spotlightFadeIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes overlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Smooth transitions for Joyride tour elements */
+[data-joyride] {
+  transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+}
+
+/* Smooth tooltip transitions - More fade */
+.react-joyride__tooltip {
+  transition: opacity 0.6s ease-out, transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+  animation: tooltipFadeIn 0.65s ease-out !important;
+}
+
+/* Smooth spotlight transitions - Make it completely transparent */
+.react-joyride__spotlight {
+  transition: all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+  animation: spotlightFadeIn 0.6s ease-out !important;
+  /* Make spotlight completely transparent - creates the "hole" in overlay */
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  /* Ensure it doesn't block the element */
+  pointer-events: none !important;
+  z-index: 10001 !important;
+}
+
+/* Smooth overlay transitions - Make it almost invisible */
+.react-joyride__overlay {
+  transition: opacity 0.5s ease-in-out !important;
+  animation: overlayFadeIn 0.5s ease-in-out !important;
+  /* Almost completely transparent - just a hint of dimming */
+  background: rgba(0, 0, 0, 0.05) !important;
+  backdrop-filter: none !important;
+}
+
+/* Ensure elements inside spotlight are visible and clickable */
+.react-joyride__spotlight * {
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 10002 !important;
+  /* Make sure nothing darkens the element */
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* Joyride spotlight - make it visible with an outline */
+.react-joyride__spotlight {
+  /* Add a visible border to the spotlight area */
+  border: 3px solid rgba(139, 92, 246, 0.9) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.2),
+              0 0 20px rgba(139, 92, 246, 0.5) !important;
+}
+
 .messages-container {
   flex: 1;
   overflow-y: auto;
@@ -311,6 +415,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  background: #1a1d29;
 }
 
 .message {
@@ -352,42 +457,50 @@ body {
 }
 
 .user-bubble {
-  background: #1e293b;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.8) 0%, rgba(59, 130, 246, 0.8) 100%);
   color: white;
   border-bottom-right-radius: 4px;
 }
 
 .assistant-bubble {
-  background: #f1f3f5;
-  color: #333;
+  background: rgba(30, 30, 40, 0.9);
+  color: rgba(255, 255, 255, 0.9);
   border-bottom-left-radius: 4px;
+  border: 1px solid rgba(139, 92, 246, 0.2);
 }
 
 .chat-input-form {
   display: flex;
   padding: 20px;
   gap: 10px;
-  border-top: 1px solid #e9ecef;
-  background: white;
+  border-top: 1px solid rgba(139, 92, 246, 0.2);
+  background: #1a1d29;
 }
 
 .chat-input {
   flex: 1;
   padding: 12px 16px;
-  border: 2px solid #e9ecef;
+  border: 2px solid rgba(139, 92, 246, 0.3);
   border-radius: 24px;
   font-size: 16px;
   outline: none;
   transition: border-color 0.2s;
+  background: rgba(30, 30, 40, 0.8);
+  color: white;
 }
 
 .chat-input:focus {
-  border-color: #1e293b;
+  border-color: rgba(139, 92, 246, 0.8);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+
+.chat-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .send-button {
   padding: 12px 24px;
-  background: linear-gradient(135deg, #1e293b 0%, #064e3b 100%);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%);
   color: white;
   border: none;
   border-radius: 24px;
@@ -399,7 +512,7 @@ body {
 
 .send-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(30, 41, 59, 0.4);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
 }
 
 .send-button:active {
@@ -410,10 +523,11 @@ body {
 .chart-container {
   margin: 20px 0;
   padding: 20px;
-  background: white;
+  background: rgba(30, 30, 40, 0.9);
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   animation: fadeInUp 0.5s ease-out;
+  border: 1px solid rgba(139, 92, 246, 0.2);
 }
 
 @keyframes fadeInUp {
@@ -430,7 +544,7 @@ body {
 .chart-title {
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: rgba(255, 255, 255, 0.95);
   margin-bottom: 20px;
   text-align: center;
 }
@@ -438,7 +552,7 @@ body {
 .chart-description {
   margin-top: 16px;
   font-size: 14px;
-  color: #666;
+  color: rgba(255, 255, 255, 0.7);
   text-align: center;
   line-height: 1.6;
 }
@@ -457,24 +571,26 @@ body {
 }
 
 .breakdown-column {
-  background: #f8f9fa;
+  background: rgba(30, 30, 40, 0.6);
   padding: 16px;
   border-radius: 8px;
+  border: 1px solid rgba(139, 92, 246, 0.2);
 }
 
 .breakdown-column h4 {
   font-size: 16px;
   font-weight: 600;
   margin-bottom: 12px;
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .breakdown-item {
   display: flex;
   justify-content: space-between;
   padding: 8px 0;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.2);
   font-size: 14px;
-  color: #333;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .breakdown-item:last-child {
@@ -484,8 +600,8 @@ body {
 .breakdown-total {
   margin-top: 8px;
   padding-top: 12px;
-  border-top: 2px solid #1e293b;
-  color: #333;
+  border-top: 2px solid rgba(139, 92, 246, 0.5);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 /* Break-even Callout */
@@ -523,13 +639,14 @@ body {
 }
 
 .modal-content {
-  background: white;
+  background: rgba(30, 30, 40, 0.95);
   padding: 32px;
   border-radius: 16px;
   max-width: 400px;
   width: 90%;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   animation: modalSlideIn 0.2s ease-out;
+  border: 1px solid rgba(139, 92, 246, 0.3);
 }
 
 @keyframes modalSlideIn {
@@ -546,13 +663,13 @@ body {
 .modal-content h2 {
   font-size: 24px;
   font-weight: 600;
-  color: #333;
+  color: rgba(255, 255, 255, 0.95);
   margin-bottom: 12px;
 }
 
 .modal-content p {
   font-size: 16px;
-  color: #666;
+  color: rgba(255, 255, 255, 0.8);
   line-height: 1.5;
   margin-bottom: 24px;
 }
@@ -574,22 +691,24 @@ body {
 }
 
 .cancel-button {
-  background: #f1f3f5;
-  color: #333;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%);
+  color: white;
 }
 
 .cancel-button:hover {
-  background: #e9ecef;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 1) 0%, rgba(59, 130, 246, 1) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
 }
 
 .confirm-button {
-  background: linear-gradient(135deg, #1e293b 0%, #064e3b 100%);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%);
   color: white;
 }
 
 .confirm-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
 }
 
 .confirm-button:active, .cancel-button:active {
@@ -598,7 +717,7 @@ body {
 
 /* Progress Modal Styles */
 .progress-modal {
-  background: white;
+  background: rgba(30, 30, 40, 0.95);
   padding: 40px;
   border-radius: 20px;
   display: flex;
@@ -607,6 +726,7 @@ body {
   gap: 20px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   animation: modalSlideIn 0.2s ease-out;
+  border: 1px solid rgba(139, 92, 246, 0.3);
 }
 
 .progress-circle {
@@ -643,14 +763,14 @@ body {
 /* Footer Styles */
 .chat-footer {
   padding: 12px 20px;
-  background: #f8f9fa;
-  border-top: 1px solid #e9ecef;
+  background: rgba(30, 30, 40, 0.8);
+  border-top: 1px solid rgba(139, 92, 246, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   font-size: 13px;
-  color: #6c757d;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .chat-footer span:nth-child(2) {
@@ -787,14 +907,15 @@ body {
 
 /* Chart Navigation Section */
 .chart-nav-section {
-  background: linear-gradient(135deg, #1e293b 0%, #064e3b 100%);
+  background: rgba(30, 30, 40, 0.9);
   border-radius: 16px;
   padding: 24px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(139, 92, 246, 0.2);
 }
 
 .chart-nav-section h4 {
-  color: white;
+  color: rgba(255, 255, 255, 0.95);
   font-size: 18px;
   font-weight: 600;
   margin: 0 0 16px 0;
@@ -807,10 +928,10 @@ body {
 }
 
 .chart-nav-btn {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(30, 30, 40, 0.6);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: rgba(255, 255, 255, 0.9);
   padding: 12px 16px;
   border-radius: 10px;
   font-size: 14px;
@@ -824,15 +945,17 @@ body {
 }
 
 .chart-nav-btn:hover:not(.disabled) {
-  background: rgba(255, 255, 255, 0.25);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.3) 0%, rgba(59, 130, 246, 0.3) 100%);
+  border-color: rgba(139, 92, 246, 0.6);
   transform: translateX(4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
 }
 
 .chart-nav-btn.disabled {
   opacity: 0.4;
   cursor: not-allowed;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(30, 30, 40, 0.3);
+  border-color: rgba(139, 92, 246, 0.1);
 }
 
 .chart-nav-btn:active:not(.disabled) {
@@ -841,8 +964,8 @@ body {
 
 /* Horizontal Chart Navigation Bar (at bottom) */
 .chart-nav-bar {
-  background: #f8f9fa;
-  border-top: 1px solid #e9ecef;
+  background: rgba(30, 30, 40, 0.8);
+  border-top: 1px solid rgba(139, 92, 246, 0.2);
   padding: 12px 20px;
   display: flex;
   align-items: center;
@@ -853,7 +976,7 @@ body {
 .chart-nav-label {
   font-size: 14px;
   font-weight: 600;
-  color: #495057;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .chart-nav-buttons-horizontal {
@@ -863,7 +986,7 @@ body {
 }
 
 .chart-nav-btn-sm {
-  background: linear-gradient(135deg, #1e293b 0%, #064e3b 100%);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%);
   color: white;
   border: none;
   padding: 8px 16px;
@@ -879,11 +1002,100 @@ body {
 
 .chart-nav-btn-sm:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
 }
 
 .chart-nav-btn-sm:active {
   transform: translateY(0);
+}
+
+/* Chart Sections Organization */
+.rvb-chart-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rvb-core-charts-header {
+  font-size: 0.9rem;
+  opacity: 0.85;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 8px;
+}
+
+.rvb-advanced-section {
+  margin-top: 8px;
+}
+
+.rvb-advanced-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  background: rgba(30, 30, 40, 0.6);
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+  transition: background 0.2s ease;
+}
+
+.rvb-advanced-toggle:hover {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.5);
+}
+
+.rvb-advanced-toggle-indicator {
+  opacity: 0.8;
+  font-size: 0.8rem;
+  margin-left: 8px;
+}
+
+.rvb-advanced-chips {
+  margin-top: 6px;
+}
+
+.monte-carlo-progress-card {
+  background: rgba(30, 30, 40, 0.9);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 16px;
+  padding: 18px 24px 20px;
+  margin: 20px auto 0;
+  max-width: 960px;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+}
+
+.monte-carlo-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  margin-bottom: 10px;
+}
+
+.monte-carlo-progress-bar {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(30, 30, 40, 0.6);
+  overflow: hidden;
+}
+
+.monte-carlo-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%);
+  width: 0%;
+  transition: width 0.4s ease;
+}
+
+.monte-carlo-progress-stage {
+  margin-top: 10px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 /* Professional Summary Button */
@@ -891,7 +1103,7 @@ body {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  background: linear-gradient(135deg, #1e293b 0%, #064e3b 100%);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%);
   color: white;
   border: none;
   padding: 10px 16px;
@@ -913,7 +1125,7 @@ body {
   left: -5px;
   right: -5px;
   bottom: -5px;
-  background: radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, transparent 70%);
   border-radius: 25px;
   z-index: -1;
   animation: subtleGlow 4s ease-in-out infinite;
@@ -922,7 +1134,7 @@ body {
 
 .bottom-line-trigger:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
   animation: none;
 }
 
@@ -944,12 +1156,13 @@ body {
   bottom: 100%;
   right: 0;
   margin-bottom: 15px;
-  background: #2d3748;
+  background: rgba(30, 30, 40, 0.95);
   color: white;
   padding: 14px 18px;
   border-radius: 10px;
   font-size: 14px;
   font-weight: 600;
+  border: 1px solid rgba(139, 92, 246, 0.3);
   white-space: normal;
   text-align: center;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
@@ -994,9 +1207,9 @@ body {
   position: fixed;
   top: 20px;
   right: 20px;
-  background: white;
+  background: rgba(30, 30, 40, 0.95);
   border-radius: 12px;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
   padding: 20px;
   max-width: 350px;
   max-height: calc(100vh - 40px);
@@ -1004,7 +1217,7 @@ body {
   width: 90%;
   z-index: 1001;
   animation: locationCardFadeIn 0.3s ease-out;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(139, 92, 246, 0.3);
 }
 
 .location-card-header {
@@ -1015,7 +1228,7 @@ body {
 }
 
 .location-card-header h3 {
-  color: #2d3748;
+  color: rgba(255, 255, 255, 0.95);
   font-size: 16px;
   font-weight: 600;
   margin: 0;
@@ -1025,14 +1238,14 @@ body {
   background: none;
   border: none;
   font-size: 24px;
-  color: #a0aec0;
+  color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
   padding: 4px;
   line-height: 1;
 }
 
 .location-card-close:hover {
-  color: #718096;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .location-card-content {
@@ -1062,7 +1275,7 @@ body {
 }
 
 .location-label {
-  color: #4a5568;
+  color: rgba(255, 255, 255, 0.7);
   font-size: 14px;
   font-weight: 500;
   margin-right: 8px;
@@ -1070,7 +1283,7 @@ body {
 }
 
 .location-value {
-  color: #2d3748;
+  color: rgba(255, 255, 255, 0.95);
   font-size: 16px;
   font-weight: 600;
 }
@@ -1092,36 +1305,36 @@ body {
 }
 
 .location-btn-primary {
-  background: linear-gradient(135deg, #1e293b 0%, #064e3b 100%);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%);
   color: white;
 }
 
 .location-btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
 }
 
 .location-btn-secondary {
-  background: #f7fafc;
-  color: #4a5568;
-  border: 1px solid #e2e8f0;
+  background: rgba(30, 30, 40, 0.6);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(139, 92, 246, 0.3);
 }
 
 .location-btn-secondary:hover {
-  background: #edf2f7;
-  border-color: #cbd5e0;
+  background: rgba(30, 30, 40, 0.8);
+  border-color: rgba(139, 92, 246, 0.5);
 }
 
 .location-card-note {
   margin-top: 12px;
   padding: 8px 12px;
-  background: #f7fafc;
+  background: rgba(30, 30, 40, 0.6);
   border-radius: 6px;
-  border-left: 3px solid #1e293b;
+  border-left: 3px solid rgba(139, 92, 246, 0.5);
 }
 
 .location-card-note small {
-  color: #4a5568;
+  color: rgba(255, 255, 255, 0.7);
   font-size: 12px;
   line-height: 1.4;
 }
@@ -1146,17 +1359,18 @@ body {
   position: fixed;
   top: 20px;
   right: 20px;
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  background: rgba(30, 30, 40, 0.95);
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   padding: 16px;
   max-width: 280px;
   max-height: calc(100vh - 40px);
   overflow-y: auto;
   overflow-x: hidden;
   z-index: 1001;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(139, 92, 246, 0.3);
   animation: referenceBoxFadeIn 0.4s ease-out;
+  backdrop-filter: blur(10px);
 }
 
 /* Draggable reference box */
@@ -1179,7 +1393,7 @@ body {
   background: none;
   border: none;
   font-size: 18px;
-  color: #666;
+  color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
   padding: 0;
   width: 20px;
@@ -1192,15 +1406,15 @@ body {
 }
 
 .close-reference-btn:hover {
-  background: #f1f5f9;
-  color: #333;
+  background: rgba(139, 92, 246, 0.2);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .toggle-reference-btn {
   padding: 8px 16px;
-  background: rgba(56, 161, 105, 0.8);
+  background: rgba(139, 92, 246, 0.8);
   color: white;
-  border: 2px solid rgba(56, 161, 105, 0.6);
+  border: 2px solid rgba(139, 92, 246, 0.6);
   border-radius: 20px;
   font-size: 14px;
   font-weight: 700;
@@ -1214,9 +1428,9 @@ body {
 }
 
 .toggle-reference-btn:hover {
-  background: rgba(56, 161, 105, 1);
+  background: rgba(139, 92, 246, 1);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(30, 41, 59, 0.4);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
 }
 
 .toggle-btn-content {
@@ -1234,14 +1448,18 @@ body {
 .reference-box-header {
   margin-bottom: 12px;
   padding-bottom: 8px;
-  border-bottom: 2px solid #1e293b;
+  border-bottom: 2px solid rgba(139, 92, 246, 0.5);
+  border-radius: 16px 16px 0 0;
+  margin: -16px -16px 12px -16px;
+  padding: 16px 16px 8px 16px;
+  background: rgba(30, 30, 40, 0.95);
 }
 
 .reference-box-header h4 {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #2d3748;
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .reference-box-content {
@@ -1260,13 +1478,13 @@ body {
 
 .ref-label {
   font-weight: 500;
-  color: #4a5568;
+  color: rgba(255, 255, 255, 0.7);
   flex-shrink: 0;
 }
 
 .ref-value {
   text-align: right;
-  color: #2d3748;
+  color: rgba(255, 255, 255, 0.95);
   font-weight: 600;
   display: flex;
   flex-direction: column;
@@ -1276,13 +1494,13 @@ body {
 .ref-value small {
   font-size: 10px;
   font-weight: 400;
-  color: #718096;
+  color: rgba(255, 255, 255, 0.5);
   margin-top: 2px;
 }
 
 .reference-divider {
   height: 1px;
-  background: #e2e8f0;
+  background: rgba(139, 92, 246, 0.2);
   margin: 4px 0;
 }
 
@@ -1308,7 +1526,7 @@ body {
 
 /* Insights Modal */
 .insights-modal {
-  background: white;
+  background: rgba(30, 30, 40, 0.95);
   border-radius: 16px;
   padding: 32px;
   max-width: 600px;
@@ -1318,6 +1536,7 @@ body {
   position: relative;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   animation: slideUp 0.3s ease-out;
+  border: 1px solid rgba(139, 92, 246, 0.3);
 }
 
 @keyframes slideUp {
@@ -1335,8 +1554,8 @@ body {
   position: absolute;
   top: 16px;
   right: 16px;
-  background: #e9ecef;
-  border: none;
+  background: rgba(30, 30, 40, 0.6);
+  border: 1px solid rgba(139, 92, 246, 0.3);
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -1344,11 +1563,11 @@ body {
   line-height: 1;
   cursor: pointer;
   transition: all 0.2s;
-  color: #495057;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .modal-close-btn:hover {
-  background: #dee2e6;
+  background: rgba(139, 92, 246, 0.3);
   transform: rotate(90deg);
 }
 
@@ -1356,20 +1575,20 @@ body {
   margin-top: 8px;
 }
 
-/* Modal-specific text colors (white background) */
+/* Modal-specific text colors (dark background) */
 .insights-modal .insight-card {
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  color: #2d3748;
+  background: rgba(30, 30, 40, 0.6);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .insights-modal .insight-card.primary {
-  background: #e3f2fd;
-  border: 2px solid #2196f3;
+  background: rgba(139, 92, 246, 0.2);
+  border: 2px solid rgba(139, 92, 246, 0.5);
 }
 
 .insights-modal .insight-label {
-  color: #6c757d;
+  color: rgba(255, 255, 255, 0.7);
   font-size: 11px;
   font-weight: 600;
   margin-bottom: 8px;
@@ -1378,7 +1597,7 @@ body {
 }
 
 .insights-modal .insight-value {
-  color: #2d3748;
+  color: rgba(255, 255, 255, 0.95);
   font-size: 26px;
   font-weight: 700;
   margin-bottom: 6px;
@@ -1387,33 +1606,33 @@ body {
 
 .insights-modal .insight-value.winner {
   font-size: 28px;
-  color: #2196f3;
+  color: rgba(139, 92, 246, 0.9);
 }
 
 .insights-modal .insight-detail {
-  color: #6c757d;
+  color: rgba(255, 255, 255, 0.7);
   font-size: 13px;
   line-height: 1.4;
 }
 
 .insights-modal .insights-header h3 {
-  color: #2d3748;
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .insights-modal .insights-subtitle {
-  color: #6c757d;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .insights-modal .insights-description {
   margin: 16px 0;
   padding: 16px 20px;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%);
   border-radius: 12px;
-  border: 1px solid rgba(102, 126, 234, 0.2);
+  border: 1px solid rgba(139, 92, 246, 0.3);
 }
 
 .insights-modal .insights-description p {
-  color: #1e293b;
+  color: rgba(255, 255, 255, 0.95);
   font-size: 20px;
   font-weight: 700;
   margin: 0;
@@ -1509,6 +1728,276 @@ body {
   }
   100% {
     background-position: 0% 50%;
+  }
+}
+
+/* New Layout Structure */
+.rvb-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  height: 100vh;
+  margin: 0 auto;
+  padding: 20px;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+/* Responsive: Use more space on larger screens */
+@media (min-width: 1400px) {
+  .rvb-layout {
+    max-width: 95%;
+    padding: 24px;
+  }
+  
+  .rvb-left {
+    flex: 0 0 380px;
+    max-width: 420px;
+  }
+  
+  .chat-container {
+    max-width: 1600px;
+  }
+}
+
+@media (min-width: 1920px) {
+  .rvb-layout {
+    max-width: 90%;
+    padding: 32px;
+  }
+  
+  .rvb-left {
+    flex: 0 0 420px;
+    max-width: 480px;
+  }
+  
+  .chat-container {
+    max-width: 1800px;
+  }
+}
+
+@media (min-width: 1920px) {
+  .rvb-layout {
+    max-width: 90%;
+    padding: 32px;
+  }
+  
+  .rvb-left {
+    flex: 0 0 420px;
+    max-width: 480px;
+  }
+}
+
+.rvb-steps {
+  display: flex;
+  gap: 8px;
+  font-size: 0.85rem;
+  opacity: 0.85;
+  margin-bottom: 8px;
+}
+
+.rvb-step {
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.7);
+  transition: all 0.2s;
+}
+
+.rvb-step-active {
+  background: rgba(255, 255, 255, 0.1);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.rvb-main {
+  display: flex;
+  flex: 1;
+  gap: 16px;
+  min-height: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow: visible;
+}
+
+.rvb-left {
+  flex: 0 0 320px;
+  min-width: 280px;
+  max-width: 400px;
+  overflow-y: auto;
+  overflow-x: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0 8px 0 20px;
+  box-sizing: border-box;
+}
+
+.rvb-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  max-width: none;
+  align-items: center;
+  width: 100%;
+  justify-content: flex-start;
+  position: relative;
+}
+
+.rvb-charts {
+  flex: 0 0 auto;
+  padding: 8px 0;
+}
+
+/* Fade-in animation */
+.rvb-fade-in {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: rvbFadeInUp 0.4s ease-out forwards;
+}
+
+@keyframes rvbFadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Update reference box for new layout */
+.rvb-left .reference-box {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  width: 100%;
+  max-width: 100%;
+  max-height: none;
+  margin: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-radius: 16px !important;
+  overflow: visible;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  background: rgba(30, 30, 40, 0.95);
+  backdrop-filter: blur(10px);
+}
+
+.rvb-left .reference-box.draggable {
+  cursor: default;
+}
+
+.rvb-left .reference-box .draggable-header {
+  cursor: default;
+}
+
+/* Placeholder for scenario card */
+.reference-box-placeholder {
+  padding: 24px 20px 24px 24px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+  border-radius: 16px;
+  overflow: visible;
+  word-wrap: break-word;
+  line-height: 1.5;
+}
+
+.reference-box-placeholder p {
+  margin: 0;
+  font-size: 14px;
+  padding: 0;
+}
+
+/* Responsive: Adjust for different screen sizes */
+@media (min-width: 1920px) {
+  .rvb-layout {
+    max-width: 1800px;
+  }
+  
+  .rvb-left {
+    flex: 0 0 380px;
+    max-width: 450px;
+  }
+}
+
+@media (min-width: 1440px) and (max-width: 1919px) {
+  .rvb-layout {
+    max-width: 1400px;
+  }
+  
+  .rvb-left {
+    flex: 0 0 340px;
+    max-width: 380px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .rvb-main {
+    flex-direction: column;
+  }
+  
+  .rvb-left {
+    flex: 0 0 auto;
+    max-width: 100%;
+    max-height: 40vh;
+  }
+  
+  .rvb-charts {
+    order: -1; /* Show charts above on mobile */
+  }
+}
+
+/* Large screens: Expand chat to use more space */
+@media (min-width: 1400px) {
+  .rvb-layout {
+    max-width: 95%;
+    padding: 24px;
+  }
+  
+  .rvb-left {
+    flex: 0 0 380px;
+    max-width: 420px;
+  }
+  
+  .rvb-right {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  
+  .chat-container {
+    max-width: 100%;
+    width: 100%;
+  }
+  
+  .messages-container {
+    max-width: 100%;
+  }
+}
+
+@media (min-width: 1920px) {
+  .rvb-layout {
+    max-width: 90%;
+    padding: 32px;
+  }
+  
+  .rvb-left {
+    flex: 0 0 420px;
+    max-width: 480px;
+  }
+  
+  .rvb-right {
+    flex: 1 1 auto;
+  }
+  
+  .chat-container {
+    max-width: 100%;
+    width: 100%;
   }
 }
 

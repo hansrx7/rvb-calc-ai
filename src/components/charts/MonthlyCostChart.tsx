@@ -30,12 +30,12 @@ export function MonthlyCostChart({ timeline }: MonthlyCostChartProps) {
     {
       name: 'Buying',
       total: Math.round(buyingCosts.total),
-      color: '#1e293b'
+      color: '#8b5cf6'
     },
     {
       name: 'Renting',
       total: Math.round(rentingCosts.total),
-      color: '#f56565'
+      color: '#60a5fa'
     }
   ];
   
@@ -56,11 +56,14 @@ export function MonthlyCostChart({ timeline }: MonthlyCostChartProps) {
   return (
     <div className="chart-container">
       <h3 className="chart-title">Monthly Cost Comparison</h3>
+      <p className="chart-caption" style={{ marginBottom: '16px', fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.5' }}>
+        This compares your monthly cost of buying (mortgage + taxes + other costs) versus renting. Lower bars are better.
+      </p>
       
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="name" />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
+          <XAxis dataKey="name" stroke="rgba(255, 255, 255, 0.7)" />
           <YAxis 
             tickFormatter={(value) => {
               if (value >= 1000000) {
@@ -70,11 +73,13 @@ export function MonthlyCostChart({ timeline }: MonthlyCostChartProps) {
               }
               return `$${value}`;
             }}
+            stroke="rgba(255, 255, 255, 0.7)"
           />
           <Tooltip 
             formatter={(value: number) => `$${value.toLocaleString()}`}
+            contentStyle={{ backgroundColor: 'rgba(30, 30, 40, 0.95)', border: '1px solid rgba(139, 92, 246, 0.5)', borderRadius: '8px', color: 'white' }}
           />
-          <Legend />
+          <Legend wrapperStyle={{ color: 'rgba(255, 255, 255, 0.9)' }} />
           <Bar dataKey="total" name="Monthly Cost" radius={[8, 8, 0, 0]}>
             {data.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.color} />
@@ -86,7 +91,7 @@ export function MonthlyCostChart({ timeline }: MonthlyCostChartProps) {
       {/* Breakdown sections */}
       <div className="cost-breakdown">
         <div className="breakdown-column">
-          <h4 style={{ color: '#1e293b' }}>Buying Breakdown</h4>
+          <h4 style={{ color: 'rgba(139, 92, 246, 0.9)' }}>Buying Breakdown</h4>
           {buyingBreakdown.map(item => (
             <div key={item.label} className="breakdown-item">
               <span>{item.label}:</span>
@@ -100,7 +105,7 @@ export function MonthlyCostChart({ timeline }: MonthlyCostChartProps) {
         </div>
         
         <div className="breakdown-column">
-          <h4 style={{ color: '#f56565' }}>Renting Breakdown</h4>
+          <h4 style={{ color: 'rgba(96, 165, 250, 0.9)' }}>Renting Breakdown</h4>
           {rentingBreakdown.map(item => (
             <div key={item.label} className="breakdown-item">
               <span>{item.label}:</span>

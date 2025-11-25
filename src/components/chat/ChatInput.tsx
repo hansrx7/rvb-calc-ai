@@ -19,7 +19,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
   };
   
   return (
-    <form onSubmit={handleSubmit} className="chat-input-form">
+    <form onSubmit={handleSubmit} className="chat-input-form" data-tour-id="zip-input">
       <input
         type="text"
         value={input}

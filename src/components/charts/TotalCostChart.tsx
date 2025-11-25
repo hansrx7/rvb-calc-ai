@@ -61,19 +61,22 @@ export function TotalCostChart({ analysis }: TotalCostChartProps) {
   return (
     <div className="chart-container">
       <h3 className="chart-title">{timelineYears}-Year Total Cost Comparison</h3>
+      <p className="chart-caption" style={{ marginBottom: '16px', fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.5' }}>
+        This shows the total money you spend over time if you buy versus rent. Lower is better.
+      </p>
       
       <div className="breakeven-callout" style={{ 
         background: winner === 'Buying' 
-          ? 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)' 
-          : 'linear-gradient(135deg, #1e293b 0%, #064e3b 100%)'
+          ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%)' 
+          : 'linear-gradient(135deg, rgba(96, 165, 250, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%)'
       }}>
         <p>🏆 <strong>{winner} saves you ${savings.toLocaleString()} over {timelineYears} years!</strong></p>
         <p>The net cost of {winner.toLowerCase()} is ${savings.toLocaleString()} lower.</p>      </div>
       
       <ResponsiveContainer width="100%" height={400}>
         <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-          <XAxis dataKey="name" />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
+          <XAxis dataKey="name" stroke="rgba(255, 255, 255, 0.7)" />
           <YAxis 
             label={{ value: 'Net Cost ($)', angle: -90, position: 'insideLeft' }}
             tickFormatter={(value) => {
@@ -84,32 +87,33 @@ export function TotalCostChart({ analysis }: TotalCostChartProps) {
               }
               return `$${value}`;
             }}
+            stroke="rgba(255, 255, 255, 0.7)"
           />
           <Tooltip 
             formatter={(value: number) => `$${value.toLocaleString()}`}
-            contentStyle={{ backgroundColor: 'white', border: '2px solid #1e293b', borderRadius: '8px' }}
+            contentStyle={{ backgroundColor: 'rgba(30, 30, 40, 0.95)', border: '1px solid rgba(139, 92, 246, 0.5)', borderRadius: '8px', color: 'white' }}
           />
-          <Legend />
+          <Legend wrapperStyle={{ color: 'rgba(255, 255, 255, 0.9)' }} />
           <Bar dataKey="netCost" name={`Net Cost (after ${timelineYears} years)`} radius={[8, 8, 0, 0]}>
-            <Cell fill="#1e293b" />
-            <Cell fill="#f56565" />
+            <Cell fill="#8b5cf6" />
+            <Cell fill="#60a5fa" />
           </Bar>
         </BarChart>
       </ResponsiveContainer>
       
-      <div style={{ marginTop: '20px', padding: '20px', background: '#f7fafc', borderRadius: '12px' }}>
+      <div style={{ marginTop: '20px', padding: '20px', background: 'rgba(30, 30, 40, 0.6)', borderRadius: '12px', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', textAlign: 'center' }}>
           <div>
-            <h4 style={{ color: '#1e293b', marginBottom: '8px' }}>💰 Buying Breakdown</h4>
-            <p style={{ color: 'black' }}><strong>Total Spent:</strong> ${totalBuyingCosts.toLocaleString()}</p>
-            <p style={{ color: 'black' }}><strong>Home Value:</strong> ${finalHomeValue.toLocaleString()}</p>
-            <p style={{ color: 'black' }}><strong>Net Cost:</strong> ${Math.round(buyingNetCost).toLocaleString()}</p>
+            <h4 style={{ color: 'rgba(139, 92, 246, 0.9)', marginBottom: '8px' }}>💰 Buying Breakdown</h4>
+            <p style={{ color: 'rgba(255, 255, 255, 0.9)' }}><strong>Total Spent:</strong> ${totalBuyingCosts.toLocaleString()}</p>
+            <p style={{ color: 'rgba(255, 255, 255, 0.9)' }}><strong>Home Value:</strong> ${finalHomeValue.toLocaleString()}</p>
+            <p style={{ color: 'rgba(255, 255, 255, 0.9)' }}><strong>Net Cost:</strong> ${Math.round(buyingNetCost).toLocaleString()}</p>
           </div>
           <div>
-            <h4 style={{ color: '#f56565', marginBottom: '8px' }}>🏠 Renting Breakdown</h4>
-            <p style={{ color: 'black' }}><strong>Total Spent:</strong> ${totalRentingCosts.toLocaleString()}</p>
-            <p style={{ color: 'black' }}><strong>Investment Value:</strong> ${finalInvestmentValue.toLocaleString()}</p>
-            <p style={{ color: 'black' }}><strong>Net Cost:</strong> ${Math.round(rentingNetCost).toLocaleString()}</p>
+            <h4 style={{ color: 'rgba(96, 165, 250, 0.9)', marginBottom: '8px' }}>🏠 Renting Breakdown</h4>
+            <p style={{ color: 'rgba(255, 255, 255, 0.9)' }}><strong>Total Spent:</strong> ${totalRentingCosts.toLocaleString()}</p>
+            <p style={{ color: 'rgba(255, 255, 255, 0.9)' }}><strong>Investment Value:</strong> ${finalInvestmentValue.toLocaleString()}</p>
+            <p style={{ color: 'rgba(255, 255, 255, 0.9)' }}><strong>Net Cost:</strong> ${Math.round(rentingNetCost).toLocaleString()}</p>
           </div>
         </div>
       </div>

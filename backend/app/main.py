@@ -66,33 +66,50 @@ def analyze_finance(request: AnalysisRequest) -> AnalysisResponse:
     inputs = request.inputs
     ml_rates_used = None  # Initialize
     if request.zipCode:
+        print(f"[ML DEBUG] ========== ML Prediction Request ==========")
+        print(f"[ML DEBUG] ZIP code provided: {request.zipCode}")
+        print(f"[ML DEBUG] Original rates: home={inputs.homeAppreciationRate:.3f}%, rent={inputs.rentGrowthRate:.3f}%")
         try:
-            from .ml.growth_model import load_models, predict_zip_growth
+            from .ml.growth_model import (
+                load_models,
+                predict_zip_growth_with_fallback,
+                get_zip_home_volatility,
+            )
             
             # Store fallback rates (original percentage values)
             fallback_home = inputs.homeAppreciationRate
             fallback_rent = inputs.rentGrowthRate
             
             # Ensure models are loaded
+            print(f"[ML DEBUG] Loading ML models...")
             load_models()
+            print(f"[ML DEBUG] Models loaded successfully")
             
-            # Get ML predictions (returns as decimals, e.g., 0.03 = 3%)
-            ml_home, ml_rent = predict_zip_growth(
+            # Convert fallback rates from percent to decimal for ML function
+            fallback_home_decimal = fallback_home / 100.0
+            fallback_rent_decimal = fallback_rent / 100.0
+            print(f"[ML DEBUG] Calling predict_zip_growth_with_fallback with fallback: home={fallback_home_decimal:.6f}, rent={fallback_rent_decimal:.6f}")
+            
+            # Get ML predictions with fallback to similar ZIPs (returns as decimals, e.g., 0.03 = 3%)
+            ml_home, ml_rent = predict_zip_growth_with_fallback(
                 request.zipCode,
-                fallback_home / 100.0,  # Convert to decimal for fallback
-                fallback_rent / 100.0   # Convert to decimal for fallback
+                fallback_home_rate=fallback_home_decimal,
+                fallback_rent_rate=fallback_rent_decimal,
+                k=10,  # Use 10 similar ZIPs for fallback
             )
+            print(f"[ML DEBUG] Function returned: home={ml_home:.6f}, rent={ml_rent:.6f}")
             
             # Convert ML predictions from decimal to percentage
             # ML returns 0.03 (3%), calculator expects 3.0 (percentage)
             ml_home_pct = ml_home * 100.0
             ml_rent_pct = ml_rent * 100.0
             
-            # Debug log
+            # Debug log (updated to mention fallback may have been used)
             print(
                 f"[ML DEBUG] ZIP={request.zipCode} "
                 f"fallback_home={fallback_home:.3f}%, fallback_rent={fallback_rent:.3f}% "
-                f"-> ml_home={ml_home_pct:.3f}%, ml_rent={ml_rent_pct:.3f}%"
+                f"-> ml_home={ml_home_pct:.3f}%, ml_rent={ml_rent_pct:.3f}% "
+                f"(may include fallback to similar ZIPs if direct prediction unavailable)"
             )
             
             # Override rates with ML predictions
@@ -130,79 +147,82 @@ def analyze_finance(request: AnalysisRequest) -> AnalysisResponse:
         analysis.rent_growth_rate = inputs.rentGrowthRate
     
     # Monte Carlo home price path simulation
-    print(f"[MC DEBUG] ========== Starting Monte Carlo Simulation ==========")
-    try:
-        from .finance.monte_carlo import simulate_home_price_paths, summarize_paths
-        from .ml.growth_model import get_zip_home_volatility
-        
-        # Get the starting home value (same as used in projections)
-        initial_price = inputs.homePrice
-        print(f"[MC DEBUG] Initial price: ${initial_price:,.2f}")
-        
-        # Get the projection horizon in years (same as used in other charts)
-        years = inputs.timeHorizonYears
-        print(f"[MC DEBUG] Time horizon: {years} years")
-        
-        # Get the home appreciation rate in decimal form (already includes ML override if ZIP provided)
-        home_appreciation_rate_pct = analysis.home_appreciation_rate
-        mu = home_appreciation_rate_pct / 100.0
-        print(f"[MC DEBUG] Home appreciation rate: {home_appreciation_rate_pct:.4f}% (mu={mu:.6f} decimal)")
-        
-        # Define fallback volatility (15% annual)
-        fallback_sigma = 0.15
-        
-        # Get ZIP-specific volatility if ZIP code is provided
-        if request.zipCode:
-            print(f"[MC DEBUG] ZIP code provided: {request.zipCode}, looking up volatility...")
-            sigma = get_zip_home_volatility(request.zipCode, fallback_sigma)
-            print(f"[MC DEBUG] ZIP={request.zipCode} -> sigma={sigma:.4f} ({sigma*100:.2f}% annual volatility, fallback={fallback_sigma:.4f})")
-        else:
-            sigma = fallback_sigma
-            print(f"[MC DEBUG] No ZIP code -> using fallback sigma={sigma:.4f} ({sigma*100:.2f}% annual volatility)")
-        
-        # Run Monte Carlo simulation
-        print(f"[MC DEBUG] Running Monte Carlo simulation with {500} paths...")
-        paths = simulate_home_price_paths(
-            initial_price=initial_price,
-            annual_mu=mu,
-            annual_sigma=sigma,
-            years=years,
-            n_paths=500,
-        )
-        print(f"[MC DEBUG] Generated {len(paths)} price paths, each with {len(paths[0]) if paths else 0} time steps")
-        
-        # Summarize paths
-        print(f"[MC DEBUG] Summarizing paths to compute percentiles...")
-        summary = summarize_paths(paths)
-        print(f"[MC DEBUG] Summary computed: {len(summary['years'])} years, p10/p50/p90 arrays all length {len(summary['p10'])}")
-        
-        # Show sample values
-        if len(summary['years']) > 0:
-            print(f"[MC DEBUG] Sample values (Year {summary['years'][0]}): p10=${summary['p10'][0]:,.2f}, p50=${summary['p50'][0]:,.2f}, p90=${summary['p90'][0]:,.2f}")
-            if len(summary['years']) > 1:
-                final_idx = len(summary['years']) - 1
-                print(f"[MC DEBUG] Final values (Year {summary['years'][final_idx]}): p10=${summary['p10'][final_idx]:,.2f}, p50=${summary['p50'][final_idx]:,.2f}, p90=${summary['p90'][final_idx]:,.2f}")
-        
-        # Convert to Pydantic model
-        analysis.monte_carlo_home_prices = HomePricePathSummary(
-            years=summary["years"],
-            p10=summary["p10"],
-            p50=summary["p50"],
-            p90=summary["p90"]
-        )
-        
-        print(f"[MC DEBUG] ✅ Monte Carlo simulation complete and attached to analysis result")
-        print(f"[MC DEBUG] ========== Monte Carlo Simulation Complete ==========")
-        
-    except Exception as e:
-        # Log warning but don't break the analysis
-        import logging
-        import traceback
-        logging.warning(f"Monte Carlo simulation failed: {e}. Continuing without Monte Carlo data.")
-        print(f"[MC DEBUG] ❌ Error in Monte Carlo simulation: {e}")
-        print(f"[MC DEBUG] Traceback: {traceback.format_exc()}")
-        print(f"[MC DEBUG] ========== Monte Carlo Simulation Failed ==========")
-        # Leave monte_carlo_home_prices as None (already default)
+    # Only run Monte Carlo if explicitly requested (it's computationally expensive)
+    if request.includeMonteCarlo:
+        print(f"[MC DEBUG] ========== Starting Monte Carlo Simulation ==========")
+        try:
+            from .finance.monte_carlo import simulate_home_price_paths, summarize_paths
+            from .ml.growth_model import get_zip_home_volatility
+            
+            # Get the starting home value (same as used in projections)
+            initial_price = inputs.homePrice
+            print(f"[MC DEBUG] Initial price: ${initial_price:,.2f}")
+            
+            # Get the projection horizon in years (same as used in other charts)
+            years = inputs.timeHorizonYears
+            print(f"[MC DEBUG] Time horizon: {years} years")
+            
+            # Get the home appreciation rate in decimal form (already includes ML override if ZIP provided)
+            home_appreciation_rate_pct = analysis.home_appreciation_rate
+            mu = home_appreciation_rate_pct / 100.0
+            print(f"[MC DEBUG] Home appreciation rate: {home_appreciation_rate_pct:.4f}% (mu={mu:.6f} decimal)")
+            
+            # Define fallback volatility (15% annual)
+            fallback_sigma = 0.15
+            
+            # Get ZIP-specific volatility if ZIP code is provided
+            if request.zipCode:
+                print(f"[MC DEBUG] ZIP code provided: {request.zipCode}, looking up volatility...")
+                sigma = get_zip_home_volatility(request.zipCode, fallback_sigma)
+                print(f"[MC DEBUG] ZIP={request.zipCode} -> sigma={sigma:.4f} ({sigma*100:.2f}% annual volatility, fallback={fallback_sigma:.4f})")
+            else:
+                sigma = fallback_sigma
+                print(f"[MC DEBUG] No ZIP code -> using fallback sigma={sigma:.4f} ({sigma*100:.2f}% annual volatility)")
+            
+            # Run Monte Carlo simulation
+            print(f"[MC DEBUG] Running Monte Carlo simulation with {500} paths...")
+            paths = simulate_home_price_paths(
+                initial_price=initial_price,
+                annual_mu=mu,
+                annual_sigma=sigma,
+                years=years,
+                n_paths=500,
+            )
+            print(f"[MC DEBUG] Generated {len(paths)} price paths, each with {len(paths[0]) if paths else 0} time steps")
+            
+            # Summarize paths
+            print(f"[MC DEBUG] Summarizing paths to compute percentiles...")
+            summary = summarize_paths(paths)
+            print(f"[MC DEBUG] Summary computed: {len(summary['years'])} years, p10/p50/p90 arrays all length {len(summary['p10'])}")
+            
+            # Show sample values
+            if len(summary['years']) > 0:
+                print(f"[MC DEBUG] Sample values (Year {summary['years'][0]}): p10=${summary['p10'][0]:,.2f}, p50=${summary['p50'][0]:,.2f}, p90=${summary['p90'][0]:,.2f}")
+                if len(summary['years']) > 1:
+                    final_idx = len(summary['years']) - 1
+                    print(f"[MC DEBUG] Final values (Year {summary['years'][final_idx]}): p10=${summary['p10'][final_idx]:,.2f}, p50=${summary['p50'][final_idx]:,.2f}, p90=${summary['p90'][final_idx]:,.2f}")
+            
+            # Convert to Pydantic model
+            analysis.monte_carlo_home_prices = HomePricePathSummary(
+                years=summary["years"],
+                p10=summary["p10"],
+                p50=summary["p50"],
+                p90=summary["p90"]
+            )
+            
+            print(f"[MC DEBUG] ✅ Monte Carlo simulation complete and attached to analysis result")
+            print(f"[MC DEBUG] ========== Monte Carlo Simulation Complete ==========")
+        except Exception as e:
+            # Log warning but don't break the analysis
+            import logging
+            import traceback
+            logging.warning(f"Monte Carlo simulation failed: {e}. Continuing without Monte Carlo data.")
+            print(f"[MC DEBUG] ❌ Error in Monte Carlo simulation: {e}")
+            print(f"[MC DEBUG] Traceback: {traceback.format_exc()}")
+            print(f"[MC DEBUG] ========== Monte Carlo Simulation Failed ==========")
+            # Leave monte_carlo_home_prices as None (already default)
+    else:
+        print(f"[MC DEBUG] Monte Carlo simulation skipped (includeMonteCarlo=False)")
     
     return AnalysisResponse(analysis=analysis)
 

@@ -66,6 +66,9 @@ export function MonteCarloChart({ monteCarloHomePrices }: MonteCarloChartProps) 
   return (
     <div className="chart-container">
       <h3 className="chart-title">Simulated Home Value Range</h3>
+      <p className="chart-caption" style={{ marginBottom: '16px', fontSize: '14px', color: '#4a5568', lineHeight: '1.5' }}>
+        This shows best, typical, and worst-case home values over time based on ML estimates and market volatility. The shaded band is the range; the middle line is the typical path.
+      </p>
       <div style={{marginBottom: '16px', background: '#f7fafc', padding: '12px', borderRadius: '8px'}}>
         <p style={{margin: 0, fontSize: '14px', color: '#2d3748'}}>
           <strong>Based on ML-estimated appreciation and ZIP-level volatility.</strong> This chart shows the range of possible home values over {finalYear} years. The shaded area represents the 10th to 90th percentile range, with the median (50th percentile) shown as a line.

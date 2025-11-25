@@ -1,6 +1,6 @@
 // src/components/chat/ChatContainer.tsx
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { NetWorthChart } from '../charts/NetWorthChart';
@@ -61,22 +61,51 @@ type ChartType =
   | 'sensitivity'
   | 'scenarioOverlay';
 
-const chartKeys: ChartType[] = [
-  'netWorth',
+// Basic charts - always visible and easy for beginners
+const BASIC_CHART_KEYS: ChartType[] = [
   'monthlyCost',
-  'totalCost',
+  'netWorth',
   'equity',
-  'rentGrowth',
+  'totalCost'
+];
+
+// Advanced charts - grouped under "Advanced Analysis"
+const ADVANCED_CHART_KEYS: ChartType[] = [
+  'monteCarlo',
   'breakEven',
+  'breakEvenHeatmap',
   'cashFlow',
   'cumulativeCost',
   'liquidity',
+  'rentGrowth',
   'taxSavings',
-  'breakEvenHeatmap',
-  'monteCarlo',
-  'sensitivity',
-  'scenarioOverlay'
+  'scenarioOverlay',
+  'sensitivity'
 ];
+
+// All chart keys (for backward compatibility)
+const chartKeys: ChartType[] = [
+  ...BASIC_CHART_KEYS,
+  ...ADVANCED_CHART_KEYS
+];
+
+// Helper to map chart keys to button labels and messages
+const chartButtonConfig: Record<ChartType, { label: string; message: string; title: string }> = {
+  monthlyCost: { label: '💰 Monthly', message: 'show me monthly costs', title: 'View Monthly Costs' },
+  netWorth: { label: '📈 Net Worth', message: 'show me net worth', title: 'View Net Worth' },
+  equity: { label: '🏠 Equity', message: 'show me equity buildup', title: 'View Equity Buildup' },
+  totalCost: { label: '💵 Total Cost', message: 'show me total cost', title: 'View Total Cost' },
+  monteCarlo: { label: '🎲 Monte Carlo', message: 'run monte carlo simulation', title: 'View Monte Carlo Simulation' },
+  breakEven: { label: '⏰ Break-Even', message: 'show me break even', title: 'View Break-Even Timeline' },
+  breakEvenHeatmap: { label: '🟩 Heatmap', message: 'show me break even heatmap', title: 'View Break-Even Heatmap' },
+  cashFlow: { label: '💸 Cash Flow', message: 'show me cash flow', title: 'View Cash Flow' },
+  cumulativeCost: { label: '📊 Cumulative', message: 'show me cumulative costs', title: 'View Cumulative Costs' },
+  liquidity: { label: '💧 Liquidity', message: 'show me liquidity', title: 'View Liquidity Timeline' },
+  rentGrowth: { label: '📊 Rent', message: 'show me rent growth', title: 'View Rent Growth' },
+  taxSavings: { label: '🏛️ Tax Savings', message: 'show me tax savings', title: 'View Tax Savings' },
+  scenarioOverlay: { label: '🔀 Scenarios', message: 'show me scenario overlay', title: 'View Scenario Overlay' },
+  sensitivity: { label: '📈 Sensitivity', message: 'show me sensitivity', title: 'View Sensitivity Analysis' }
+};
 
 const DEFAULT_HEATMAP_TIMELINES = [5, 10, 15, 20];
 const DEFAULT_HEATMAP_DOWN_PAYMENTS = [5, 10, 15, 20];
@@ -126,12 +155,7 @@ export function ChatContainer() {
     {
       id: '1',
       role: 'assistant',
-        content: "Welcome! I'm your AI-powered financial advisor, here to help you make the smartest decision between buying and renting. I'll analyze your specific situation and show you exactly how your money will grow over time."
-      },
-      {
-        id: '2',
-        role: 'assistant',
-        content: "Let's get started! What's the home price you're considering and your current monthly rent?\n\nPro tip: You can also enter a ZIP code (like 90210) and I'll pull real local market data for that area!"
+      content: "Welcome. I'm your financial advisor for home-buying decisions. I'll analyze your local market and show you how buying compares to renting over time.\n\nYou can start by:\n• providing a ZIP code (e.g., 92127) so I can pull local market data, or\n• telling me the home price and rent you want to compare."
     }
   ]);
   
@@ -158,7 +182,12 @@ export function ChatContainer() {
 // Track if charts are ready to show (data calculated)
 const [chartsReady, setChartsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState<{ stage: string; progress: number }>({ stage: 'Starting...', progress: 0 });
+  const [isAnalyzing, setIsAnalyzing] = useState(false); // Track if we're doing full analysis vs just AI extraction
   const [saveProgress, setSaveProgress] = useState<number | null>(null); // Track PDF save progress
+  const [isMonteCarloLoading, setIsMonteCarloLoading] = useState(false);
+  const [monteCarloProgress, setMonteCarloProgress] = useState(0);
+  const [monteCarloProgressStage, setMonteCarloProgressStage] = useState('Starting Monte Carlo simulation...');
   
   // Restart modal state
   const [showRestartModal, setShowRestartModal] = useState(false);
@@ -169,12 +198,18 @@ const [chartsReady, setChartsReady] = useState(false);
   const [showLocationCard, setShowLocationCard] = useState(false);
   const [isLocationLocked, setIsLocationLocked] = useState(false); // Track if user made a choice
   const [usingZipData, setUsingZipData] = useState(false); // Track which scenario
-  const [useZipAutoFill, setUseZipAutoFill] = useState(true); // Toggle for ZIP auto-fill
   const [isBackendAvailable, setIsBackendAvailable] = useState(true);
+  const [hasShownScenarioSummary, setHasShownScenarioSummary] = useState(false); // Track if we've shown scenario summary for current analysis
   
   // Edit mode state
   const [isEditMode, setIsEditMode] = useState(false);
   const [editableValues, setEditableValues] = useState<UserData | null>(null);
+  
+  // Advanced assumptions visibility state
+  const [showAdvancedAssumptions, setShowAdvancedAssumptions] = useState(false);
+  
+  // Advanced charts visibility state
+  const [showAdvancedCharts, setShowAdvancedCharts] = useState(false);
   
   // Reference box visibility and position state
   const [isReferenceBoxVisible, setIsReferenceBoxVisible] = useState(true);
@@ -182,6 +217,7 @@ const [chartsReady, setChartsReady] = useState(false);
   
   // Ref for scrolling to charts
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const monteCarloProgressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   
   const [monthlyCosts, setMonthlyCosts] = useState<{
     buying: BuyingCostsBreakdown;
@@ -206,6 +242,51 @@ const [chartsReady, setChartsReady] = useState(false);
   const [scenarioOverlayData, setScenarioOverlayData] = useState<ScenarioResult[] | null>(null);
   const [unifiedAnalysisResult, setUnifiedAnalysisResult] = useState<AnalysisResult | null>(null);
   
+  useEffect(() => {
+    return () => {
+      if (monteCarloProgressTimer.current) {
+        clearInterval(monteCarloProgressTimer.current);
+      }
+    };
+  }, []);
+
+  const startMonteCarloProgress = () => {
+    if (monteCarloProgressTimer.current) {
+      clearInterval(monteCarloProgressTimer.current);
+    }
+    setIsMonteCarloLoading(true);
+    setMonteCarloProgress(5);
+    setMonteCarloProgressStage('Starting Monte Carlo simulation...');
+    monteCarloProgressTimer.current = setInterval(() => {
+      setMonteCarloProgress(prev => {
+        const increment = Math.random() * 7 + 3;
+        const next = Math.min(prev + increment, 92);
+        if (next >= 70) {
+          setMonteCarloProgressStage('Summarizing price path percentiles...');
+        } else if (next >= 40) {
+          setMonteCarloProgressStage('Simulating hundreds of random price paths...');
+        } else {
+          setMonteCarloProgressStage('Loading ML-driven appreciation + volatility...');
+        }
+        return next;
+      });
+    }, 1200);
+  };
+
+  const stopMonteCarloProgress = (wasSuccessful: boolean) => {
+    if (monteCarloProgressTimer.current) {
+      clearInterval(monteCarloProgressTimer.current);
+      monteCarloProgressTimer.current = null;
+    }
+    setMonteCarloProgress(100);
+    setMonteCarloProgressStage(wasSuccessful ? 'Monte Carlo complete!' : 'Monte Carlo unavailable this time.');
+    setTimeout(() => {
+      setIsMonteCarloLoading(false);
+      setMonteCarloProgress(0);
+      setMonteCarloProgressStage('Starting Monte Carlo simulation...');
+    }, 800);
+  };
+
   // Handle save chat as PDF
   const handleSaveChat = async () => {
     try {
@@ -317,13 +398,21 @@ const [chartsReady, setChartsReady] = useState(false);
         
         // Add chart if present
         if (message.chartToShow && message.snapshotData) {
-          const chartNames = {
+          const chartNames: Record<ChartType, string> = {
             netWorth: 'Net Worth Comparison',
             monthlyCost: 'Monthly Costs Breakdown',
             totalCost: 'Total Cost Comparison',
             equity: 'Equity Buildup',
             rentGrowth: 'Rent Growth Comparison',
-            breakEven: 'Break-Even Timeline'
+            breakEven: 'Break-Even Timeline',
+            cashFlow: 'Cash Flow Timeline',
+            cumulativeCost: 'Cumulative Cost Comparison',
+            liquidity: 'Liquidity Timeline',
+            taxSavings: 'Tax Savings Timeline',
+            breakEvenHeatmap: 'Break-Even Heatmap',
+            monteCarlo: 'Monte Carlo Simulation',
+            sensitivity: 'Sensitivity Analysis',
+            scenarioOverlay: 'Scenario Overlay'
           };
           
           const chartName = chartNames[message.chartToShow] || message.chartToShow;
@@ -394,12 +483,7 @@ const [chartsReady, setChartsReady] = useState(false);
       {
         id: '1',
         role: 'assistant',
-        content: "Welcome! I'm your AI-powered financial advisor, here to help you make the smartest decision between buying and renting. I'll analyze your specific situation and show you exactly how your money will grow over time."
-      },
-      {
-        id: '2',
-        role: 'assistant',
-        content: "Let's get started! What's the home price you're considering and your current monthly rent?\n\nPro tip: You can also enter a ZIP code (like 90210) and I'll pull real local market data for that area!"
+        content: "Welcome. I'm your financial advisor for home-buying decisions. I'll analyze your local market and show you how buying compares to renting over time.\n\nYou can start by:\n• providing a ZIP code (e.g., 92127) so I can pull local market data, or\n• telling me the home price and rent you want to compare."
       }
     ]);
     setUserData({
@@ -429,10 +513,10 @@ const [chartsReady, setChartsReady] = useState(false);
     setShowLocationCard(false);
     setIsLocationLocked(false);
     setUsingZipData(false);
-    setUseZipAutoFill(true); // Reset to default (enabled)
     setIsEditMode(false);
     setEditableValues(null);
     setIsReferenceBoxVisible(true);
+    setHasShownScenarioSummary(false); // Reset scenario summary flag
     setReferenceBoxPosition({ x: 20, y: 20 });
   };
 
@@ -594,7 +678,7 @@ const [chartsReady, setChartsReady] = useState(false);
   };
 
   // Simple function to check if AI response indicates a chart should be shown
-function shouldShowChart(aiResponse: string): string | null {
+function shouldShowChart(aiResponse: string): ChartType | null {
   const lower = aiResponse.toLowerCase();
   
   // Check for chart trigger phrases (allows for "updated", "new", etc.)
@@ -639,7 +723,7 @@ function shouldShowChart(aiResponse: string): string | null {
       
       // User chose ZIP data but now wants custom
       if (usingZipData && ((lowerContent.includes('actually') || lowerContent.includes('wait')) && (lowerContent.includes('my own') || lowerContent.includes('custom') || lowerContent.includes('enter')))) {
-        // Reset to custom mode
+        // Reset location data
         setIsLocationLocked(false);
         setUsingZipData(false);
         setLocationData(null);
@@ -657,7 +741,7 @@ function shouldShowChart(aiResponse: string): string | null {
       
       // User chose custom but now wants ZIP data
       if (!usingZipData && ((lowerContent.includes('actually') || lowerContent.includes('wait')) && (lowerContent.includes('zip') || lowerContent.includes('local') || lowerContent.includes('those values')))) {
-        // Switch to ZIP mode
+        // Using ZIP data
         setUsingZipData(true);
         setUserData({
           homePrice: locationData.medianHomePrice,
@@ -731,6 +815,7 @@ function shouldShowChart(aiResponse: string): string | null {
   setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     
+    try {
     // Extract data from message using AI
     console.log('🚨🚨🚨 [CRITICAL DEBUG] handleSendMessage STARTED - About to extract data');
     const { userData: newUserData, locationData: detectedLocationData } = await extractUserDataWithAI(content, userData);
@@ -826,38 +911,29 @@ function shouldShowChart(aiResponse: string): string | null {
         return; // Continue with custom home price collection
       }
       
-      // Normal ZIP flow (no custom data provided)
-      if (useZipAutoFill) {
-        // Auto-fill mode: automatically use ZIP data
-        const autoFilledData: UserData = {
-          homePrice: detectedLocationData.medianHomePrice,
-          monthlyRent: detectedLocationData.averageRent,
-          downPaymentPercent: null, // Still need to ask
-          timeHorizonYears: null // Still need to ask
-        };
-        setUserData(autoFilledData);
-        setIsLocationLocked(true);
-        setUsingZipData(true);
-        setShowLocationCard(false);
-        
-        const autoFillMessage: Message = {
-          id: Date.now().toString(),
-          role: 'assistant',
-          content: `Perfect! I've auto-filled values based on market data for ${detectedLocationData.city}, ${detectedLocationData.state}:\n\n🏠 Home: $${detectedLocationData.medianHomePrice.toLocaleString()}\n💵 Rent: ${detectedLocationData.averageRent ? `$${detectedLocationData.averageRent.toLocaleString()}/mo` : '___'}\n\nWhat's your down payment percentage and how long do you plan to stay in this home?`
-        };
-        setMessages(prev => [...prev, autoFillMessage]);
-        setIsLoading(false);
-        return;
-      } else {
-        // Manual mode: show location card for user to choose
-        setShowLocationCard(true);
-        // Reset lock if user is trying a new ZIP code
-        if (isLocationLocked) {
-          setIsLocationLocked(false);
-          setUsingZipData(false);
-        }
-      }
+      // Normal ZIP flow (no custom data provided) - always auto-fill from ZIP data
+      const autoFilledData: UserData = {
+        homePrice: detectedLocationData.medianHomePrice,
+        monthlyRent: detectedLocationData.averageRent,
+        downPaymentPercent: null, // Still need to ask
+        timeHorizonYears: null // Still need to ask
+      };
+      setUserData(autoFilledData);
+      setIsLocationLocked(true);
+      setUsingZipData(true);
+      setShowLocationCard(false); // Don't show location card - just auto-fill
+      
+      const autoFillMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `Perfect! I've auto-filled values based on market data for ${detectedLocationData.city}, ${detectedLocationData.state}:\n\n🏠 Home: $${detectedLocationData.medianHomePrice.toLocaleString()}\n💵 Rent: ${detectedLocationData.averageRent ? `$${detectedLocationData.averageRent.toLocaleString()}/mo` : '___'}\n\nWhat's your down payment percentage and how long do you plan to stay in this home?`
+      };
+      setMessages(prev => [...prev, autoFillMessage]);
+      setIsLoading(false);
+      return;
     }
+    
+    // If we get here, no ZIP was detected or user provided custom values
     setUserData(newUserData);
     
     // Check if we have all data and if it changed
@@ -918,6 +994,16 @@ function shouldShowChart(aiResponse: string): string | null {
     if (hasAllData && dataChanged) {
       console.log('✅ [DEBUG] hasAllData && dataChanged is TRUE - About to run analysis');
       setHeatmapData(null);
+      setIsAnalyzing(true); // Mark that we're doing full analysis
+      setLoadingProgress({ stage: 'Starting analysis...', progress: 0 }); // Reset progress
+      
+      // Show a message that this may take a moment
+      const processingMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: "Perfect! I'm calculating your analysis. This may take 60-90 seconds as I'm running ML predictions for your ZIP code and computing your full timeline (calculating every month for the next " + newUserData.timeHorizonYears + " years). Please be patient..."
+      };
+      setMessages(prev => [...prev, processingMessage]);
       const inputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult);
       console.log('🟡 [DEBUG] buildScenarioInputs returned:', { hasInputs: !!inputs, inputs });
 
@@ -926,6 +1012,8 @@ function shouldShowChart(aiResponse: string): string | null {
         console.log('🟡 [DEBUG] About to call runAnalysis with:', { zipCode: currentZipCode, inputs: { homePrice: inputs.homePrice, monthlyRent: inputs.monthlyRent } });
 
         const { analysis, unifiedAnalysis, source } = await runAnalysis(inputs, currentZipCode);
+        setLoadingProgress({ stage: 'Complete!', progress: 100 }); // Set to complete
+        setIsAnalyzing(false); // Done with analysis
         analysisResult = analysis;
         
         console.log('🟣 [DEBUG] Setting unifiedAnalysisResult:', {
@@ -958,15 +1046,49 @@ function shouldShowChart(aiResponse: string): string | null {
 
         applyAnalysis(analysis);
 
+        // Add scenario summary message (only once per scenario)
+        if (!hasShownScenarioSummary && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent && newUserData.timeHorizonYears) {
+          const locationText = locationData 
+            ? ` in ${locationData.city}, ${locationData.state}`
+            : '';
+          
+          // Get ML rates from the unifiedAnalysis that was just returned
+          const mlHomeRate = unifiedAnalysis ? ((unifiedAnalysis as any)?.home_appreciation_rate ?? unifiedAnalysis?.homeAppreciationRate) : undefined;
+          const mlRentRate = unifiedAnalysis ? ((unifiedAnalysis as any)?.rent_growth_rate ?? unifiedAnalysis?.rentGrowthRate) : undefined;
+          
+          console.log('📊 [SCENARIO SUMMARY] ML rates (path 1):', { 
+            hasUnifiedAnalysis: !!unifiedAnalysis,
+            mlHomeRate, 
+            mlRentRate, 
+            currentZipCode,
+            unifiedAnalysisKeys: unifiedAnalysis ? Object.keys(unifiedAnalysis) : [],
+            fullUnifiedAnalysis: unifiedAnalysis
+          });
+          
+          let ratesText = '';
+          // Show ML rates if they exist and are valid numbers
+          const hasValidMLRates = mlHomeRate !== undefined && mlRentRate !== undefined && 
+                                   !isNaN(mlHomeRate) && !isNaN(mlRentRate) &&
+                                   mlHomeRate !== 0 && mlRentRate !== 0; // 0 would be suspicious
+          
+          if (hasValidMLRates) {
+            ratesText = `\n• ML predictions: ${mlHomeRate.toFixed(2)}% home appreciation, ${mlRentRate.toFixed(2)}% rent growth`;
+          } else if (locationData) {
+            ratesText = `\n• Using local market data for growth rates`;
+          }
+          
+          const summaryMessage: Message = {
+            id: (Date.now() - 1).toString(),
+            role: 'assistant',
+            content: `Great, here's the scenario I'm analyzing:\n\n• Home: $${newUserData.homePrice.toLocaleString()}${locationText}\n• Rent: $${newUserData.monthlyRent.toLocaleString()}/month\n• Down payment: ${newUserData.downPaymentPercent}%\n• Time horizon: ${newUserData.timeHorizonYears} years${ratesText}`
+          };
+          
+          setMessages(prev => [...prev, summaryMessage]);
+          setHasShownScenarioSummary(true);
+        }
+
         // Reset visible charts (all become available again)
-        setVisibleCharts({
-          netWorth: false,
-          monthlyCost: false,
-          totalCost: false,
-          equity: false,
-          rentGrowth: false,
-          breakEven: false
-        });
+        setVisibleCharts(createVisibleChartState());
       }
     }
 
@@ -993,19 +1115,118 @@ function shouldShowChart(aiResponse: string): string | null {
           renting: calcResult.analysis.rentingCosts
         };
         freshTotalCostData = calcResult.analysis.totals;
+
+        // Add scenario summary message BEFORE any chart messages (only once per scenario)
+        if (!hasShownScenarioSummary && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent && newUserData.timeHorizonYears) {
+          const locationText = locationData 
+            ? ` in ${locationData.city}, ${locationData.state}`
+            : '';
+          
+          // Get ML rates from the unifiedAnalysis that was just returned (not from state, which may be stale)
+          const unifiedAnalysis = calcResult.unifiedAnalysis ?? unifiedAnalysisResult;
+          const mlHomeRate = unifiedAnalysis ? ((unifiedAnalysis as any)?.home_appreciation_rate ?? unifiedAnalysis?.homeAppreciationRate) : undefined;
+          const mlRentRate = unifiedAnalysis ? ((unifiedAnalysis as any)?.rent_growth_rate ?? unifiedAnalysis?.rentGrowthRate) : undefined;
+          
+          console.log('📊 [SCENARIO SUMMARY] ML rates:', { 
+            hasUnifiedAnalysis: !!unifiedAnalysis,
+            mlHomeRate, 
+            mlRentRate, 
+            currentZipCode,
+            unifiedAnalysisKeys: unifiedAnalysis ? Object.keys(unifiedAnalysis) : [],
+            fullUnifiedAnalysis: unifiedAnalysis
+          });
+          
+          let ratesText = '';
+          // Show ML rates if they exist and are valid numbers
+          const hasValidMLRates = mlHomeRate !== undefined && mlRentRate !== undefined && 
+                                   !isNaN(mlHomeRate) && !isNaN(mlRentRate) &&
+                                   mlHomeRate !== 0 && mlRentRate !== 0; // 0 would be suspicious
+          
+          if (hasValidMLRates) {
+            ratesText = `\n• ML predictions: ${mlHomeRate.toFixed(2)}% home appreciation, ${mlRentRate.toFixed(2)}% rent growth`;
+          } else if (locationData) {
+            ratesText = `\n• Using local market data for growth rates`;
+          }
+          
+          const summaryMessage: Message = {
+            id: (Date.now() - 1).toString(), // Use timestamp - 1 to ensure it appears before the chart message
+            role: 'assistant',
+            content: `Great, here's the scenario I'm analyzing:\n\n• Home: $${newUserData.homePrice.toLocaleString()}${locationText}\n• Rent: $${newUserData.monthlyRent.toLocaleString()}/month\n• Down payment: ${newUserData.downPaymentPercent}%\n• Time horizon: ${newUserData.timeHorizonYears} years${ratesText}`
+          };
+          
+          setMessages(prev => [...prev, summaryMessage]);
+          setHasShownScenarioSummary(true);
+        }
       }
     }
 
-    // Get AI response
+    // Check if user is asking for a chart and we already have analysis data
+    // If so, skip the slow AI call and go straight to chart detection
+    const contentLower = content.toLowerCase();
+    const isChartRequest = hasAllData && analysisResult && (
+      contentLower.includes('show') || 
+      contentLower.includes('chart') || 
+      contentLower.includes('graph') ||
+      contentLower.includes('net worth') ||
+      contentLower.includes('monthly cost') ||
+      contentLower.includes('total cost') ||
+      contentLower.includes('equity') ||
+      contentLower.includes('break even') ||
+      contentLower.includes('cash flow') ||
+      contentLower.includes('monte carlo') ||
+      contentLower.includes('sensitivity') ||
+      contentLower.includes('heatmap')
+    );
+    
+    // Get AI response (skip if it's just a chart request and we have data)
     const allMessages = [...messages, userMessage].map(m => ({
       role: m.role,
       content: m.content
     }));
     
-    const botResponse = await getAIResponse(allMessages, newUserData);
+    let botResponse: string;
+    if (isChartRequest) {
+      // For chart requests, use a fast fallback response instead of waiting for AI
+      console.log('⚡ [PERF] Skipping AI call for chart request, using fast fallback');
+      botResponse = "Sure! Let me show you that chart.";
+    } else {
+      try {
+        botResponse = await getAIResponse(allMessages, newUserData);
+      } catch (error) {
+        console.error('AI response failed, using fallback:', error);
+        // Fallback response if AI fails
+        if (hasAllData && analysisResult) {
+          botResponse = "Perfect! I've calculated your analysis. Want to see how your wealth builds up over time? I can show you your Net Worth Comparison!";
+        } else {
+          botResponse = "Got it! I'm processing your information. What else would you like to know?";
+        }
+      }
+    }
 
-    // Check if AI response indicates a chart should be shown
-    const chartToShow = shouldShowChart(botResponse);
+    // Check if user directly requested a chart (faster than waiting for AI)
+    let chartToShow: ChartType | null = null;
+    if (isChartRequest && hasAllData && analysisResult) {
+      // Direct chart detection from user input
+      if (contentLower.includes('net worth')) chartToShow = 'netWorth';
+      else if (contentLower.includes('monthly cost')) chartToShow = 'monthlyCost';
+      else if (contentLower.includes('total cost')) chartToShow = 'totalCost';
+      else if (contentLower.includes('equity')) chartToShow = 'equity';
+      else if (contentLower.includes('rent growth') || contentLower.includes('rent growth')) chartToShow = 'rentGrowth';
+      else if (contentLower.includes('break even') && contentLower.includes('heatmap')) chartToShow = 'breakEvenHeatmap';
+      else if (contentLower.includes('break even')) chartToShow = 'breakEven';
+      else if (contentLower.includes('cash flow')) chartToShow = 'cashFlow';
+      else if (contentLower.includes('cumulative')) chartToShow = 'cumulativeCost';
+      else if (contentLower.includes('liquidity')) chartToShow = 'liquidity';
+      else if (contentLower.includes('tax')) chartToShow = 'taxSavings';
+      else if (contentLower.includes('monte carlo')) chartToShow = 'monteCarlo';
+      else if (contentLower.includes('sensitivity')) chartToShow = 'sensitivity';
+      else if (contentLower.includes('scenario')) chartToShow = 'scenarioOverlay';
+    }
+    
+    // If no direct match, check AI response
+    if (!chartToShow) {
+      chartToShow = shouldShowChart(botResponse);
+    }
     let heatmapPointsResult: BreakEvenHeatmapPoint[] | null = null;
     let monteCarloResult: { runs: MonteCarloRun[]; summary: MonteCarloSummary } | null = null;
     let sensitivityResult: SensitivityResult[] | null = null;
@@ -1021,11 +1242,33 @@ function shouldShowChart(aiResponse: string): string | null {
     }
     
     if (chartToShow === 'monteCarlo') {
-      // Load Monte Carlo simulation data
-      setMonteCarloData(null); // Clear old cached data
+      // Load Monte Carlo simulation data using unified analysis endpoint
+      // This ensures we get the new HomePricePathSummary format
       const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult);
       if (baseInputs) {
-        monteCarloResult = await loadMonteCarloData(baseInputs, 500);
+        startMonteCarloProgress();
+        try {
+          // Use unified analysis endpoint with includeMonteCarlo: true
+          const response = await analyzeScenario(baseInputs, false, currentZipCode || undefined, true);
+          const mcData = (response.analysis as any)?.monte_carlo_home_prices ?? response.analysis?.monteCarloHomePrices;
+          
+          if (mcData) {
+            // Update unifiedAnalysisResult with Monte Carlo data
+            if (unifiedAnalysisResult) {
+              setUnifiedAnalysisResult({
+                ...unifiedAnalysisResult,
+                monteCarloHomePrices: mcData
+              });
+            }
+            stopMonteCarloProgress(true);
+          } else {
+            console.warn('Monte Carlo data not found in response');
+            stopMonteCarloProgress(false);
+          }
+        } catch (error) {
+          console.error('Failed to load Monte Carlo data:', error);
+          stopMonteCarloProgress(false);
+        }
       }
     }
     
@@ -1056,7 +1299,7 @@ function shouldShowChart(aiResponse: string): string | null {
           ...buildSnapshotData(analysisResult, analysisInputs),
           analysis: unifiedAnalysisResult ?? undefined,
           heatmapPoints: heatmapPointsResult ?? heatmapData,
-          monteCarlo: monteCarloResult ?? monteCarloData,
+          monteCarlo: monteCarloResult ?? monteCarloData, // Legacy format fallback
           sensitivity: sensitivityResult ?? sensitivityData,
           scenarioOverlay: scenarioOverlayResult ?? scenarioOverlayData
         }
@@ -1084,10 +1327,25 @@ function shouldShowChart(aiResponse: string): string | null {
     let assistantMessage: Message;
     if (chartToShow && (chartsReady || hasAllData) && snapshotData) {
       // AI wants to show a chart and we have the data
+      // If this is the first chart after showing the scenario summary, add an intro sentence
+      let finalResponseContent = responseContent;
+      if (chartToShow === 'monteCarlo' && !responseContent.toLowerCase().includes('takes a bit longer')) {
+        finalResponseContent = `Heads up, this Monte Carlo simulation runs hundreds of price paths so it takes a bit longer than the other charts. I’ll show it as soon as it’s ready.\n\n${finalResponseContent}`;
+      }
+      if (
+        chartToShow === 'monthlyCost' &&
+        hasShownScenarioSummary &&
+        analysisApplied &&
+        !responseContent.toLowerCase().includes("let's start")
+      ) {
+        // This is the first chart after summary - add a brief intro if not already present
+        finalResponseContent = `Let's start with a simple monthly cost comparison. Then we can look at net worth, equity, and risk.\n\n${responseContent}`;
+      }
+      
       assistantMessage = {
       id: (Date.now() + 1).toString(),
       role: 'assistant',
-        content: responseContent,
+        content: finalResponseContent,
         chartToShow,
         snapshotData
       };
@@ -1125,7 +1383,21 @@ function shouldShowChart(aiResponse: string): string | null {
     // Then add bot response
     setMessages(prev => [...prev, assistantMessage]);
     setIsLoading(false);
-    
+    setIsAnalyzing(false); // Reset analysis flag
+    setLoadingProgress({ stage: 'Starting...', progress: 0 }); // Reset progress when done
+    } catch (error) {
+      console.error('Error in handleSendMessage:', error);
+      setIsLoading(false);
+      setIsAnalyzing(false); // Reset analysis flag on error
+      
+      // Show error message to user
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: "Sorry, I'm having trouble processing that. Could you try again? If the problem persists, you can also enter your numbers directly (e.g., 'home price $500k, rent $3k')."
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    }
   };
 
 // Handle suggestion chip clicks
@@ -1356,10 +1628,60 @@ const handleChipClick = (message: string) => {
 
   const runAnalysis = async (inputs: ScenarioInputs, zipCode?: string | null): Promise<{ analysis: CalculatorOutput; unifiedAnalysis?: AnalysisResult; source: 'backend' | 'local'; }> => {
     console.log('🔵 [DEBUG] runAnalysis called with:', { zipCode, inputs: { homePrice: inputs.homePrice, monthlyRent: inputs.monthlyRent } });
+    
+    // Progress indicator
+    const progressStages = [
+      { stage: 'Loading ML models...', progress: 15 },
+      { stage: 'Predicting market rates...', progress: 35 },
+      { stage: 'Calculating timeline...', progress: 60 },
+      { stage: 'Finalizing analysis...', progress: 85 }
+    ];
+    
+    setLoadingProgress(progressStages[0]); // Start with first stage
+    let currentStageIndex = 1;
+    let progressCounter = 0;
+    const progressInterval = setInterval(() => {
+      if (currentStageIndex < progressStages.length) {
+        setLoadingProgress(progressStages[currentStageIndex]);
+        currentStageIndex++;
+      } else {
+        // Keep updating progress even after all stages, slowly incrementing to 95%
+        progressCounter++;
+        const baseProgress = progressStages[progressStages.length - 1].progress;
+        const increment = Math.min(progressCounter * 0.5, 95 - baseProgress); // Slow increment
+        setLoadingProgress({ 
+          stage: progressStages[progressStages.length - 1].stage, 
+          progress: Math.min(baseProgress + increment, 95) 
+        });
+      }
+    }, 2000); // Update every 2 seconds
+    
     try {
+      console.log('🔵 [FRONTEND DEBUG] Calling analyzeScenario with:', {
+        zipCode: zipCode || undefined,
+        homePrice: inputs.homePrice,
+        monthlyRent: inputs.monthlyRent,
+        homeAppreciationRate: inputs.homeAppreciationRate,
+        rentGrowthRate: inputs.rentGrowthRate
+      });
       
-      const response = await analyzeScenario(inputs, false, zipCode || undefined);
+      // Don't include Monte Carlo by default - it's computationally expensive
+      // Monte Carlo will only run when user explicitly requests it via the chart
+      const response = await analyzeScenario(inputs, false, zipCode || undefined, false);
+      clearInterval(progressInterval);
+      setLoadingProgress({ stage: 'Complete!', progress: 100 });
+      // Small delay to show 100% before clearing
+      setTimeout(() => {
+        setLoadingProgress({ stage: 'Starting...', progress: 0 });
+      }, 300);
       const { analysis } = response;
+      
+      console.log('🟢 [FRONTEND DEBUG] Received analysis response:', {
+        homeAppreciationRate: (analysis as any)?.home_appreciation_rate ?? analysis?.homeAppreciationRate,
+        rentGrowthRate: (analysis as any)?.rent_growth_rate ?? analysis?.rentGrowthRate,
+        hasTimeline: !!analysis?.timeline,
+        timelineLength: analysis?.timeline?.length
+      });
       
       // Check for Monte Carlo data in the response
       const mcData = (analysis as any)?.monte_carlo_home_prices ?? analysis?.monteCarloHomePrices;
@@ -1414,8 +1736,18 @@ const handleChipClick = (message: string) => {
       });
       
       return { analysis: converted, unifiedAnalysis: analysis, source: 'backend' };
-    } catch (error) {
+    } catch (error: any) {
+      clearInterval(progressInterval);
+      setLoadingProgress({ stage: 'Error occurred', progress: 0 });
       console.error('❌ [DEBUG] Failed to analyze scenario via backend:', error);
+      
+      // Check if it's a timeout error
+      if (error?.message?.includes('timed out') || error?.message?.includes('timeout')) {
+        console.warn('⚠️ Backend analysis timed out, using local fallback');
+        // Don't show error message - just use local calculations silently
+        // The user will still get results, just without ML predictions
+      }
+      
       if (isBackendAvailable) {
         setIsBackendAvailable(false);
       }
@@ -1517,6 +1849,7 @@ const handleChipClick = (message: string) => {
 
     return {
       analysis: result.analysis,
+      unifiedAnalysis: result.unifiedAnalysis,
       source: result.source,
       inputs
     };
@@ -1703,6 +2036,13 @@ const handleChipClick = (message: string) => {
               insuranceMonthly: costs.buying.insurance,
               maintenanceMonthly: costs.buying.maintenance,
               hoaMonthly: costs.buying.hoa,
+              principalPaid: 0,
+              interestPaid: 0,
+              remainingBalance: 0,
+              homeValue: 0,
+              homeEquity: 0,
+              renterInvestmentBalance: 0,
+              buyerCashAccount: 0,
             }]} />
           </div>
         ) : null;
@@ -1916,12 +2256,21 @@ const handleChipClick = (message: string) => {
         ) : renderUnavailable('Break-Even heatmap');
       case 'monteCarlo':
         // Get Monte Carlo home price paths from analysis result
-        const monteCarloHomePrices = analysis?.monteCarloHomePrices ?? 
-                                     (analysis as any)?.monte_carlo_home_prices ?? 
-                                     null;
+        // Check both the message's snapshotData and the current unifiedAnalysisResult state
+        // (unifiedAnalysisResult may be updated after the message is created)
+        const mcFromAnalysis = analysis?.monteCarloHomePrices ?? 
+                               (analysis as any)?.monte_carlo_home_prices ?? 
+                               null;
+        const mcFromState = (unifiedAnalysisResult as any)?.monte_carlo_home_prices ?? 
+                            unifiedAnalysisResult?.monteCarloHomePrices ?? 
+                            null;
+        const monteCarloHomePrices = mcFromAnalysis ?? mcFromState;
         
         console.log('📊 [CHART DEBUG] monteCarlo:', {
           hasAnalysis: !!analysis,
+          hasUnifiedAnalysisResult: !!unifiedAnalysisResult,
+          mcFromAnalysis: !!mcFromAnalysis,
+          mcFromState: !!mcFromState,
           hasMonteCarloHomePrices: !!monteCarloHomePrices,
           yearsLength: monteCarloHomePrices?.years?.length,
           hasP10: !!monteCarloHomePrices?.p10,
@@ -2010,11 +2359,20 @@ const handleChipClick = (message: string) => {
     }
   });
 
+  // Determine step states
+  const hasScenario = (isLocationLocked && userData.homePrice && userData.monthlyRent) || 
+    (userData.homePrice && userData.monthlyRent && userData.downPaymentPercent && userData.timeHorizonYears);
+  const hasResults = chartsReady;
+
   return (
-    <div className="app-layout">
-      
-      {/* Location Data Card */}
-      {showLocationCard && locationData && !isLocationLocked && (
+    <div className="rvb-layout">
+      {/* Step Indicator */}
+
+      <div className="rvb-main">
+        {/* Left Column: Scenario Card */}
+        <div className="rvb-left">
+          {/* Location Data Card */}
+          {showLocationCard && locationData && !isLocationLocked && (
         // Decision Mode: Show big card with buttons
         <div className="location-data-card">
           <div className="location-card-header">
@@ -2116,7 +2474,7 @@ const handleChipClick = (message: string) => {
                 {(unifiedAnalysisResult as any)?.home_appreciation_rate ?? unifiedAnalysisResult?.homeAppreciationRate ?? '❌ NOT FOUND'}
               </div>
               {(unifiedAnalysisResult as any)?.home_appreciation_rate !== undefined && (
-                <div style={{ fontSize: '12px', color: '#666' }}>
+                <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)' }}>
                   Value: {(unifiedAnalysisResult as any).home_appreciation_rate}
                 </div>
               )}
@@ -2127,7 +2485,7 @@ const handleChipClick = (message: string) => {
                 {(unifiedAnalysisResult as any)?.rent_growth_rate ?? unifiedAnalysisResult?.rentGrowthRate ?? '❌ NOT FOUND'}
               </div>
               {(unifiedAnalysisResult as any)?.rent_growth_rate !== undefined && (
-                <div style={{ fontSize: '12px', color: '#666' }}>
+                <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)' }}>
                   Value: {(unifiedAnalysisResult as any).rent_growth_rate}
                 </div>
               )}
@@ -2172,7 +2530,7 @@ const handleChipClick = (message: string) => {
               {(unifiedAnalysisResult as any)?.home_appreciation_rate ?? unifiedAnalysisResult?.homeAppreciationRate ?? '❌ NOT FOUND'}
             </div>
             {(unifiedAnalysisResult as any)?.home_appreciation_rate !== undefined && (
-              <div style={{ fontSize: '12px', color: '#666' }}>
+              <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)' }}>
                 Value: {(unifiedAnalysisResult as any).home_appreciation_rate}
               </div>
             )}
@@ -2183,7 +2541,7 @@ const handleChipClick = (message: string) => {
               {(unifiedAnalysisResult as any)?.rent_growth_rate ?? unifiedAnalysisResult?.rentGrowthRate ?? '❌ NOT FOUND'}
             </div>
             {(unifiedAnalysisResult as any)?.rent_growth_rate !== undefined && (
-              <div style={{ fontSize: '12px', color: '#666' }}>
+              <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)' }}>
                 Value: {(unifiedAnalysisResult as any).rent_growth_rate}
               </div>
             )}
@@ -2191,29 +2549,36 @@ const handleChipClick = (message: string) => {
           <div style={{ marginTop: '12px', padding: '8px', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #f59e0b' }}>
             <strong style={{ fontSize: '12px' }}>All Keys in unifiedAnalysisResult:</strong>
             <pre style={{ fontSize: '10px', overflow: 'auto', maxHeight: '150px', marginTop: '4px' }}>
-              {unifiedAnalysisResult ? Object.keys(unifiedAnalysisResult).join(', ') : 'null'}
+              {unifiedAnalysisResult ? Object.keys(unifiedAnalysisResult as object).join(', ') : 'null'}
             </pre>
           </div>
         </div>
       )}
       
-      {/* Reference Box: Show after user makes choice */}
-      {isLocationLocked && isReferenceBoxVisible && (
-        <div 
-          className="reference-box draggable"
-          style={{
-            position: 'fixed',
-            left: `${referenceBoxPosition.x}px`,
-            top: `${referenceBoxPosition.y}px`,
-            zIndex: 1000
-          }}
-        >
+          {/* Reference Box: Always visible for tour, show placeholder when no scenario */}
           <div 
-            className="reference-box-header draggable-header"
-            onMouseDown={handleMouseDown}
-            style={{ cursor: 'move' }}
+            className={`reference-box ${hasScenario ? 'rvb-fade-in' : ''}`}
+            data-tour-id="scenario-card"
+            style={{ 
+              display: isReferenceBoxVisible || !hasScenario ? 'block' : 'none',
+              opacity: hasScenario ? 1 : 0.6 
+            }}
           >
-            <h4>📊 Your Inputs</h4>
+            {!hasScenario ? (
+              <div className="reference-box-placeholder">
+                <p>Your scenario will appear here once you enter your ZIP code or provide home price and rent.</p>
+              </div>
+            ) : (
+              <>
+              <div 
+                className="reference-box-header"
+              >
+            <div style={{ flex: 1 }}>
+              <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.95)' }}>Step 2: Your scenario</h4>
+              <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)', fontWeight: 400, lineHeight: '1.4' }}>
+                These are the numbers I'm using for your analysis. You can edit anything if it doesn't match your situation.
+              </p>
+            </div>
             <button 
               className="close-reference-btn"
               onClick={handleCloseReferenceBox}
@@ -2300,334 +2665,612 @@ const handleChipClick = (message: string) => {
               return usingZipData && locationData ? (
                 // Scenario 1: Using ZIP data
                 <>
-                  <div style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '2px solid #e2e8f0' }}>
-                    <strong style={{ fontSize: '14px', color: '#1a202c' }}>Your Inputs</strong>
-                    <div style={{ marginTop: '6px', fontSize: '12px', color: '#718096', fontStyle: 'italic' }}>
-                      Values based on market data for {locationData.city}, {locationData.state} (you can override anything)
+                  <div style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '2px solid rgba(139, 92, 246, 0.3)' }}>
+                    <div style={{ fontSize: '22px', fontWeight: 'bold', color: 'rgba(255, 255, 255, 0.95)', marginBottom: '8px', textAlign: 'center' }}>
+                      🏙️ {locationData.city}, {locationData.state}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)', marginBottom: '8px', textAlign: 'center' }}>
+                      Based on local market data (you can override anything)
                     </div>
                   </div>
-                  <div className="reference-item">
-                    <span className="ref-label">🏠 Home:</span>
-                    {isEditMode ? (
-                      <div className="ref-input-container">
-                        <input
-                          type="number"
-                          value={editableValues?.homePrice || ''}
-                          onChange={(e) => setEditableValues(prev => prev ? {...prev, homePrice: parseInt(e.target.value) || null} : null)}
-                          className="ref-input"
-                          placeholder="Home price"
-                        />
-                        <small>({locationData.city})</small>
-                      </div>
-                    ) : (
-                      <span className="ref-value">
-                        {userData.homePrice ? `$${userData.homePrice.toLocaleString()}` : '___'} 
-                        <small>({locationData.city})</small>
-                      </span>
-                    )}
-                  </div>
-                  <div className="reference-item">
-                    <span className="ref-label">💵 Rent:</span>
-                    {isEditMode ? (
-                      <div className="ref-input-container">
-                        <input
-                          type="number"
-                          value={editableValues?.monthlyRent || ''}
-                          onChange={(e) => setEditableValues(prev => prev ? {...prev, monthlyRent: parseInt(e.target.value) || null} : null)}
-                          className="ref-input"
-                          placeholder="Monthly rent"
-                        />
-                        <small>({locationData.city})</small>
-                      </div>
-                    ) : (
-                      <span className="ref-value">
-                        {userData.monthlyRent ? `$${userData.monthlyRent.toLocaleString()}/mo` : '___'} 
-                        <small>({locationData.city})</small>
-                      </span>
-                    )}
-                  </div>
-                  <div className="reference-item">
-                    <span className="ref-label">💰 Down:</span>
-                    {isEditMode ? (
-                      <div className="ref-input-container">
-                        <input
-                          type="number"
-                          value={editableValues?.downPaymentPercent || ''}
-                          onChange={(e) => setEditableValues(prev => prev ? {...prev, downPaymentPercent: parseInt(e.target.value) || null} : null)}
-                          className="ref-input"
-                          placeholder="Down payment %"
-                          min="1"
-                          max="100"
-                        />
-                        <small>(you chose)</small>
-                      </div>
-                    ) : (
-                      <span className="ref-value">
-                        {userData.downPaymentPercent ? `${userData.downPaymentPercent}%` : '___'} 
-                        {downPaymentAmount && <small> (${downPaymentAmount.toLocaleString()})</small>}
-                        <small>(you chose)</small>
-                      </span>
-                    )}
-                  </div>
-                  <div className="reference-item">
-                    <span className="ref-label">⏰ Timeline:</span>
-                    {isEditMode ? (
-                      <div className="ref-input-container">
-                        <input
-                          type="number"
-                          value={editableValues?.timeHorizonYears || ''}
-                          onChange={(e) => setEditableValues(prev => prev ? {...prev, timeHorizonYears: parseInt(e.target.value) || null} : null)}
-                          className="ref-input"
-                          placeholder="Years"
-                          min="1"
-                          max="30"
-                        />
-                        <small>(you chose)</small>
-                      </div>
-                    ) : (
-                      <span className="ref-value">
-                        {userData.timeHorizonYears ? `${userData.timeHorizonYears} years` : '___'} 
-                        <small>(you chose)</small>
-                      </span>
-                    )}
-                  </div>
-                  {currentInputs && (
-                    <>
-                      <div className="reference-item">
-                        <span className="ref-label">📋 Loan term:</span>
-                        <span className="ref-value">{currentInputs.loanTermYears} years <small>(default)</small></span>
-                      </div>
-                      <div className="reference-item">
-                        <span className="ref-label">📊 Mortgage rate:</span>
-                        <span className="ref-value">{currentInputs.interestRate}% <small>(default)</small></span>
-                      </div>
-                    </>
-                  )}
                   
-                  <div style={{ marginTop: '16px', marginBottom: '12px', paddingTop: '12px', paddingBottom: '8px', borderTop: '2px solid #e2e8f0', borderBottom: '2px solid #e2e8f0' }}>
-                    <strong style={{ fontSize: '14px', color: '#1a202c' }}>Assumptions & Market Data</strong>
-                  </div>
-                  
-                  <div className="reference-item">
-                    <span className="ref-label">🏛️ Property tax:</span>
-                    <span className="ref-value">
-                      {(locationData.propertyTaxRate * 100).toFixed(2)}% 
-                      <small>({locationData.state} state avg)</small>
-                    </span>
-                  </div>
-                  {currentInputs && (
-                    <>
-                      <div className="reference-item">
-                        <span className="ref-label">🔧 Maintenance:</span>
-                        <span className="ref-value">{currentInputs.maintenanceRate}% of home value/year <small>(default)</small></span>
-                      </div>
-                      <div className="reference-item">
-                        <span className="ref-label">🛡️ Home insurance:</span>
-                        <span className="ref-value">${currentInputs.homeInsuranceAnnual.toLocaleString()}/year <small>(default)</small></span>
-                      </div>
-                      <div className="reference-item">
-                        <span className="ref-label">🛡️ Renter insurance:</span>
-                        <span className="ref-value">${currentInputs.renterInsuranceAnnual.toLocaleString()}/year <small>(default)</small></span>
-                      </div>
-                      {currentInputs.hoaMonthly > 0 && (
-                        <div className="reference-item">
-                          <span className="ref-label">🏘️ HOA:</span>
-                          <span className="ref-value">${currentInputs.hoaMonthly.toLocaleString()}/mo <small>(default)</small></span>
+                  {/* Basics Section */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <strong style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.95)', display: 'block', marginBottom: '8px' }}>Basics</strong>
+                    <div className="reference-item">
+                      <span className="ref-label">🏠 Home:</span>
+                      {isEditMode ? (
+                        <div className="ref-input-container">
+                          <input
+                            type="number"
+                            value={editableValues?.homePrice || ''}
+                            onChange={(e) => setEditableValues(prev => prev ? {...prev, homePrice: parseInt(e.target.value) || null} : null)}
+                            className="ref-input"
+                            placeholder="Home price"
+                          />
+                          <small>({locationData.city})</small>
                         </div>
+                      ) : (
+                        <span className="ref-value">
+                          {userData.homePrice ? `$${userData.homePrice.toLocaleString()}` : '___'} 
+                          <small>({locationData.city})</small>
+                        </span>
                       )}
-                    </>
-                  )}
-                  <div className="reference-divider"></div>
-                  <div className="reference-item">
-                    <span className="ref-label">📈 Rent growth:</span>
-                    <span className="ref-value">
-                      {(() => {
-                        const displayRate = mlRentRate !== undefined ? mlRentRate : (rateSource?.rentGrowthRate ?? 0);
-                        const displayLabel = mlRentRate !== undefined ? 'ML prediction' : (locationData ? `${locationData.city} market` : 'national avg');
-                        console.log('📊 [REF BOX] Rent growth display:', { mlRentRate, rateSourceRent: rateSource?.rentGrowthRate, displayRate, displayLabel });
-                        return `${displayRate.toFixed(1)}%/year`;
-                      })()}
-                      <small>({mlRentRate !== undefined ? 'ML prediction' : locationData ? `${locationData.city} market` : 'national avg'})</small>
-                    </span>
+                    </div>
+                    <div className="reference-item">
+                      <span className="ref-label">💵 Rent:</span>
+                      {isEditMode ? (
+                        <div className="ref-input-container">
+                          <input
+                            type="number"
+                            value={editableValues?.monthlyRent || ''}
+                            onChange={(e) => setEditableValues(prev => prev ? {...prev, monthlyRent: parseInt(e.target.value) || null} : null)}
+                            className="ref-input"
+                            placeholder="Monthly rent"
+                          />
+                          <small>({locationData.city})</small>
+                        </div>
+                      ) : (
+                        <span className="ref-value">
+                          {userData.monthlyRent ? `$${userData.monthlyRent.toLocaleString()}/mo` : '___'} 
+                          <small>({locationData.city})</small>
+                        </span>
+                      )}
+                    </div>
+                    <div className="reference-item">
+                      <span className="ref-label">💰 Down:</span>
+                      {isEditMode ? (
+                        <div className="ref-input-container">
+                          <input
+                            type="number"
+                            value={editableValues?.downPaymentPercent || ''}
+                            onChange={(e) => setEditableValues(prev => prev ? {...prev, downPaymentPercent: parseInt(e.target.value) || null} : null)}
+                            className="ref-input"
+                            placeholder="Down payment %"
+                            min="1"
+                            max="100"
+                          />
+                          <small>(you chose)</small>
+                        </div>
+                      ) : (
+                        <span className="ref-value">
+                          {userData.downPaymentPercent ? `${userData.downPaymentPercent}%` : '___'} 
+                          {downPaymentAmount && <small> (${downPaymentAmount.toLocaleString()})</small>}
+                          <small>(you chose)</small>
+                        </span>
+                      )}
+                    </div>
+                    <div className="reference-item">
+                      <span className="ref-label">⏰ Timeline:</span>
+                      {isEditMode ? (
+                        <div className="ref-input-container">
+                          <input
+                            type="number"
+                            value={editableValues?.timeHorizonYears || ''}
+                            onChange={(e) => setEditableValues(prev => prev ? {...prev, timeHorizonYears: parseInt(e.target.value) || null} : null)}
+                            className="ref-input"
+                            placeholder="Years"
+                            min="1"
+                            max="30"
+                          />
+                          <small>(you chose)</small>
+                        </div>
+                      ) : (
+                        <span className="ref-value">
+                          {userData.timeHorizonYears ? `${userData.timeHorizonYears} years` : '___'} 
+                          <small>(you chose)</small>
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="reference-item">
-                    <span className="ref-label">🏘️ Appreciation:</span>
-                    <span className="ref-value">
-                      {(() => {
-                        const displayRate = mlHomeRate !== undefined ? mlHomeRate : (rateSource?.homeAppreciationRate ?? 0);
-                        const displayLabel = mlHomeRate !== undefined ? 'ML prediction' : (locationData ? `${locationData.city} market` : 'based on timeline');
-                        console.log('📊 [REF BOX] Appreciation display:', { mlHomeRate, rateSourceHome: rateSource?.homeAppreciationRate, displayRate, displayLabel });
-                        return `${displayRate.toFixed(1)}%/year`;
-                      })()}
-                      <small>({mlHomeRate !== undefined ? 'ML prediction' : locationData ? `${locationData.city} market` : 'based on timeline'})</small>
-                    </span>
-                  </div>
-                  <div className="reference-item">
-                    <span className="ref-label">💹 Investment:</span>
-                    <span className="ref-value">
-                      {rateSource ? `${rateSource.investmentReturnRate}%/year` : '___'} 
-                      <small>(based on timeline)</small>
-                    </span>
+                  
+                  {/* Assumptions & Market Data Section (Collapsible) */}
+                  <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '2px solid rgba(139, 92, 246, 0.3)' }}>
+                    <button
+                      onClick={() => setShowAdvancedAssumptions(!showAdvancedAssumptions)}
+                      className="rvb-advanced-toggle"
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: 'rgba(30, 30, 40, 0.6)',
+                        border: '1px solid rgba(139, 92, 246, 0.3)',
+                        borderRadius: '12px',
+                        color: 'rgba(255, 255, 255, 0.9)',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        padding: '10px 12px',
+                        margin: 0,
+                        transition: 'background 0.2s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)';
+                        e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.5)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'rgba(30, 30, 40, 0.6)';
+                        e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+                      }}
+                    >
+                      <span>Assumptions & Market Data</span>
+                      <span style={{ opacity: 0.7, fontSize: '14px', marginLeft: '8px', color: 'rgba(255, 255, 255, 0.9)' }}>
+                        {showAdvancedAssumptions ? '▾' : '▸'}
+                      </span>
+                    </button>
+                    
+                    {/* Always show ML predictions as summary */}
+                    {(rateSource || mlRentRate !== undefined || mlHomeRate !== undefined) && (
+                      <div style={{ marginTop: '8px' }}>
+                        <div className="reference-item">
+                          <span className="ref-label">📈 Rent growth:</span>
+                          <span className="ref-value">
+                            {(() => {
+                              const displayRate = mlRentRate !== undefined ? mlRentRate : (rateSource?.rentGrowthRate ?? 0);
+                              return displayRate > 0 ? `${displayRate.toFixed(1)}%/year` : '___';
+                            })()}
+                            <small>({mlRentRate !== undefined ? 'ML prediction' : locationData ? `${locationData.city} market` : 'national avg'})</small>
+                          </span>
+                        </div>
+                        <div className="reference-item">
+                          <span className="ref-label">🏘️ Appreciation:</span>
+                          <span className="ref-value">
+                            {(() => {
+                              const displayRate = mlHomeRate !== undefined ? mlHomeRate : (rateSource?.homeAppreciationRate ?? 0);
+                              return displayRate > 0 ? `${displayRate.toFixed(1)}%/year` : '___';
+                            })()}
+                            <small>({mlHomeRate !== undefined ? 'ML prediction' : locationData ? `${locationData.city} market` : 'based on timeline'})</small>
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Show detailed assumptions when expanded */}
+                    {showAdvancedAssumptions && (
+                      <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                        {currentInputs && (
+                          <>
+                            <div className="reference-item">
+                              <span className="ref-label">📋 Loan term:</span>
+                              <span className="ref-value">{currentInputs.loanTermYears} years <small>(standard)</small></span>
+                            </div>
+                            <div className="reference-item">
+                              <span className="ref-label">📊 Mortgage rate:</span>
+                              {isEditMode ? (
+                                <div className="ref-input-container">
+                                  <input
+                                    type="number"
+                                    value={currentInputs.interestRate}
+                                    className="ref-input"
+                                    placeholder="Mortgage rate"
+                                    step="0.1"
+                                    disabled
+                                  />
+                                  <small>(read-only for now)</small>
+                                </div>
+                              ) : (
+                                <span className="ref-value">{currentInputs.interestRate}% <small>(default)</small></span>
+                              )}
+                            </div>
+                            <div className="reference-item">
+                              <span className="ref-label">🏛️ Property tax:</span>
+                              {isEditMode ? (
+                                <div className="ref-input-container">
+                                  <input
+                                    type="number"
+                                    value={(locationData.propertyTaxRate * 100).toFixed(2)}
+                                    className="ref-input"
+                                    placeholder="Property tax rate"
+                                    step="0.01"
+                                    disabled
+                                  />
+                                  <small>(read-only for now)</small>
+                                </div>
+                              ) : (
+                                <span className="ref-value">
+                                  {(locationData.propertyTaxRate * 100).toFixed(2)}% 
+                                  <small>({locationData.state} state avg)</small>
+                                </span>
+                              )}
+                            </div>
+                            <div className="reference-item">
+                              <span className="ref-label">🔧 Maintenance:</span>
+                              {isEditMode ? (
+                                <div className="ref-input-container">
+                                  <input
+                                    type="number"
+                                    value={currentInputs.maintenanceRate}
+                                    className="ref-input"
+                                    placeholder="Maintenance %"
+                                    step="0.1"
+                                    disabled
+                                  />
+                                  <small>(read-only for now)</small>
+                                </div>
+                              ) : (
+                                <span className="ref-value">{currentInputs.maintenanceRate}% of home value/year <small>(default)</small></span>
+                              )}
+                            </div>
+                            <div className="reference-item">
+                              <span className="ref-label">🛡️ Home insurance:</span>
+                              {isEditMode ? (
+                                <div className="ref-input-container">
+                                  <input
+                                    type="number"
+                                    value={currentInputs.homeInsuranceAnnual}
+                                    className="ref-input"
+                                    placeholder="Home insurance annual"
+                                    disabled
+                                  />
+                                  <small>(read-only for now)</small>
+                                </div>
+                              ) : (
+                                <span className="ref-value">${currentInputs.homeInsuranceAnnual.toLocaleString()}/year <small>(default)</small></span>
+                              )}
+                            </div>
+                            <div className="reference-item">
+                              <span className="ref-label">🛡️ Renter insurance:</span>
+                              {isEditMode ? (
+                                <div className="ref-input-container">
+                                  <input
+                                    type="number"
+                                    value={currentInputs.renterInsuranceAnnual}
+                                    className="ref-input"
+                                    placeholder="Renter insurance annual"
+                                    disabled
+                                  />
+                                  <small>(read-only for now)</small>
+                                </div>
+                              ) : (
+                                <span className="ref-value">${currentInputs.renterInsuranceAnnual.toLocaleString()}/year <small>(default)</small></span>
+                              )}
+                            </div>
+                            {currentInputs.hoaMonthly > 0 && (
+                              <div className="reference-item">
+                                <span className="ref-label">🏘️ HOA:</span>
+                                {isEditMode ? (
+                                  <div className="ref-input-container">
+                                    <input
+                                      type="number"
+                                      value={currentInputs.hoaMonthly}
+                                      className="ref-input"
+                                      placeholder="HOA monthly"
+                                      disabled
+                                    />
+                                    <small>(read-only for now)</small>
+                                  </div>
+                                ) : (
+                                  <span className="ref-value">${currentInputs.hoaMonthly.toLocaleString()}/mo <small>(default)</small></span>
+                                )}
+                              </div>
+                            )}
+                            <div className="reference-item">
+                              <span className="ref-label">💹 Investment:</span>
+                              {isEditMode ? (
+                                <div className="ref-input-container">
+                                  <input
+                                    type="number"
+                                    value={rateSource?.investmentReturnRate ?? 0}
+                                    className="ref-input"
+                                    placeholder="Investment return %"
+                                    step="0.1"
+                                    disabled
+                                  />
+                                  <small>(read-only for now)</small>
+                                </div>
+                              ) : (
+                                <span className="ref-value">
+                                  {rateSource ? `${rateSource.investmentReturnRate}%/year` : '___'} 
+                                  <small>(based on timeline)</small>
+                                </span>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </>
               ) : (
                 // Scenario 2: Using custom data
                 <>
-                  <div style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '2px solid #e2e8f0' }}>
-                    <strong style={{ fontSize: '14px', color: '#1a202c' }}>Your Inputs</strong>
-                  </div>
-                  <div className="reference-item">
-                    <span className="ref-label">🏠 Home:</span>
-                    {isEditMode ? (
-                      <div className="ref-input-container">
-                        <input
-                          type="number"
-                          value={editableValues?.homePrice || ''}
-                          onChange={(e) => setEditableValues(prev => prev ? {...prev, homePrice: parseInt(e.target.value) || null} : null)}
-                          className="ref-input"
-                          placeholder="Home price"
-                        />
-                        <small>(you chose)</small>
-                      </div>
-                    ) : (
-                      <span className="ref-value">
-                        {userData.homePrice ? `$${userData.homePrice.toLocaleString()}` : '___'} 
-                        <small>(you chose)</small>
-                      </span>
-                    )}
-                  </div>
-                  <div className="reference-item">
-                    <span className="ref-label">💵 Rent:</span>
-                    {isEditMode ? (
-                      <div className="ref-input-container">
-                        <input
-                          type="number"
-                          value={editableValues?.monthlyRent || ''}
-                          onChange={(e) => setEditableValues(prev => prev ? {...prev, monthlyRent: parseInt(e.target.value) || null} : null)}
-                          className="ref-input"
-                          placeholder="Monthly rent"
-                        />
-                        <small>(you chose)</small>
-                      </div>
-                    ) : (
-                      <span className="ref-value">
-                        {userData.monthlyRent ? `$${userData.monthlyRent.toLocaleString()}/mo` : '___'} 
-                        <small>(you chose)</small>
-                      </span>
-                    )}
-                  </div>
-                  <div className="reference-item">
-                    <span className="ref-label">💰 Down:</span>
-                    {isEditMode ? (
-                      <div className="ref-input-container">
-                        <input
-                          type="number"
-                          value={editableValues?.downPaymentPercent || ''}
-                          onChange={(e) => setEditableValues(prev => prev ? {...prev, downPaymentPercent: parseInt(e.target.value) || null} : null)}
-                          className="ref-input"
-                          placeholder="Down payment %"
-                          min="1"
-                          max="100"
-                        />
-                        <small>(you chose)</small>
-                      </div>
-                    ) : (
-                      <span className="ref-value">
-                        {userData.downPaymentPercent ? `${userData.downPaymentPercent}%` : '___'} 
-                        {downPaymentAmount && <small> (${downPaymentAmount.toLocaleString()})</small>}
-                        <small>(you chose)</small>
-                      </span>
-                    )}
-                  </div>
-                  <div className="reference-item">
-                    <span className="ref-label">⏰ Timeline:</span>
-                    {isEditMode ? (
-                      <div className="ref-input-container">
-                        <input
-                          type="number"
-                          value={editableValues?.timeHorizonYears || ''}
-                          onChange={(e) => setEditableValues(prev => prev ? {...prev, timeHorizonYears: parseInt(e.target.value) || null} : null)}
-                          className="ref-input"
-                          placeholder="Years"
-                          min="1"
-                          max="30"
-                        />
-                        <small>(you chose)</small>
-                      </div>
-                    ) : (
-                      <span className="ref-value">
-                        {userData.timeHorizonYears ? `${userData.timeHorizonYears} years` : '___'} 
-                        <small>(you chose)</small>
-                      </span>
-                    )}
-                  </div>
-                  {currentInputs && (
-                    <>
-                      <div className="reference-item">
-                        <span className="ref-label">📋 Loan term:</span>
-                        <span className="ref-value">{currentInputs.loanTermYears} years <small>(default)</small></span>
-                      </div>
-                      <div className="reference-item">
-                        <span className="ref-label">📊 Mortgage rate:</span>
-                        <span className="ref-value">{currentInputs.interestRate}% <small>(default)</small></span>
-                      </div>
-                    </>
-                  )}
-                  
-                  <div style={{ marginTop: '16px', marginBottom: '12px', paddingTop: '12px', paddingBottom: '8px', borderTop: '2px solid #e2e8f0', borderBottom: '2px solid #e2e8f0' }}>
-                    <strong style={{ fontSize: '14px', color: '#1a202c' }}>Assumptions & Market Data</strong>
-                  </div>
-                  
-                  <div className="reference-item">
-                    <span className="ref-label">🏛️ Property tax:</span>
-                    <span className="ref-value">
-                      {currentInputs ? `${currentInputs.propertyTaxRate.toFixed(2)}%` : '1.0%'} 
-                      <small>(national avg)</small>
-                    </span>
-                  </div>
-                  {currentInputs && (
-                    <>
-                      <div className="reference-item">
-                        <span className="ref-label">🔧 Maintenance:</span>
-                        <span className="ref-value">{currentInputs.maintenanceRate}% of home value/year <small>(default)</small></span>
-                      </div>
-                      <div className="reference-item">
-                        <span className="ref-label">🛡️ Home insurance:</span>
-                        <span className="ref-value">${currentInputs.homeInsuranceAnnual.toLocaleString()}/year <small>(default)</small></span>
-                      </div>
-                      <div className="reference-item">
-                        <span className="ref-label">🛡️ Renter insurance:</span>
-                        <span className="ref-value">${currentInputs.renterInsuranceAnnual.toLocaleString()}/year <small>(default)</small></span>
-                      </div>
-                      {currentInputs.hoaMonthly > 0 && (
-                        <div className="reference-item">
-                          <span className="ref-label">🏘️ HOA:</span>
-                          <span className="ref-value">${currentInputs.hoaMonthly.toLocaleString()}/mo <small>(default)</small></span>
+                  {/* Basics Section */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <strong style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.95)', display: 'block', marginBottom: '8px' }}>Basics</strong>
+                    <div className="reference-item">
+                      <span className="ref-label">🏠 Home:</span>
+                      {isEditMode ? (
+                        <div className="ref-input-container">
+                          <input
+                            type="number"
+                            value={editableValues?.homePrice || ''}
+                            onChange={(e) => setEditableValues(prev => prev ? {...prev, homePrice: parseInt(e.target.value) || null} : null)}
+                            className="ref-input"
+                            placeholder="Home price"
+                          />
+                          <small>(you chose)</small>
                         </div>
+                      ) : (
+                        <span className="ref-value">
+                          {userData.homePrice ? `$${userData.homePrice.toLocaleString()}` : '___'} 
+                          <small>(you chose)</small>
+                        </span>
                       )}
-                    </>
-                  )}
-                  <div className="reference-divider"></div>
-                  <div className="reference-item">
-                    <span className="ref-label">📈 Rent growth:</span>
-                    <span className="ref-value">
-                      {rateSource ? `${rateSource.rentGrowthRate.toFixed(1)}%/year` : '___'} 
-                      <small>(national avg)</small>
-                    </span>
+                    </div>
+                    <div className="reference-item">
+                      <span className="ref-label">💵 Rent:</span>
+                      {isEditMode ? (
+                        <div className="ref-input-container">
+                          <input
+                            type="number"
+                            value={editableValues?.monthlyRent || ''}
+                            onChange={(e) => setEditableValues(prev => prev ? {...prev, monthlyRent: parseInt(e.target.value) || null} : null)}
+                            className="ref-input"
+                            placeholder="Monthly rent"
+                          />
+                          <small>(you chose)</small>
+                        </div>
+                      ) : (
+                        <span className="ref-value">
+                          {userData.monthlyRent ? `$${userData.monthlyRent.toLocaleString()}/mo` : '___'} 
+                          <small>(you chose)</small>
+                        </span>
+                      )}
+                    </div>
+                    <div className="reference-item">
+                      <span className="ref-label">💰 Down:</span>
+                      {isEditMode ? (
+                        <div className="ref-input-container">
+                          <input
+                            type="number"
+                            value={editableValues?.downPaymentPercent || ''}
+                            onChange={(e) => setEditableValues(prev => prev ? {...prev, downPaymentPercent: parseInt(e.target.value) || null} : null)}
+                            className="ref-input"
+                            placeholder="Down payment %"
+                            min="1"
+                            max="100"
+                          />
+                          <small>(you chose)</small>
+                        </div>
+                      ) : (
+                        <span className="ref-value">
+                          {userData.downPaymentPercent ? `${userData.downPaymentPercent}%` : '___'} 
+                          {downPaymentAmount && <small> (${downPaymentAmount.toLocaleString()})</small>}
+                          <small>(you chose)</small>
+                        </span>
+                      )}
+                    </div>
+                    <div className="reference-item">
+                      <span className="ref-label">⏰ Timeline:</span>
+                      {isEditMode ? (
+                        <div className="ref-input-container">
+                          <input
+                            type="number"
+                            value={editableValues?.timeHorizonYears || ''}
+                            onChange={(e) => setEditableValues(prev => prev ? {...prev, timeHorizonYears: parseInt(e.target.value) || null} : null)}
+                            className="ref-input"
+                            placeholder="Years"
+                            min="1"
+                            max="30"
+                          />
+                          <small>(you chose)</small>
+                        </div>
+                      ) : (
+                        <span className="ref-value">
+                          {userData.timeHorizonYears ? `${userData.timeHorizonYears} years` : '___'} 
+                          <small>(you chose)</small>
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="reference-item">
-                    <span className="ref-label">🏘️ Appreciation:</span>
-                    <span className="ref-value">
-                      {rateSource ? `${rateSource.homeAppreciationRate.toFixed(1)}%/year` : '___'} 
-                      <small>(based on timeline)</small>
-                    </span>
-                  </div>
-                  <div className="reference-item">
-                    <span className="ref-label">💹 Investment:</span>
-                    <span className="ref-value">
-                      {rateSource ? `${rateSource.investmentReturnRate}%/year` : '___'} 
-                      <small>(based on timeline)</small>
-                    </span>
+                  
+                  {/* Assumptions & Market Data Section (Collapsible) */}
+                  <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '2px solid rgba(139, 92, 246, 0.3)' }}>
+                    <button
+                      onClick={() => setShowAdvancedAssumptions(!showAdvancedAssumptions)}
+                      className="rvb-advanced-toggle"
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: 'rgba(30, 30, 40, 0.6)',
+                        border: '1px solid rgba(139, 92, 246, 0.3)',
+                        borderRadius: '12px',
+                        color: 'rgba(255, 255, 255, 0.9)',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        padding: '10px 12px',
+                        margin: 0,
+                        transition: 'background 0.2s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)';
+                        e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.5)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'rgba(30, 30, 40, 0.6)';
+                        e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+                      }}
+                    >
+                      <span>Assumptions & Market Data</span>
+                      <span style={{ opacity: 0.7, fontSize: '14px', marginLeft: '8px', color: 'rgba(255, 255, 255, 0.9)' }}>
+                        {showAdvancedAssumptions ? '▾' : '▸'}
+                      </span>
+                    </button>
+                    
+                    {/* Always show ML predictions as summary */}
+                    {(rateSource || mlRentRate !== undefined || mlHomeRate !== undefined) && (
+                      <div style={{ marginTop: '8px' }}>
+                        <div className="reference-item">
+                          <span className="ref-label">📈 Rent growth:</span>
+                          <span className="ref-value">
+                            {(() => {
+                              const displayRate = mlRentRate !== undefined ? mlRentRate : (rateSource?.rentGrowthRate ?? 0);
+                              return displayRate > 0 ? `${displayRate.toFixed(1)}%/year` : '___';
+                            })()}
+                            <small>({mlRentRate !== undefined ? 'ML prediction' : 'national avg'})</small>
+                          </span>
+                        </div>
+                        <div className="reference-item">
+                          <span className="ref-label">🏘️ Appreciation:</span>
+                          <span className="ref-value">
+                            {(() => {
+                              const displayRate = mlHomeRate !== undefined ? mlHomeRate : (rateSource?.homeAppreciationRate ?? 0);
+                              return displayRate > 0 ? `${displayRate.toFixed(1)}%/year` : '___';
+                            })()}
+                            <small>({mlHomeRate !== undefined ? 'ML prediction' : 'based on timeline'})</small>
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Show detailed assumptions when expanded */}
+                    {showAdvancedAssumptions && (
+                      <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                        {currentInputs && (
+                          <>
+                            <div className="reference-item">
+                              <span className="ref-label">📋 Loan term:</span>
+                              <span className="ref-value">{currentInputs.loanTermYears} years <small>(standard)</small></span>
+                            </div>
+                            <div className="reference-item">
+                              <span className="ref-label">📊 Mortgage rate:</span>
+                              {isEditMode ? (
+                                <div className="ref-input-container">
+                                  <input
+                                    type="number"
+                                    value={currentInputs.interestRate}
+                                    className="ref-input"
+                                    placeholder="Mortgage rate"
+                                    step="0.1"
+                                    disabled
+                                  />
+                                  <small>(read-only for now)</small>
+                                </div>
+                              ) : (
+                                <span className="ref-value">{currentInputs.interestRate}% <small>(default)</small></span>
+                              )}
+                            </div>
+                            <div className="reference-item">
+                              <span className="ref-label">🏛️ Property tax:</span>
+                              {isEditMode ? (
+                                <div className="ref-input-container">
+                                  <input
+                                    type="number"
+                                    value={currentInputs.propertyTaxRate.toFixed(2)}
+                                    className="ref-input"
+                                    placeholder="Property tax rate"
+                                    step="0.01"
+                                    disabled
+                                  />
+                                  <small>(read-only for now)</small>
+                                </div>
+                              ) : (
+                                <span className="ref-value">
+                                  {currentInputs.propertyTaxRate.toFixed(2)}% 
+                                  <small>(national avg)</small>
+                                </span>
+                              )}
+                            </div>
+                            <div className="reference-item">
+                              <span className="ref-label">🔧 Maintenance:</span>
+                              {isEditMode ? (
+                                <div className="ref-input-container">
+                                  <input
+                                    type="number"
+                                    value={currentInputs.maintenanceRate}
+                                    className="ref-input"
+                                    placeholder="Maintenance %"
+                                    step="0.1"
+                                    disabled
+                                  />
+                                  <small>(read-only for now)</small>
+                                </div>
+                              ) : (
+                                <span className="ref-value">{currentInputs.maintenanceRate}% of home value/year <small>(default)</small></span>
+                              )}
+                            </div>
+                            <div className="reference-item">
+                              <span className="ref-label">🛡️ Home insurance:</span>
+                              {isEditMode ? (
+                                <div className="ref-input-container">
+                                  <input
+                                    type="number"
+                                    value={currentInputs.homeInsuranceAnnual}
+                                    className="ref-input"
+                                    placeholder="Home insurance annual"
+                                    disabled
+                                  />
+                                  <small>(read-only for now)</small>
+                                </div>
+                              ) : (
+                                <span className="ref-value">${currentInputs.homeInsuranceAnnual.toLocaleString()}/year <small>(default)</small></span>
+                              )}
+                            </div>
+                            <div className="reference-item">
+                              <span className="ref-label">🛡️ Renter insurance:</span>
+                              {isEditMode ? (
+                                <div className="ref-input-container">
+                                  <input
+                                    type="number"
+                                    value={currentInputs.renterInsuranceAnnual}
+                                    className="ref-input"
+                                    placeholder="Renter insurance annual"
+                                    disabled
+                                  />
+                                  <small>(read-only for now)</small>
+                                </div>
+                              ) : (
+                                <span className="ref-value">${currentInputs.renterInsuranceAnnual.toLocaleString()}/year <small>(default)</small></span>
+                              )}
+                            </div>
+                            {currentInputs.hoaMonthly > 0 && (
+                              <div className="reference-item">
+                                <span className="ref-label">🏘️ HOA:</span>
+                                {isEditMode ? (
+                                  <div className="ref-input-container">
+                                    <input
+                                      type="number"
+                                      value={currentInputs.hoaMonthly}
+                                      className="ref-input"
+                                      placeholder="HOA monthly"
+                                      disabled
+                                    />
+                                    <small>(read-only for now)</small>
+                                  </div>
+                                ) : (
+                                  <span className="ref-value">${currentInputs.hoaMonthly.toLocaleString()}/mo <small>(default)</small></span>
+                                )}
+                              </div>
+                            )}
+                            <div className="reference-item">
+                              <span className="ref-label">💹 Investment:</span>
+                              {isEditMode ? (
+                                <div className="ref-input-container">
+                                  <input
+                                    type="number"
+                                    value={rateSource?.investmentReturnRate ?? 0}
+                                    className="ref-input"
+                                    placeholder="Investment return %"
+                                    step="0.1"
+                                    disabled
+                                  />
+                                  <small>(read-only for now)</small>
+                                </div>
+                              ) : (
+                                <span className="ref-value">
+                                  {rateSource ? `${rateSource.investmentReturnRate}%/year` : '___'} 
+                                  <small>(based on timeline)</small>
+                                </span>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </>
               );
@@ -2637,12 +3280,18 @@ const handleChipClick = (message: string) => {
           {/* Edit Mode Buttons */}
           <div className="reference-box-actions">
             {!isEditMode ? (
-              <button 
-                className="edit-values-btn"
-                onClick={handleEditValues}
-              >
-                Edit Values
-              </button>
+              <div style={{ width: '100%' }}>
+                <button 
+                  className="edit-values-btn"
+                  onClick={handleEditValues}
+                  title="Change home price, rent, down payment, or timeframe"
+                >
+                  Edit scenario
+                </button>
+                <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: '#a0aec0', textAlign: 'center' }}>
+                  Change home price, rent, down payment, or timeframe.
+                </p>
+              </div>
             ) : (
               <div className="edit-actions">
                 <button 
@@ -2660,53 +3309,22 @@ const handleChipClick = (message: string) => {
               </div>
             )}
           </div>
+              </>
+            )}
+          </div>
         </div>
-      )}
-      
-    <div className="chat-container">
+        
+        {/* Right Column: Chat Container */}
+        <div className="rvb-right">
+          <div className="chat-container">
       <div className="chat-header">
         <h1 className="app-title">RentVsBuy.ai</h1>
-        <div className="zip-toggle-container" style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          marginRight: 'auto', 
-          marginLeft: '20px',
-          opacity: 0.85
-        }}>
-          <label 
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px', 
-              cursor: 'pointer', 
-              fontSize: '12px', 
-              color: '#718096',
-              fontWeight: 400,
-              transition: 'opacity 0.2s'
-            }}
-            title="When enabled, ZIP codes automatically fill home price and rent from market data. You can still override any values."
-            onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-            onMouseLeave={(e) => e.currentTarget.style.opacity = '0.85'}
-          >
-            <input
-              type="checkbox"
-              checked={useZipAutoFill}
-              onChange={(e) => setUseZipAutoFill(e.target.checked)}
-              style={{ 
-                cursor: 'pointer', 
-                width: '14px', 
-                height: '14px',
-                accentColor: '#4299e1'
-              }}
-            />
-            <span style={{ userSelect: 'none' }}>ZIP auto-fill</span>
-          </label>
-        </div>
           <div className="header-buttons">
             <button 
               className="save-button"
               onClick={handleSaveChat}
               title="Save current chat"
+              data-tour-id="save-button"
             >
               Save Chat
             </button>
@@ -2714,25 +3332,33 @@ const handleChipClick = (message: string) => {
               className="restart-button"
               onClick={() => setShowRestartModal(true)}
               title="Start over"
+              data-tour-id="restart-button"
             >
 Restart
             </button>
-            {/* Toggle Reference Box Button */}
-            {isLocationLocked && (
-              <button 
-                className="toggle-reference-btn"
-                onClick={handleToggleReferenceBox}
-                title={isReferenceBoxVisible ? "Hide inputs" : "Show inputs"}
-              >
-                <span className="toggle-btn-content">
-                  <span className="toggle-btn-label">Inputs</span>
-                </span>
-              </button>
-            )}
+            {/* Toggle Reference Box Button - Always visible */}
+            <button 
+              className="toggle-reference-btn"
+              onClick={handleToggleReferenceBox}
+              title={isReferenceBoxVisible ? "Hide scenario" : "Show scenario"}
+              data-tour-id="scenario-toggle-button"
+              disabled={!((isLocationLocked && userData.homePrice && userData.monthlyRent) || 
+                (userData.homePrice && userData.monthlyRent && userData.downPaymentPercent && userData.timeHorizonYears))}
+              style={{
+                opacity: ((isLocationLocked && userData.homePrice && userData.monthlyRent) || 
+                  (userData.homePrice && userData.monthlyRent && userData.downPaymentPercent && userData.timeHorizonYears)) ? 1 : 0.5,
+                cursor: ((isLocationLocked && userData.homePrice && userData.monthlyRent) || 
+                  (userData.homePrice && userData.monthlyRent && userData.downPaymentPercent && userData.timeHorizonYears)) ? 'pointer' : 'not-allowed'
+              }}
+            >
+              <span className="toggle-btn-content">
+                <span className="toggle-btn-label">Scenario</span>
+              </span>
+            </button>
           </div>
       </div>
       
-      <div className="messages-container">
+      <div className="messages-container" data-tour-id="chat-area">
         {messages.map((message, index) => {
           // Calculate delay based on previous assistant messages' content length
           let delay = 0;
@@ -2765,7 +3391,32 @@ Restart
               <span></span>
               <span></span>
             </div>
-            <span>AI is thinking...</span>
+            {isAnalyzing ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px' }}>
+                <div style={{ 
+                  width: '200px', 
+                  height: '6px', 
+                  backgroundColor: 'rgba(30, 30, 40, 0.6)', 
+                  borderRadius: '3px',
+                  overflow: 'hidden',
+                  flexShrink: 0
+                }}>
+                  <div style={{
+                    width: `${loadingProgress.progress}%`,
+                    height: '100%',
+                    background: 'linear-gradient(90deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%)',
+                    borderRadius: '3px',
+                    transition: 'width 0.5s ease'
+                  }}></div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 500, color: 'rgba(255, 255, 255, 0.9)' }}>{loadingProgress.stage}</span>
+                  <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.7)' }}>{loadingProgress.progress}%</span>
+                </div>
+              </div>
+            ) : (
+              <span>AI is thinking...</span>
+            )}
           </div>
         )}
         
@@ -2779,75 +3430,145 @@ Restart
 
         {/* Scroll target for smooth scrolling to charts */}
         <div ref={messagesEndRef} />
-              </div>
+      </div>
       
-      {/* Chart Navigation Buttons - above input for convenience */}
-      {chartsReady && (
-        <div className="chart-nav-bar">
-          <span className="chart-nav-label">📊 Charts:</span>
-          <div className="chart-nav-buttons-horizontal">
-            <button 
-              className="chart-nav-btn-sm"
-              onClick={() => handleChipClick('show me monthly costs')}
-              title="View Monthly Costs"
-            >
-              💰 Monthly
-            </button>
-            <button 
-              className="chart-nav-btn-sm"
-              onClick={() => handleChipClick('show me net worth')}
-              title="View Net Worth"
-            >
-              📈 Net Worth
-            </button>
-            <button 
-              className="chart-nav-btn-sm"
-              onClick={() => handleChipClick('show me total cost')}
-              title="View Total Cost"
-            >
-              💵 Total Cost
-            </button>
-            <button 
-              className="chart-nav-btn-sm"
-              onClick={() => handleChipClick('show me equity buildup')}
-              title="View Equity Buildup"
-            >
-              🏠 Equity
-            </button>
-            <button 
-              className="chart-nav-btn-sm"
-              onClick={() => handleChipClick('show me rent growth')}
-              title="View Rent Growth"
-            >
-              📊 Rent
-            </button>
-            <button 
-              className="chart-nav-btn-sm"
-              onClick={() => handleChipClick('show me break even')}
-              title="View Break-Even Timeline"
-            >
-              ⏰ Break-Even
-            </button>
-            <button className="chart-nav-btn-sm" onClick={()=>handleChipClick('show me cash flow')}>💸 Cash Flow</button>
-            <button className="chart-nav-btn-sm" onClick={()=>handleChipClick('show me cumulative costs')}>📊 Cumulative</button>
-            <button className="chart-nav-btn-sm" onClick={()=>handleChipClick('show me liquidity')}>💧 Liquidity</button>
-            <button className="chart-nav-btn-sm" onClick={()=>handleChipClick('show me tax savings')}>🏛️ Tax Savings</button>
-            <button className="chart-nav-btn-sm" onClick={()=>handleChipClick('show me break even heatmap')}>🟩 Heatmap</button>
-            <button className="chart-nav-btn-sm" onClick={()=>handleChipClick('run monte carlo simulation')}>🎲 Monte Carlo</button>
-            <button className="chart-nav-btn-sm" onClick={()=>handleChipClick('show me sensitivity')}>📈 Sensitivity</button>
-            <button className="chart-nav-btn-sm" onClick={()=>handleChipClick('show me scenario overlay')}>🔀 Scenarios</button>
-          </div>
-              </div>
-            )}
-  
       <ChatInput onSend={handleSendMessage} />
       
-        {/* Footer */}
-        <div className="chat-footer">
-          <span>RentVsBuy.ai v1.0</span>
-          <span>•</span>
-          <span>Built with AI-powered insights</span>
+      {/* Footer */}
+      <div className="chat-footer">
+        <span>RentVsBuy.ai v1.0</span>
+        <span>•</span>
+        <span>Built with AI-powered insights</span>
+      </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Charts Area - Full Width Below */}
+      <div className="rvb-charts">
+        {/* Monte Carlo Progress Card */}
+        {isMonteCarloLoading && (
+          <div className="monte-carlo-progress-card rvb-fade-in">
+            <div className="monte-carlo-progress-header">
+              <span>🎲 Running Monte Carlo simulation</span>
+              <span>{Math.round(monteCarloProgress)}%</span>
+            </div>
+            <div className="monte-carlo-progress-bar">
+              <div
+                className="monte-carlo-progress-fill"
+                style={{ width: `${Math.min(monteCarloProgress, 100)}%` }}
+              />
+            </div>
+            <p className="monte-carlo-progress-stage">
+              {monteCarloProgressStage || 'Generating random price paths...'}
+            </p>
+          </div>
+        )}
+        
+        {/* Chart Navigation Buttons - Always visible for tour */}
+        <div 
+          className={`chart-nav-bar ${hasResults ? 'rvb-fade-in' : ''}`} 
+          data-tour-id="charts-area"
+          style={{ 
+            opacity: chartsReady ? 1 : 0.6,
+            pointerEvents: chartsReady ? 'auto' : 'none'
+          }}
+        >
+          {!chartsReady ? (
+            <>
+              <div style={{ padding: '20px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.7)' }}>
+                <span className="chart-nav-label">📊 Charts:</span>
+                <span style={{ marginLeft: '12px', fontSize: '14px' }}>Charts will appear here after you complete your scenario.</span>
               </div>
+              {/* Advanced Analysis Section - Always visible for tour, even when charts not ready */}
+              <div className="rvb-advanced-section" style={{ marginTop: '16px' }}>
+                <button
+                  className="rvb-advanced-toggle"
+                  onClick={() => chartsReady && setShowAdvancedCharts(prev => !prev)}
+                  data-tour-id="advanced-charts-toggle"
+                  style={{ 
+                    opacity: 0.6,
+                    pointerEvents: 'none',
+                    cursor: 'default'
+                  }}
+                >
+                  Advanced Analysis (for experts)
+                  <span className="rvb-advanced-toggle-indicator">
+                    ▸
+                  </span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+          <span className="chart-nav-label">📊 Charts:</span>
+          
+          <div className="rvb-chart-sections">
+            {/* Core Charts Section */}
+            <div>
+              <div className="rvb-core-charts-header">Core charts</div>
+              <div className="chart-nav-buttons-horizontal">
+                {BASIC_CHART_KEYS.map(chartKey => {
+                  const config = chartButtonConfig[chartKey];
+                  return (
+                    <button
+                      key={chartKey}
+                      className="chart-nav-btn-sm"
+                      onClick={() => handleChipClick(config.message)}
+                      title={config.title}
+                    >
+                      {config.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            
+            {/* Advanced Analysis Section (Collapsible) */}
+            <div className="rvb-advanced-section">
+              <button
+                className="rvb-advanced-toggle"
+                onClick={() => setShowAdvancedCharts(prev => !prev)}
+                data-tour-id="advanced-charts-toggle"
+              >
+                Advanced Analysis (for experts)
+                <span className="rvb-advanced-toggle-indicator">
+                  {showAdvancedCharts ? "▾" : "▸"}
+                </span>
+              </button>
+              
+              {showAdvancedCharts && (
+                <div className="rvb-advanced-chips">
+                  <p style={{ 
+                    fontSize: '11px', 
+                    color: 'rgba(255, 255, 255, 0.7)', 
+                    margin: '0 0 8px 0',
+                    lineHeight: '1.4'
+                  }}>
+                    These charts show risk, volatility, break-even points, and more detailed scenarios. You don't need them to understand the basics, but they're here if you want to go deeper.
+                  </p>
+                  <div className="chart-nav-buttons-horizontal">
+                    {ADVANCED_CHART_KEYS.map(chartKey => {
+                      const config = chartButtonConfig[chartKey];
+                      return (
+                        <button
+                          key={chartKey}
+                          className="chart-nav-btn-sm"
+                          onClick={() => handleChipClick(config.message)}
+                          title={config.title}
+                        >
+                          {config.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+            </>
+          )}
+        </div>
       </div>
       
       {/* Restart Confirmation Modal */}
@@ -2907,10 +3628,9 @@ Restart
               <div className="progress-text">{saveProgress}%</div>
               </div>
             <p className="progress-label">Generating PDF...</p>
-      </div>
-              </div>
-            )}
-      
+          </div>
+        </div>
+      )}
     </div>
   );
   
@@ -2926,7 +3646,12 @@ Restart
 function buildLocalAnalysis(inputs: ScenarioInputs): CalculatorOutput {
   const monthlySnapshots = calculateNetWorthComparison(inputs);
   const monthlyCosts = calculateBuyingCosts(inputs);
-  const rentingCosts = calculateRentingCosts(inputs, 1);
+  const rentingCostsRaw = calculateRentingCosts(inputs, 1);
+  const rentingCosts: RentingCostsBreakdown = {
+    rent: inputs.monthlyRent,
+    insurance: rentingCostsRaw.insurance,
+    total: rentingCostsRaw.total
+  };
 
   const summary = buildLocalSummary(monthlySnapshots);
 
@@ -3073,6 +3798,16 @@ async function extractUserDataWithAI(message: string, currentData: UserData): Pr
     const rawLocationData = getLocationData(zipCode);
     if (rawLocationData) {
       locationData = formatLocationData(rawLocationData);
+    }
+    
+    // If message is JUST a ZIP code (or ZIP code + minimal text), skip AI extraction
+    // This avoids unnecessary AI API calls that are timing out
+    const messageWithoutZip = message.replace(/\b\d{5}\b/g, '').trim();
+    const isJustZipCode = messageWithoutZip.length < 10; // Less than 10 chars after removing ZIP
+    
+    if (isJustZipCode) {
+      console.log('📦 [EXTRACTION] Message is just a ZIP code, skipping AI extraction');
+      return { userData: newData, locationData };
     }
   }
   
