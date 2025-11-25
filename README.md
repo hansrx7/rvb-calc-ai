@@ -18,14 +18,23 @@ RentVsBuy.ai is a web application that analyzes your housing situation and provi
 - No complicated forms—just chat naturally
 
 ### 📊 Interactive Financial Charts
-The app generates **6 comprehensive charts** to help you visualize your financial future:
+The app generates **comprehensive charts** to help you visualize your financial future:
 
+**Core Charts:**
 1. **Net Worth Comparison** - Shows how your wealth grows over your timeline when buying vs. renting
 2. **Monthly Cost Breakdown** - Compares monthly expenses for buying (mortgage, taxes, insurance, maintenance) vs. renting
 3. **Total Cost Comparison** - Calculates the true cost of each option after your timeline, factoring in home appreciation and investment returns
 4. **Home Equity Buildup** - Visualizes how much equity you build in a home over time
 5. **Rent Growth vs Fixed Mortgage** - Demonstrates how rent increases over time while mortgage payments stay fixed
 6. **Break-Even Timeline** - Shows exactly when buying starts paying off with visual timeline
+
+**Advanced Charts:**
+- **Cash Flow Analysis** - Monthly cash flow comparison
+- **Cumulative Cost Tracking** - Running totals over time
+- **Tax Savings** - Mortgage interest deduction benefits
+- **Monte Carlo Simulation** - 1,000+ simulated scenarios for risk analysis
+- **Sensitivity Analysis** - Impact of rate changes on outcomes
+- **Break-Even Heatmap** - Visual break-even analysis across scenarios
 
 ### ⏰ Time Horizon Analysis (NEW!)
 - **Custom timeline support** - Analyze any timeframe (3, 5, 10+ years)
@@ -50,6 +59,12 @@ The app generates **6 comprehensive charts** to help you visualize your financia
 - Choose to use local data OR enter your own custom values
 - Reference box shows exactly what data is being used (local vs. custom vs. national averages)
 - Switch ZIP codes mid-conversation to compare different areas
+
+### 🎯 AI-Powered Recommendations
+- **Smart recommendations** - Get personalized "Buy" or "Rent" recommendations based on your scenario
+- **Savings calculations** - See exactly how much you'll save with each option
+- **Reasoning explanations** - Understand why the AI recommends one option over another
+- **Interactive cards** - Click to see detailed breakdowns and explore different scenarios
 
 ### 💾 Professional PDF Export
 - Save your entire conversation and all charts in a single PDF
@@ -432,18 +447,28 @@ This project is in **active development** and currently operates at a foundation
 rentvsbuy-ai/
 ├── src/
 │   ├── components/
-│   │   ├── charts/           # 6 chart components
+│   │   ├── charts/           # Chart components
 │   │   │   ├── NetWorthChart.tsx
 │   │   │   ├── MonthlyCostChart.tsx
 │   │   │   ├── TotalCostChart.tsx
 │   │   │   ├── EquityBuildupChart.tsx
 │   │   │   ├── RentGrowthChart.tsx
-│   │   │   └── BreakEvenChart.tsx
-│   │   └── chat/             # Chat interface
-│   │       ├── ChatContainer.tsx
-│   │       ├── ChatInput.tsx
-│   │       ├── ChatMessage.tsx
-│   │       └── SuggestionChips.tsx
+│   │   │   ├── BreakEvenChart.tsx
+│   │   │   ├── CashFlowChart.tsx
+│   │   │   ├── CumulativeCostChart.tsx
+│   │   │   ├── TaxSavingsChart.tsx
+│   │   │   ├── MonteCarloChart.tsx
+│   │   │   ├── SensitivityChart.tsx
+│   │   │   ├── ChartPlaceholder.tsx
+│   │   │   └── ChartExplanation.tsx
+│   │   ├── chat/             # Chat interface
+│   │   │   ├── ChatContainer.tsx
+│   │   │   ├── ChatInput.tsx
+│   │   │   ├── ChatMessage.tsx
+│   │   │   └── SuggestionChips.tsx
+│   │   ├── RecommendationCard/  # AI recommendation display
+│   │   ├── LoadingIndicator/    # Loading states
+│   │   └── ErrorBoundary.tsx     # Error handling
 │   ├── data/
 │   │   └── zipCodeData.json  # 26,000+ ZIP codes with market data
 │   ├── lib/
@@ -455,7 +480,10 @@ rentvsbuy-ai/
 │   │   └── location/
 │   │       └── zipCodeService.ts  # ZIP code data service
 │   ├── types/
-│   │   └── calculator.ts      # TypeScript types
+│   │   ├── calculator.ts      # TypeScript types
+│   │   └── recommendation.ts  # Recommendation types
+│   ├── hooks/
+│   │   └── useScenarioState.ts  # Scenario state management
 │   ├── App.tsx
 │   └── main.tsx
 ├── public/

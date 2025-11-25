@@ -17,7 +17,7 @@ export function RentGrowthChart({ timeline }: RentGrowthChartProps) {
     .map(point => ({
       year: point.year,
       rent: Math.round(point.rentMonthlyOutflow),
-      mortgage: Math.round(monthlyMortgage)
+        mortgage: Math.round(monthlyMortgage)
     }));
   
   const finalRent = chartData[chartData.length - 1].rent;

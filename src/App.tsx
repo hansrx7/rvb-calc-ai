@@ -5,6 +5,7 @@ import Joyride from 'react-joyride';
 import type { Step } from 'react-joyride';
 import { ChatContainer } from './components/chat/ChatContainer';
 import AuroraBackground from './components/layout/AuroraBackground';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import './App.css';
 
 function App() {
@@ -175,10 +176,11 @@ function App() {
   }, []);
 
   return (
-    <div className="app">
-      <AuroraBackground />
-      {/* Manual Tour Button - Always available */}
-      <button
+    <ErrorBoundary>
+      <div className="app">
+        <AuroraBackground />
+        {/* Manual Tour Button - Always available */}
+        <button
         onClick={handleStartTour}
         data-tour-id="help-button"
         style={{
@@ -351,8 +353,9 @@ function App() {
           },
         }}
       />
-      <ChatContainer />
-    </div>
+        <ChatContainer />
+      </div>
+    </ErrorBoundary>
   );
 }
 

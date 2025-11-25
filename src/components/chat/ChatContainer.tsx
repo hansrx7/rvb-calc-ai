@@ -4,6 +4,19 @@ import { useState, useRef, useEffect } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { NetWorthChart } from '../charts/NetWorthChart';
+import { MonthlyCostChart } from '../charts/MonthlyCostChart';
+import { TotalCostChart } from '../charts/TotalCostChart';
+import { EquityBuildupChart } from '../charts/EquityBuildupChart';
+import { RentGrowthChart } from '../charts/RentGrowthChart';
+import { BreakEvenChart } from '../charts/BreakEvenChart';
+import { CashFlowChart } from '../charts/CashFlowChart';
+import { CumulativeCostChart } from '../charts/CumulativeCostChart';
+import { TaxSavingsChart } from '../charts/TaxSavingsChart';
+import { MonteCarloChart } from '../charts/MonteCarloChart';
+import { SensitivityChart } from '../charts/SensitivityChart';
+import { ChartPlaceholder } from '../charts/ChartPlaceholder';
+import { generateRecommendation } from '../../types/recommendation';
+import { RecommendationCard } from '../RecommendationCard/RecommendationCard';
 import { calculateNetWorthComparison, calculateBuyingCosts, calculateRentingCosts, getTimelineBasedRates, getZIPBasedRates } from '../../lib/finance/calculator';
 import { getLocationData, formatLocationData, detectZipCode, type FormattedLocationData } from '../../lib/location/zipCodeService';
 import type {
@@ -25,25 +38,25 @@ import type {
   SensitivityResult,
   ScenarioResult
 } from '../../types/calculator';
-import { MonthlyCostChart } from '../charts/MonthlyCostChart';
-import { TotalCostChart } from '../charts/TotalCostChart';
+// import { MonthlyCostChart } from '../charts/MonthlyCostChart';
+// import { TotalCostChart } from '../charts/TotalCostChart';
 import { getAIResponse, createChatCompletion } from '../../lib/ai/openai';
-import { EquityBuildupChart } from '../charts/EquityBuildupChart';
-import { RentGrowthChart } from '../charts/RentGrowthChart';
-import { BreakEvenChart } from '../charts/BreakEvenChart';
+// import { EquityBuildupChart } from '../charts/EquityBuildupChart';
+// import { RentGrowthChart } from '../charts/RentGrowthChart';
+// import { BreakEvenChart } from '../charts/BreakEvenChart';
 import { SuggestionChips } from './SuggestionChips';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { analyzeScenario, fetchBreakEvenHeatmap, fetchMonteCarlo, fetchSensitivity, fetchScenarios } from '../../lib/api/finance';
-import { CashFlowChart } from '../charts/CashFlowChart';
-import { CumulativeCostChart } from '../charts/CumulativeCostChart';
-import { LiquidityTimeline } from '../charts/LiquidityTimeline';
-import { TaxSavingsChart } from '../charts/TaxSavingsChart';
-import { BreakEvenHeatmap } from '../charts/BreakEvenHeatmap';
+// import { CashFlowChart } from '../charts/CashFlowChart';
+// import { CumulativeCostChart } from '../charts/CumulativeCostChart';
+// import { LiquidityTimeline } from '../charts/LiquidityTimeline';
+// import { TaxSavingsChart } from '../charts/TaxSavingsChart';
+// import { BreakEvenHeatmap } from '../charts/BreakEvenHeatmap';
 import type { BreakEvenHeatmapPoint } from '../../types/calculator';
-import { MonteCarloChart } from '../charts/MonteCarloChart';
-import { SensitivityChart } from '../charts/SensitivityChart';
-import { ScenarioOverlayChart } from '../charts/ScenarioOverlayChart';
+// import { MonteCarloChart } from '../charts/MonteCarloChart';
+// import { SensitivityChart } from '../charts/SensitivityChart';
+// import { ScenarioOverlayChart } from '../charts/ScenarioOverlayChart';
 
 type ChartType =
   | 'netWorth'
@@ -89,22 +102,92 @@ const chartKeys: ChartType[] = [
   ...ADVANCED_CHART_KEYS
 ];
 
-// Helper to map chart keys to button labels and messages
-const chartButtonConfig: Record<ChartType, { label: string; message: string; title: string }> = {
-  monthlyCost: { label: '💰 Monthly', message: 'show me monthly costs', title: 'View Monthly Costs' },
-  netWorth: { label: '📈 Net Worth', message: 'show me net worth', title: 'View Net Worth' },
-  equity: { label: '🏠 Equity', message: 'show me equity buildup', title: 'View Equity Buildup' },
-  totalCost: { label: '💵 Total Cost', message: 'show me total cost', title: 'View Total Cost' },
-  monteCarlo: { label: '🎲 Monte Carlo', message: 'run monte carlo simulation', title: 'View Monte Carlo Simulation' },
-  breakEven: { label: '⏰ Break-Even', message: 'show me break even', title: 'View Break-Even Timeline' },
-  breakEvenHeatmap: { label: '🟩 Heatmap', message: 'show me break even heatmap', title: 'View Break-Even Heatmap' },
-  cashFlow: { label: '💸 Cash Flow', message: 'show me cash flow', title: 'View Cash Flow' },
-  cumulativeCost: { label: '📊 Cumulative', message: 'show me cumulative costs', title: 'View Cumulative Costs' },
-  liquidity: { label: '💧 Liquidity', message: 'show me liquidity', title: 'View Liquidity Timeline' },
-  rentGrowth: { label: '📊 Rent', message: 'show me rent growth', title: 'View Rent Growth' },
-  taxSavings: { label: '🏛️ Tax Savings', message: 'show me tax savings', title: 'View Tax Savings' },
-  scenarioOverlay: { label: '🔀 Scenarios', message: 'show me scenario overlay', title: 'View Scenario Overlay' },
-  sensitivity: { label: '📈 Sensitivity', message: 'show me sensitivity', title: 'View Sensitivity Analysis' }
+// Helper to map chart keys to button labels and messages - Plain English labels
+const chartButtonConfig: Record<ChartType, { label: string; message: string; title: string; description: string }> = {
+  monthlyCost: { 
+    label: '📅 What will I pay each month?', 
+    message: 'show me monthly costs', 
+    title: 'Monthly Cost Breakdown',
+    description: 'Monthly cost breakdown'
+  },
+  netWorth: { 
+    label: '💰 How much money will I have?', 
+    message: 'show me net worth', 
+    title: 'Net Worth Comparison',
+    description: 'Total net worth over time'
+  },
+  equity: { 
+    label: '🏠 How much house will I own?', 
+    message: 'show me equity buildup', 
+    title: 'Equity Buildup',
+    description: 'Equity buildup over time'
+  },
+  totalCost: { 
+    label: '💵 Total cost comparison', 
+    message: 'show me total cost', 
+    title: 'Total Cost Comparison',
+    description: 'Everything you\'ll spend'
+  },
+  monteCarlo: { 
+    label: '🎲 What if the market changes?', 
+    message: 'run monte carlo simulation', 
+    title: 'Monte Carlo Simulation',
+    description: '1,000 simulated scenarios'
+  },
+  breakEven: { 
+    label: '⏰ When does buying become worth it?', 
+    message: 'show me break even', 
+    title: 'Break-Even Timeline',
+    description: 'Break-even timeline'
+  },
+  breakEvenHeatmap: { 
+    label: '🟩 Break-even heatmap', 
+    message: 'show me break even heatmap', 
+    title: 'Break-Even Heatmap',
+    description: 'Visual break-even analysis'
+  },
+  cashFlow: { 
+    label: '💸 Monthly cash flow', 
+    message: 'show me cash flow', 
+    title: 'Cash Flow',
+    description: 'Money saved or spent'
+  },
+  cumulativeCost: { 
+    label: '📊 Cumulative costs', 
+    message: 'show me cumulative costs', 
+    title: 'Cumulative Costs',
+    description: 'Running total of costs'
+  },
+  liquidity: { 
+    label: '💧 Liquidity timeline', 
+    message: 'show me liquidity', 
+    title: 'Liquidity Timeline',
+    description: 'Available cash over time'
+  },
+  rentGrowth: { 
+    label: '📊 Rent growth over time', 
+    message: 'show me rent growth', 
+    title: 'Rent Growth',
+    description: 'How rent increases over time'
+  },
+  taxSavings: { 
+    label: '📋 Tax deduction benefits', 
+    message: 'show me tax savings', 
+    title: 'Tax Savings',
+    description: 'Mortgage interest savings'
+  },
+  scenarioOverlay: { 
+    label: '🔀 Compare scenarios', 
+    message: 'show me scenario overlay', 
+    title: 'Scenario Overlay',
+    description: 'Side-by-side comparison'
+  },
+  sensitivity: { 
+    label: '📊 Rate sensitivity analysis', 
+    message: 'show me sensitivity', 
+    title: 'Sensitivity Analysis',
+    description: 'Impact of rate changes'
+  }
 };
 
 const DEFAULT_HEATMAP_TIMELINES = [5, 10, 15, 20];
@@ -115,6 +198,7 @@ interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   chartToShow?: ChartType;
+  showRecommendation?: boolean; // Flag to show recommendation card in this message
   // Store chart data with the message so it doesn't change when new scenarios are calculated
   snapshotData?: {
     // New unified structure
@@ -189,6 +273,13 @@ const [chartsReady, setChartsReady] = useState(false);
   const [monteCarloProgress, setMonteCarloProgress] = useState(0);
   const [monteCarloProgressStage, setMonteCarloProgressStage] = useState('Starting Monte Carlo simulation...');
   
+  // Chart loading states for slow charts
+  const [chartLoading, setChartLoading] = useState<{
+    type: ChartType | null;
+    progress: number;
+    message: string;
+  }>({ type: null, progress: 0, message: '' });
+  
   // Restart modal state
   const [showRestartModal, setShowRestartModal] = useState(false);
   
@@ -241,6 +332,8 @@ const [chartsReady, setChartsReady] = useState(false);
   const [sensitivityData, setSensitivityData] = useState<SensitivityResult[] | null>(null);
   const [scenarioOverlayData, setScenarioOverlayData] = useState<ScenarioResult[] | null>(null);
   const [unifiedAnalysisResult, setUnifiedAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [recommendation, setRecommendation] = useState<any | null>(null);
+  const [showRecommendation, setShowRecommendation] = useState(false);
   
   useEffect(() => {
     return () => {
@@ -518,6 +611,8 @@ const [chartsReady, setChartsReady] = useState(false);
     setIsReferenceBoxVisible(true);
     setHasShownScenarioSummary(false); // Reset scenario summary flag
     setReferenceBoxPosition({ x: 20, y: 20 });
+    setRecommendation(null);
+    setShowRecommendation(false);
   };
 
   // Edit mode handlers
@@ -582,6 +677,44 @@ const [chartsReady, setChartsReady] = useState(false);
 
   const handleToggleReferenceBox = () => {
     setIsReferenceBoxVisible(!isReferenceBoxVisible);
+  };
+
+  // Recommendation card handlers
+  const handleShowDetails = () => {
+    // Show the Net Worth chart automatically
+    setVisibleCharts(prev => ({
+      ...prev,
+      netWorth: true
+    }));
+    
+    // Add Net Worth chart message
+    const chartMessage: Message = {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: "Here's your net worth comparison over time. The higher line shows which option leaves you with more money.",
+      chartToShow: 'netWorth',
+      snapshotData: unifiedAnalysisResult ? {
+        analysis: unifiedAnalysisResult,
+        inputValues: {
+          homePrice: userData.homePrice || 0,
+          monthlyRent: userData.monthlyRent || 0,
+          downPaymentPercent: userData.downPaymentPercent || 0
+        }
+      } : undefined
+    };
+    setMessages(prev => [...prev, chartMessage]);
+  };
+
+  const handleTryNewScenario = () => {
+    setIsEditMode(true);
+    setEditableValues({ ...userData });
+    
+    const editMessage: Message = {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: 'Sure! What would you like to change? You can modify the home price, rent, down payment, or timeline.'
+    };
+    setMessages(prev => [...prev, editMessage]);
   };
 
   // Drag functionality for reference box
@@ -715,6 +848,43 @@ function shouldShowChart(aiResponse: string): ChartType | null {
   
   return null;
 }
+
+  // Keyboard shortcuts - placed after function declarations
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when user is typing in an input/textarea
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        // Cmd/Ctrl + Enter to send message (only when in chat input)
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && target.classList.contains('chat-input')) {
+          e.preventDefault();
+          const input = target as HTMLInputElement;
+          if (input && input.value.trim()) {
+            handleSendMessage(input.value);
+            input.value = '';
+          }
+        }
+        return; // Don't process other shortcuts when typing
+      }
+      
+      // Cmd/Ctrl + R to restart (prevent default browser refresh)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'r') {
+        e.preventDefault();
+        if (window.confirm('Start over? This will clear all your data.')) {
+          handleRestart();
+        }
+      }
+      
+      // Cmd/Ctrl + S to save PDF
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        handleSaveChat();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, []); // Functions are stable, empty deps is fine
 
   const handleSendMessage = async (content: string) => {
     // PATH 14: Check if user is changing their mind after making a choice
@@ -1026,6 +1196,23 @@ function shouldShowChart(aiResponse: string): ChartType | null {
         
         setUnifiedAnalysisResult(unifiedAnalysis ?? null);
         
+        // Generate and show recommendation
+        if (unifiedAnalysis && newUserData.timeHorizonYears) {
+          const recommendation = generateRecommendation(unifiedAnalysis, newUserData.timeHorizonYears);
+          setRecommendation(recommendation);
+          setShowRecommendation(true);
+          
+          // Add recommendation card as a special message in the chat flow
+          // This will appear right after the analysis completes
+          const recommendationMessage: Message = {
+            id: `recommendation-${Date.now()}`,
+            role: 'assistant',
+            content: '', // Empty content, we'll render the card instead
+            showRecommendation: true
+          };
+          setMessages(prev => [...prev, recommendationMessage]);
+        }
+        
         // Verify it was set correctly
         setTimeout(() => {
           console.log('🔴 [DEBUG] unifiedAnalysisResult state after setState (checking via closure):', {
@@ -1046,8 +1233,11 @@ function shouldShowChart(aiResponse: string): ChartType | null {
 
         applyAnalysis(analysis);
 
-        // Add scenario summary message (only once per scenario)
-        if (!hasShownScenarioSummary && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent && newUserData.timeHorizonYears) {
+        // Skip scenario summary if we're showing a recommendation (recommendation card already has the key info)
+        const willShowRecommendation = unifiedAnalysis && newUserData.timeHorizonYears;
+        
+        // Add scenario summary message (only once per scenario, and only if no recommendation)
+        if (!hasShownScenarioSummary && !willShowRecommendation && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent && newUserData.timeHorizonYears) {
           const locationText = locationData 
             ? ` in ${locationData.city}, ${locationData.state}`
             : '';
@@ -1086,6 +1276,28 @@ function shouldShowChart(aiResponse: string): ChartType | null {
           setMessages(prev => [...prev, summaryMessage]);
           setHasShownScenarioSummary(true);
         }
+        
+        // Add recommendation card message if we have recommendation (skip scenario summary in this case)
+        if (willShowRecommendation) {
+          setTimeout(() => {
+            if (recommendation && unifiedAnalysis && newUserData.timeHorizonYears) {
+              const recommendationMessage: Message = {
+                id: `recommendation-${Date.now()}`,
+                role: 'assistant',
+                content: '', // Empty content, we'll render the card instead
+                showRecommendation: true
+              };
+              setMessages(prev => {
+                // Only add if not already present
+                if (prev.some(m => m.showRecommendation)) {
+                  return prev;
+                }
+                return [...prev, recommendationMessage];
+              });
+            }
+          }, 100);
+          setHasShownScenarioSummary(true); // Mark as shown so we don't show scenario summary later
+        }
 
         // Reset visible charts (all become available again)
         setVisibleCharts(createVisibleChartState());
@@ -1116,14 +1328,17 @@ function shouldShowChart(aiResponse: string): ChartType | null {
         };
         freshTotalCostData = calcResult.analysis.totals;
 
-        // Add scenario summary message BEFORE any chart messages (only once per scenario)
-        if (!hasShownScenarioSummary && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent && newUserData.timeHorizonYears) {
+        // Skip scenario summary if we're showing a recommendation (recommendation card already has the key info)
+        const unifiedAnalysis = calcResult.unifiedAnalysis ?? unifiedAnalysisResult;
+        const willShowRecommendation = unifiedAnalysis && newUserData.timeHorizonYears;
+        
+        // Add scenario summary message BEFORE any chart messages (only once per scenario, and only if no recommendation)
+        if (!hasShownScenarioSummary && !willShowRecommendation && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent && newUserData.timeHorizonYears) {
           const locationText = locationData 
             ? ` in ${locationData.city}, ${locationData.state}`
             : '';
           
           // Get ML rates from the unifiedAnalysis that was just returned (not from state, which may be stale)
-          const unifiedAnalysis = calcResult.unifiedAnalysis ?? unifiedAnalysisResult;
           const mlHomeRate = unifiedAnalysis ? ((unifiedAnalysis as any)?.home_appreciation_rate ?? unifiedAnalysis?.homeAppreciationRate) : undefined;
           const mlRentRate = unifiedAnalysis ? ((unifiedAnalysis as any)?.rent_growth_rate ?? unifiedAnalysis?.rentGrowthRate) : undefined;
           
@@ -1156,6 +1371,28 @@ function shouldShowChart(aiResponse: string): ChartType | null {
           
           setMessages(prev => [...prev, summaryMessage]);
           setHasShownScenarioSummary(true);
+        }
+        
+        // Add recommendation card message if we have recommendation (skip scenario summary in this case)
+        if (willShowRecommendation) {
+          setTimeout(() => {
+            if (recommendation && unifiedAnalysis && newUserData.timeHorizonYears) {
+              const recommendationMessage: Message = {
+                id: `recommendation-${Date.now()}`,
+                role: 'assistant',
+                content: '', // Empty content, we'll render the card instead
+                showRecommendation: true
+              };
+              setMessages(prev => {
+                // Only add if not already present
+                if (prev.some(m => m.showRecommendation)) {
+                  return prev;
+                }
+                return [...prev, recommendationMessage];
+              });
+            }
+          }, 100);
+          setHasShownScenarioSummary(true); // Mark as shown so we don't show scenario summary later
         }
       }
     }
@@ -1237,7 +1474,32 @@ function shouldShowChart(aiResponse: string): ChartType | null {
       setHeatmapData(null); // Clear old cached data
       const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult);
       if (baseInputs) {
-        heatmapPointsResult = await loadHeatmapData(baseInputs);
+        setChartLoading({ type: 'breakEvenHeatmap', progress: 10, message: 'Calculating break-even points...' });
+        try {
+          heatmapPointsResult = await loadHeatmapData(baseInputs);
+          
+          // Only mark as complete when data is actually ready
+          if (heatmapPointsResult && heatmapPointsResult.length > 0) {
+            setChartLoading({ type: 'breakEvenHeatmap', progress: 100, message: 'Complete!' });
+            // Update the message's snapshotData with the loaded data
+            setMessages(prev => prev.map(msg => 
+              msg.chartToShow === 'breakEvenHeatmap' && msg.snapshotData
+                ? { ...msg, snapshotData: { ...msg.snapshotData, heatmapPoints: heatmapPointsResult } }
+                : msg
+            ));
+            setTimeout(() => setChartLoading({ type: null, progress: 0, message: '' }), 300);
+          } else {
+            setChartLoading({ type: null, progress: 0, message: '' });
+          }
+        } catch (error) {
+          setChartLoading({ 
+            type: 'breakEvenHeatmap', 
+            progress: 0, 
+            message: `Error: ${error instanceof Error ? error.message : 'Failed to load heatmap data'}` 
+          });
+          setTimeout(() => setChartLoading({ type: null, progress: 0, message: '' }), 3000);
+          console.error('Failed to load heatmap data:', error);
+        }
       }
     }
     
@@ -1246,28 +1508,92 @@ function shouldShowChart(aiResponse: string): ChartType | null {
       // This ensures we get the new HomePricePathSummary format
       const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult);
       if (baseInputs) {
-        startMonteCarloProgress();
+        // Use unified chart loading system
+        setChartLoading({ type: 'monteCarlo', progress: 5, message: 'Starting Monte Carlo simulation...' });
+        startMonteCarloProgress(); // Keep old system for the separate card too
+        
         try {
+          // Show initial progress
+          setChartLoading({ type: 'monteCarlo', progress: 10, message: 'Starting Monte Carlo simulation...' });
+          
+          // Add timeout wrapper - if it takes more than 2 minutes, show error
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Monte Carlo simulation timed out after 2 minutes. The backend may be overloaded.')), 120000);
+          });
+          
           // Use unified analysis endpoint with includeMonteCarlo: true
-          const response = await analyzeScenario(baseInputs, false, currentZipCode || undefined, true);
+          const analyzePromise = analyzeScenario(baseInputs, false, currentZipCode || undefined, true);
+          
+          // Update progress during the wait (but don't go to 100% until data is ready)
+          const progressInterval = setInterval(() => {
+            setChartLoading(prev => {
+              if (prev.type !== 'monteCarlo') return prev;
+              // Only go up to 90% - don't hit 100% until data is actually ready
+              const increment = Math.random() * 3 + 1;
+              const next = Math.min(prev.progress + increment, 90);
+              let message = 'Generating random price paths...';
+              if (next >= 70) {
+                message = 'Summarizing price path percentiles...';
+              } else if (next >= 40) {
+                message = 'Simulating hundreds of random price paths...';
+              } else {
+                message = 'Loading ML-driven appreciation + volatility...';
+              }
+              return { ...prev, progress: next, message };
+            });
+          }, 2000); // Update every 2 seconds
+          
+          const response = await Promise.race([analyzePromise, timeoutPromise]) as Awaited<ReturnType<typeof analyzeScenario>>;
           const mcData = (response.analysis as any)?.monte_carlo_home_prices ?? response.analysis?.monteCarloHomePrices;
           
-          if (mcData) {
+          clearInterval(progressInterval);
+          
+          // Only mark as complete when data is actually ready
+          if (mcData && (mcData.years || mcData.runs)) {
             // Update unifiedAnalysisResult with Monte Carlo data
-            if (unifiedAnalysisResult) {
-              setUnifiedAnalysisResult({
-                ...unifiedAnalysisResult,
-                monteCarloHomePrices: mcData
-              });
+            const updatedAnalysis = unifiedAnalysisResult ? {
+              ...unifiedAnalysisResult,
+              monteCarloHomePrices: mcData
+            } : null;
+            if (updatedAnalysis) {
+              setUnifiedAnalysisResult(updatedAnalysis);
             }
+            setChartLoading({ type: 'monteCarlo', progress: 100, message: 'Complete!' });
+            // Update the message's snapshotData with the loaded data
+            setMessages(prev => prev.map(msg => 
+              msg.chartToShow === 'monteCarlo' && msg.snapshotData
+                ? { 
+                    ...msg, 
+                    snapshotData: { 
+                      ...msg.snapshotData, 
+                      analysis: updatedAnalysis ?? msg.snapshotData.analysis,
+                      monteCarlo: mcData
+                    } 
+                  }
+                : msg
+            ));
             stopMonteCarloProgress(true);
+            setTimeout(() => setChartLoading({ type: null, progress: 0, message: '' }), 300);
           } else {
             console.warn('Monte Carlo data not found in response');
+            setChartLoading({ 
+              type: 'monteCarlo', 
+              progress: 0, 
+              message: 'Monte Carlo data not available. Please try again.' 
+            });
             stopMonteCarloProgress(false);
+            setTimeout(() => setChartLoading({ type: null, progress: 0, message: '' }), 3000);
           }
         } catch (error) {
           console.error('Failed to load Monte Carlo data:', error);
+          setChartLoading({ 
+            type: 'monteCarlo', 
+            progress: 0, 
+            message: `Error: ${error instanceof Error ? error.message : 'Failed to load Monte Carlo data. Please try again.'}` 
+          });
           stopMonteCarloProgress(false);
+          // Clear error after 5 seconds
+          setTimeout(() => setChartLoading({ type: null, progress: 0, message: '' }), 5000);
         }
       }
     }
@@ -1277,7 +1603,32 @@ function shouldShowChart(aiResponse: string): ChartType | null {
       setSensitivityData(null); // Clear old cached data
       const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult);
       if (baseInputs) {
-        sensitivityResult = await loadSensitivityData(baseInputs, 1.0, 0.1, 0.1);
+        setChartLoading({ type: 'sensitivity', progress: 10, message: 'Running sensitivity analysis...' });
+        try {
+          sensitivityResult = await loadSensitivityData(baseInputs, 1.0, 0.1, 0.1);
+          
+          // Only mark as complete when data is actually ready
+          if (sensitivityResult && sensitivityResult.length > 0) {
+            setChartLoading({ type: 'sensitivity', progress: 100, message: 'Complete!' });
+            // Update the message's snapshotData with the loaded data
+            setMessages(prev => prev.map(msg => 
+              msg.chartToShow === 'sensitivity' && msg.snapshotData
+                ? { ...msg, snapshotData: { ...msg.snapshotData, sensitivity: sensitivityResult } }
+                : msg
+            ));
+            setTimeout(() => setChartLoading({ type: null, progress: 0, message: '' }), 300);
+          } else {
+            setChartLoading({ type: null, progress: 0, message: '' });
+          }
+        } catch (error) {
+          setChartLoading({ 
+            type: 'sensitivity', 
+            progress: 0, 
+            message: `Error: ${error instanceof Error ? error.message : 'Failed to load sensitivity data'}` 
+          });
+          setTimeout(() => setChartLoading({ type: null, progress: 0, message: '' }), 3000);
+          console.error('Failed to load sensitivity data:', error);
+        }
       }
     }
     
@@ -1287,8 +1638,33 @@ function shouldShowChart(aiResponse: string): ChartType | null {
       setScenarioOverlayData(null); // Clear old cached data
       const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult);
       if (baseInputs) {
-        // For now, just use the current scenario. Later we can allow multiple scenarios
-        scenarioOverlayResult = await loadScenarioOverlayData([baseInputs]);
+        setChartLoading({ type: 'scenarioOverlay', progress: 10, message: 'Preparing scenario comparison...' });
+        try {
+          // For now, just use the current scenario. Later we can allow multiple scenarios
+          scenarioOverlayResult = await loadScenarioOverlayData([baseInputs]);
+          
+          // Only mark as complete when data is actually ready
+          if (scenarioOverlayResult && scenarioOverlayResult.length > 0) {
+            setChartLoading({ type: 'scenarioOverlay', progress: 100, message: 'Complete!' });
+            // Update the message's snapshotData with the loaded data
+            setMessages(prev => prev.map(msg => 
+              msg.chartToShow === 'scenarioOverlay' && msg.snapshotData
+                ? { ...msg, snapshotData: { ...msg.snapshotData, scenarioOverlay: scenarioOverlayResult } }
+                : msg
+            ));
+            setTimeout(() => setChartLoading({ type: null, progress: 0, message: '' }), 300);
+          } else {
+            setChartLoading({ type: null, progress: 0, message: '' });
+          }
+        } catch (error) {
+          setChartLoading({ 
+            type: 'scenarioOverlay', 
+            progress: 0, 
+            message: `Error: ${error instanceof Error ? error.message : 'Failed to load scenario overlay data'}` 
+          });
+          setTimeout(() => setChartLoading({ type: null, progress: 0, message: '' }), 3000);
+          console.error('Failed to load scenario overlay data:', error);
+        }
       }
     }
     
@@ -1298,6 +1674,10 @@ function shouldShowChart(aiResponse: string): ChartType | null {
       ? {
           ...buildSnapshotData(analysisResult, analysisInputs),
           analysis: unifiedAnalysisResult ?? undefined,
+          cashFlow: advancedMetrics.cashFlow,
+          cumulativeCosts: advancedMetrics.cumulativeCosts,
+          liquidityTimeline: advancedMetrics.liquidityTimeline,
+          taxSavings: advancedMetrics.taxSavings,
           heatmapPoints: heatmapPointsResult ?? heatmapData,
           monteCarlo: monteCarloResult ?? monteCarloData, // Legacy format fallback
           sensitivity: sensitivityResult ?? sensitivityData,
@@ -1910,20 +2290,172 @@ const handleChipClick = (message: string) => {
   
   // Helper function to render chart based on type - uses message's snapshot data
   const renderChart = (chartType: ChartType, snapshotData?: Message['snapshotData']) => {
-    console.log('🎯 [CHART DEBUG] renderChart called:', {
-      chartType,
-      hasSnapshotData: !!snapshotData,
-      snapshotDataKeys: snapshotData ? Object.keys(snapshotData) : []
-    });
+    // 🔍 DEBUG: Log when one of the problematic charts is requested
+    if (chartType === 'breakEven' || chartType === 'liquidity' || chartType === 'scenarioOverlay') {
+      console.log(`🔴 [${chartType.toUpperCase()} DEBUG] renderChart called:`, {
+        chartType,
+        hasSnapshotData: !!snapshotData,
+        snapshotDataKeys: snapshotData ? Object.keys(snapshotData) : [],
+        chartLoadingType: chartLoading.type,
+        chartLoadingProgress: chartLoading.progress,
+        chartLoadingMessage: chartLoading.message
+      });
+    }
     
-    // Use new unified structure if available, otherwise fall back to legacy
+    // First, declare all variables we need
     const analysis = snapshotData?.analysis;
-    // Normalize timeline points (convert snake_case to camelCase if needed)
     const timeline = analysis?.timeline?.map(normalizeTimelinePoint);
+    const data = snapshotData?.chartData || chartData;
+    const cashFlowSeries = snapshotData?.cashFlow ?? advancedMetrics?.cashFlow ?? null;
+    const cumulativeSeries = snapshotData?.cumulativeCosts ?? advancedMetrics?.cumulativeCosts ?? null;
+    const liquiditySeries = snapshotData?.liquidityTimeline ?? advancedMetrics?.liquidityTimeline ?? null;
+    const taxSeries = snapshotData?.taxSavings ?? advancedMetrics?.taxSavings ?? null;
+    const heatmapPoints = snapshotData?.heatmapPoints ?? heatmapData;
+    const monteCarlo = snapshotData?.monteCarlo ?? monteCarloData;
+    const sensitivity = snapshotData?.sensitivity ?? sensitivityData;
+    const scenarioOverlay = snapshotData?.scenarioOverlay ?? scenarioOverlayData;
+    
+    // 🔍 DEBUG: Log data availability for problematic charts
+    if (chartType === 'breakEven' || chartType === 'liquidity' || chartType === 'scenarioOverlay') {
+      console.log(`🔴 [${chartType.toUpperCase()} DEBUG] Data variables:`, {
+        breakEven: {
+          hasAnalysis: !!analysis,
+          analysisKeys: analysis ? Object.keys(analysis) : [],
+          hasTimeline: !!timeline,
+          timelineLength: timeline?.length,
+          timelineFirstPoint: timeline?.[0],
+          hasData: !!data,
+          dataLength: data?.length,
+          dataFirstPoint: data?.[0]
+        },
+        liquidity: {
+          liquiditySeries: !!liquiditySeries,
+          liquiditySeriesLength: liquiditySeries?.length,
+          liquiditySeriesFirst: liquiditySeries?.[0],
+          fromSnapshot: !!snapshotData?.liquidityTimeline,
+          fromState: !!advancedMetrics?.liquidityTimeline,
+          snapshotLiquidityLength: snapshotData?.liquidityTimeline?.length,
+          stateLiquidityLength: advancedMetrics?.liquidityTimeline?.length
+        },
+        scenarioOverlay: {
+          scenarioOverlay: !!scenarioOverlay,
+          scenarioOverlayLength: scenarioOverlay?.length,
+          scenarioOverlayFirst: scenarioOverlay?.[0],
+          fromSnapshot: !!snapshotData?.scenarioOverlay,
+          fromState: !!scenarioOverlayData,
+          snapshotScenarioLength: snapshotData?.scenarioOverlay?.length,
+          stateScenarioLength: scenarioOverlayData?.length
+        }
+      });
+    }
+    
+    // Now check if data exists (after variables are declared)
+    const hasData = (() => {
+      switch (chartType) {
+        case 'cashFlow':
+          return !!(cashFlowSeries && cashFlowSeries.length > 0);
+        case 'cumulativeCost':
+          return !!(cumulativeSeries && cumulativeSeries.length > 0);
+        case 'taxSavings':
+          return !!(taxSeries && taxSeries.length > 0);
+        case 'liquidity':
+          const liquidityHasData = !!(liquiditySeries && liquiditySeries.length > 0);
+          console.log('🔴 [LIQUIDITY DEBUG] hasData check:', {
+            liquiditySeriesExists: !!liquiditySeries,
+            liquiditySeriesLength: liquiditySeries?.length,
+            liquiditySeriesType: typeof liquiditySeries,
+            liquiditySeriesIsArray: Array.isArray(liquiditySeries),
+            finalHasData: liquidityHasData
+          });
+          return liquidityHasData;
+        case 'monteCarlo':
+          return !!(snapshotData?.analysis?.monteCarloHomePrices ?? snapshotData?.monteCarlo ?? monteCarlo);
+        case 'sensitivity':
+          return !!(sensitivity && sensitivity.length > 0);
+        case 'breakEvenHeatmap':
+          return !!(heatmapPoints && heatmapPoints.length > 0);
+        case 'scenarioOverlay':
+          const scenarioOverlayHasData = !!(scenarioOverlay && scenarioOverlay.length > 0);
+          console.log('🔴 [SCENARIO OVERLAY DEBUG] hasData check:', {
+            scenarioOverlayExists: !!scenarioOverlay,
+            scenarioOverlayLength: scenarioOverlay?.length,
+            scenarioOverlayType: typeof scenarioOverlay,
+            scenarioOverlayIsArray: Array.isArray(scenarioOverlay),
+            finalHasData: scenarioOverlayHasData
+          });
+          return scenarioOverlayHasData;
+        case 'breakEven':
+          // Check if we have timeline data (either from analysis.timeline or from chartData)
+          const breakEvenHasData = !!(timeline && timeline.length > 0) || !!(data && data.length > 0) || !!(analysis && analysis.timeline && analysis.timeline.length > 0);
+          console.log('🔴 [BREAKEVEN DEBUG] hasData check:', {
+            timelineExists: !!timeline,
+            timelineLength: timeline?.length,
+            dataExists: !!data,
+            dataLength: data?.length,
+            analysisExists: !!analysis,
+            analysisTimelineExists: !!analysis?.timeline,
+            analysisTimelineLength: analysis?.timeline?.length,
+            finalHasData: breakEvenHasData
+          });
+          return breakEvenHasData;
+        case 'rentGrowth':
+          return !!(timeline || data);
+        default:
+          return true; // Other charts don't need special loading checks
+      }
+    })();
+    
+    // Only show loading if actively loading AND no data yet
+    if (chartLoading.type === chartType && !hasData && chartLoading.progress < 100) {
+      if (chartType === 'breakEven' || chartType === 'liquidity' || chartType === 'scenarioOverlay') {
+        console.log(`🔴 [${chartType.toUpperCase()} DEBUG] Showing loading indicator:`, {
+          chartLoadingType: chartLoading.type,
+          hasData,
+          progress: chartLoading.progress,
+          message: chartLoading.message
+        });
+      }
+      return (
+        <div className="chart-wrapper">
+          <div className="chart-loading-indicator">
+            <div className="chart-loading-spinner"></div>
+            <p className="chart-loading-message">{chartLoading.message}</p>
+            <div className="chart-loading-progress-bar">
+              <div 
+                className="chart-loading-progress-fill" 
+                style={{ width: `${chartLoading.progress}%` }}
+              />
+            </div>
+            <span className="chart-loading-progress-text">{Math.round(chartLoading.progress)}%</span>
+          </div>
+        </div>
+      );
+    }
+    
+    // 🔍 DEBUG: Log if we're past the loading check
+    if (chartType === 'breakEven' || chartType === 'liquidity' || chartType === 'scenarioOverlay') {
+      console.log(`🔴 [${chartType.toUpperCase()} DEBUG] Past loading check, proceeding to render:`, {
+        chartLoadingType: chartLoading.type,
+        hasData,
+        progress: chartLoading.progress,
+        willShowLoading: chartLoading.type === chartType && !hasData && chartLoading.progress < 100
+      });
+    }
+    
+    // Additional variables needed for specific charts
     const breakEven = analysis?.breakEven ? {
       monthIndex: (analysis.breakEven as any).month_index ?? analysis.breakEven.monthIndex ?? null,
       year: (analysis.breakEven as any).year ?? analysis.breakEven.year ?? null
     } : null;
+    const costs = chartType === 'monthlyCost' ? monthlyCosts : (snapshotData?.monthlyCosts || monthlyCosts);
+    const totalData = snapshotData?.totalCostData || totalCostData;
+    
+    console.log('🎯 [CHART DEBUG] renderChart called:', {
+      chartType,
+      hasSnapshotData: !!snapshotData,
+      snapshotDataKeys: snapshotData ? Object.keys(snapshotData) : [],
+      hasData
+    });
     
     console.log('🎯 [CHART DEBUG] Data availability:', {
       hasAnalysis: !!analysis,
@@ -1932,19 +2464,6 @@ const handleChipClick = (message: string) => {
       timelineFirstPoint: timeline?.[0],
       hasBreakEven: !!breakEven
     });
-    
-    // Legacy fallbacks
-    const data = snapshotData?.chartData || chartData;
-    const costs = chartType === 'monthlyCost' ? monthlyCosts : (snapshotData?.monthlyCosts || monthlyCosts);
-    const totalData = snapshotData?.totalCostData || totalCostData;
-    const cashFlowSeries = snapshotData?.cashFlow ?? advancedMetrics.cashFlow;
-    const cumulativeSeries = snapshotData?.cumulativeCosts ?? advancedMetrics.cumulativeCosts;
-    const liquiditySeries = snapshotData?.liquidityTimeline ?? advancedMetrics.liquidityTimeline;
-    const taxSeries = snapshotData?.taxSavings ?? advancedMetrics.taxSavings;
-    const heatmapPoints = snapshotData?.heatmapPoints ?? heatmapData;
-    const monteCarlo = snapshotData?.monteCarlo ?? monteCarloData;
-    const sensitivity = snapshotData?.sensitivity ?? sensitivityData;
-    const scenarioOverlay = snapshotData?.scenarioOverlay ?? scenarioOverlayData;
     
     console.log('🎯 [CHART DEBUG] Advanced metrics:', {
       cashFlowLength: cashFlowSeries?.length,
@@ -2059,7 +2578,12 @@ const handleChipClick = (message: string) => {
         });
         
         // Normalize analysis if it exists (convert snake_case to camelCase)
-        const normalizedAnalysis = normalizeAnalysisResult(analysis);
+        const normalizedAnalysis = analysis ? {
+          timeline: timeline || [],
+          breakEven: breakEven || { monthIndex: null, year: null },
+          totalBuyCost: analysis.totalBuyCost ?? (analysis as any).total_buy_cost ?? 0,
+          totalRentCost: analysis.totalRentCost ?? (analysis as any).total_rent_cost ?? 0,
+        } : null;
         
         return normalizedAnalysis ? (
           <div className="chart-wrapper">
@@ -2152,24 +2676,52 @@ const handleChipClick = (message: string) => {
           </div>
         ) : null;
       case 'breakEven':
-        console.log('📊 [CHART DEBUG] breakEven:', {
+        console.log('🔴 [BREAKEVEN DEBUG] Rendering breakEven chart:', {
           hasAnalysis: !!analysis,
-          timelineLength: analysis?.timeline?.length,
+          analysisKeys: analysis ? Object.keys(analysis) : [],
+          timelineLength: timeline?.length,
+          timelineFirstPoint: timeline?.[0],
+          analysisTimelineLength: analysis?.timeline?.length,
+          analysisTimelineFirst: analysis?.timeline?.[0],
           breakEven: analysis?.breakEven,
           breakEvenMonth: analysis?.breakEven?.monthIndex,
-          hasData: !!data
+          hasData: !!data,
+          dataLength: data?.length,
+          dataFirstPoint: data?.[0],
+          chartLoadingType: chartLoading.type,
+          chartLoadingProgress: chartLoading.progress
         });
         
         // Normalize analysis if it exists (convert snake_case to camelCase)
-        const normalizedBreakEvenAnalysis = normalizeAnalysisResult(analysis);
+        // Must have timeline data to render
+        const normalizedBreakEvenAnalysis = analysis && timeline && timeline.length > 0 ? {
+          timeline: timeline,
+          breakEven: breakEven || { monthIndex: null, year: null },
+          totalBuyCost: analysis.totalBuyCost ?? (analysis as any).total_buy_cost ?? 0,
+          totalRentCost: analysis.totalRentCost ?? (analysis as any).total_rent_cost ?? 0,
+        } : null;
         
-        return normalizedBreakEvenAnalysis ? (
-          <div className="chart-wrapper">
-            <BreakEvenChart analysis={normalizedBreakEvenAnalysis} />
-          </div>
-        ) : data ? (
-          <div className="chart-wrapper">
-            <BreakEvenChart analysis={{
+        console.log('🔴 [BREAKEVEN DEBUG] Normalized analysis:', {
+          hasNormalizedAnalysis: !!normalizedBreakEvenAnalysis,
+          normalizedTimelineLength: normalizedBreakEvenAnalysis?.timeline?.length
+        });
+        
+        // If we have normalized analysis with timeline, use it
+        if (normalizedBreakEvenAnalysis) {
+          console.log('🔴 [BREAKEVEN DEBUG] ✅ Rendering with normalized analysis');
+          return (
+            <div className="chart-wrapper">
+              <BreakEvenChart analysis={normalizedBreakEvenAnalysis} />
+            </div>
+          );
+        }
+        
+        // Fallback to data if available
+        if (data && data.length > 0) {
+          console.log('🔴 [BREAKEVEN DEBUG] ✅ Rendering with fallback data');
+          return (
+            <div className="chart-wrapper">
+              <BreakEvenChart analysis={{
               timeline: data.map(s => ({
                 monthIndex: s.month,
                 year: Math.ceil(s.month / 12),
@@ -2195,128 +2747,309 @@ const handleChipClick = (message: string) => {
               breakEven: { monthIndex: null, year: null },
               totalBuyCost: 0,
               totalRentCost: 0,
-            }} />
+              }} />
+            </div>
+          );
+        }
+        
+        // If no data available, show placeholder or loading
+        if (chartLoading.type === 'breakEven' && chartLoading.progress < 100) {
+          console.log('🔴 [BREAKEVEN DEBUG] ⏳ Returning null (loading indicator shown at top)');
+          return null; // Loading indicator shown at top
+        }
+        
+        console.log('🔴 [BREAKEVEN DEBUG] ❌ No data available, showing placeholder');
+        return (
+          <div className="chart-wrapper">
+            <ChartPlaceholder 
+              title="Break-Even Timeline" 
+              description="Break-even data is being calculated..."
+            />
           </div>
-        ) : null;
+        );
       case 'cashFlow':
         console.log('📊 [CHART DEBUG] cashFlow:', {
-          hasCashFlowSeries: !!cashFlowSeries,
+          hasCashFlow: !!cashFlowSeries,
           cashFlowLength: cashFlowSeries?.length,
-          firstFew: cashFlowSeries?.slice(0, 3),
-          hasNaN: cashFlowSeries?.some(p => isNaN(p.homeownerCashFlow) || isNaN(p.renterCashFlow))
+          firstPoint: cashFlowSeries?.[0],
+          fromSnapshot: !!snapshotData?.cashFlow,
+          fromState: !!advancedMetrics?.cashFlow
         });
-        return cashFlowSeries && cashFlowSeries.length ? (
+        // If no data yet, show loading or placeholder
+        if (!cashFlowSeries || cashFlowSeries.length === 0) {
+          if (chartLoading.type === 'cashFlow') {
+            return null; // Loading indicator shown at top
+          }
+          return (
+            <div className="chart-wrapper">
+              <ChartPlaceholder 
+                title="Cash Flow Chart" 
+                description="Cash flow data is being calculated..."
+              />
+            </div>
+          );
+        }
+        return (
           <div className="chart-wrapper">
             <CashFlowChart data={cashFlowSeries} />
           </div>
-        ) : renderUnavailable('Cash flow');
+        );
       case 'cumulativeCost':
         console.log('📊 [CHART DEBUG] cumulativeCost:', {
-          hasCumulativeSeries: !!cumulativeSeries,
+          hasCumulative: !!cumulativeSeries,
           cumulativeLength: cumulativeSeries?.length,
-          firstCumulative: cumulativeSeries?.[0],
-          sampleData: cumulativeSeries?.slice(0, 3),
-          hasNaN: cumulativeSeries?.some(p => isNaN(p.cumulativeBuying) || isNaN(p.cumulativeRenting))
+          firstPoint: cumulativeSeries?.[0],
+          fromSnapshot: !!snapshotData?.cumulativeCosts,
+          fromState: !!advancedMetrics?.cumulativeCosts
         });
-        return cumulativeSeries && cumulativeSeries.length ? (
+        // If no data yet, show loading or placeholder
+        if (!cumulativeSeries || cumulativeSeries.length === 0) {
+          if (chartLoading.type === 'cumulativeCost') {
+            return null; // Loading indicator shown at top
+          }
+          return (
+            <div className="chart-wrapper">
+              <ChartPlaceholder 
+                title="Cumulative Cost Chart" 
+                description="Cumulative cost data is being calculated..."
+              />
+            </div>
+          );
+        }
+        return (
           <div className="chart-wrapper">
             <CumulativeCostChart data={cumulativeSeries} />
           </div>
-        ) : renderUnavailable('Cumulative cost');
+        );
       case 'liquidity':
-        console.log('📊 [CHART DEBUG] liquidity:', {
+        console.log('🔴 [LIQUIDITY DEBUG] Rendering liquidity chart:', {
           hasLiquiditySeries: !!liquiditySeries,
+          liquiditySeriesType: typeof liquiditySeries,
+          liquiditySeriesIsArray: Array.isArray(liquiditySeries),
           liquidityLength: liquiditySeries?.length,
-          firstLiquidity: liquiditySeries?.[0],
-          sampleData: liquiditySeries?.slice(0, 3)
+          firstPoint: liquiditySeries?.[0],
+          fromSnapshot: !!snapshotData?.liquidityTimeline,
+          snapshotLiquidityType: typeof snapshotData?.liquidityTimeline,
+          snapshotLiquidityIsArray: Array.isArray(snapshotData?.liquidityTimeline),
+          snapshotLiquidityLength: snapshotData?.liquidityTimeline?.length,
+          fromState: !!advancedMetrics?.liquidityTimeline,
+          stateLiquidityType: typeof advancedMetrics?.liquidityTimeline,
+          stateLiquidityIsArray: Array.isArray(advancedMetrics?.liquidityTimeline),
+          stateLiquidityLength: advancedMetrics?.liquidityTimeline?.length,
+          chartLoadingType: chartLoading.type,
+          chartLoadingProgress: chartLoading.progress,
+          fullSnapshotData: snapshotData,
+          fullAdvancedMetrics: advancedMetrics
         });
-        return liquiditySeries && liquiditySeries.length ? (
-          <div className="chart-wrapper">
-            <LiquidityTimeline data={liquiditySeries} />
-          </div>
-        ) : renderUnavailable('Liquidity timeline');
+        // If no data yet, show loading or placeholder
+        if (!liquiditySeries || liquiditySeries.length === 0) {
+          console.log('🔴 [LIQUIDITY DEBUG] ❌ No liquidity data available');
+          if (chartLoading.type === 'liquidity' && chartLoading.progress < 100) {
+            console.log('🔴 [LIQUIDITY DEBUG] ⏳ Returning null (loading indicator shown at top)');
+            return null; // Loading indicator shown at top
+          }
+          console.log('🔴 [LIQUIDITY DEBUG] 📦 Showing placeholder (no loading)');
+          return (
+            <ChartPlaceholder 
+              title="Liquidity Timeline" 
+              description="Liquidity data is being calculated..."
+            />
+          );
+        }
+        // Liquidity chart component doesn't exist yet, but data is available
+        console.log('🔴 [LIQUIDITY DEBUG] ✅ Data available, showing chart placeholder');
+        const placeholder = (
+          <ChartPlaceholder 
+            title="Liquidity Timeline" 
+            description="Shows available cash over time. Chart component coming soon."
+          />
+        );
+        console.log('🔴 [LIQUIDITY DEBUG] Placeholder component created:', placeholder);
+        return placeholder;
       case 'taxSavings':
         console.log('📊 [CHART DEBUG] taxSavings:', {
           hasTaxSeries: !!taxSeries,
           taxLength: taxSeries?.length,
-          firstTax: taxSeries?.[0],
-          sampleData: taxSeries?.slice(0, 3),
-          hasNaN: taxSeries?.some(p => isNaN(p.totalTaxBenefit) || isNaN(p.deductibleMortgageInterest))
+          firstPoint: taxSeries?.[0],
+          fromSnapshot: !!snapshotData?.taxSavings,
+          fromState: !!advancedMetrics?.taxSavings
         });
-        return taxSeries && taxSeries.length ? (
+        // If no data yet, show loading or placeholder
+        if (!taxSeries || taxSeries.length === 0) {
+          if (chartLoading.type === 'taxSavings') {
+            return null; // Loading indicator shown at top
+          }
+          return (
+            <div className="chart-wrapper">
+              <ChartPlaceholder 
+                title="Tax Savings Chart" 
+                description="Tax savings data is being calculated..."
+              />
+            </div>
+          );
+        }
+        return (
           <div className="chart-wrapper">
             <TaxSavingsChart data={taxSeries} />
           </div>
-        ) : renderUnavailable('Tax savings');
+        );
       case 'breakEvenHeatmap':
-        return heatmapPoints && heatmapPoints.length ? (
-          <div className="chart-wrapper">
-            <BreakEvenHeatmap points={heatmapPoints} />
-          </div>
-        ) : renderUnavailable('Break-Even heatmap');
-      case 'monteCarlo':
-        // Get Monte Carlo home price paths from analysis result
-        // Check both the message's snapshotData and the current unifiedAnalysisResult state
-        // (unifiedAnalysisResult may be updated after the message is created)
-        const mcFromAnalysis = analysis?.monteCarloHomePrices ?? 
-                               (analysis as any)?.monte_carlo_home_prices ?? 
-                               null;
-        const mcFromState = (unifiedAnalysisResult as any)?.monte_carlo_home_prices ?? 
-                            unifiedAnalysisResult?.monteCarloHomePrices ?? 
-                            null;
-        const monteCarloHomePrices = mcFromAnalysis ?? mcFromState;
-        
-        console.log('📊 [CHART DEBUG] monteCarlo:', {
-          hasAnalysis: !!analysis,
-          hasUnifiedAnalysisResult: !!unifiedAnalysisResult,
-          mcFromAnalysis: !!mcFromAnalysis,
-          mcFromState: !!mcFromState,
-          hasMonteCarloHomePrices: !!monteCarloHomePrices,
-          yearsLength: monteCarloHomePrices?.years?.length,
-          hasP10: !!monteCarloHomePrices?.p10,
-          hasP50: !!monteCarloHomePrices?.p50,
-          hasP90: !!monteCarloHomePrices?.p90,
-          // Legacy support (old format)
-          hasLegacyMonteCarlo: !!monteCarlo,
-          hasRuns: !!monteCarlo?.runs,
-          runsLength: monteCarlo?.runs?.length
+        console.log('📊 [CHART DEBUG] breakEvenHeatmap:', {
+          hasHeatmapPoints: !!heatmapPoints,
+          heatmapLength: heatmapPoints?.length,
+          firstPoint: heatmapPoints?.[0],
+          fromSnapshot: !!snapshotData?.heatmapPoints,
+          fromState: !!heatmapData
         });
-        
-        // Use new home price paths if available, otherwise fall back to legacy format
-        if (monteCarloHomePrices && monteCarloHomePrices.years && monteCarloHomePrices.years.length > 0) {
+        // If no data yet, show loading or placeholder
+        if (!heatmapPoints || heatmapPoints.length === 0) {
+          if (chartLoading.type === 'breakEvenHeatmap' && chartLoading.progress < 100) {
+            return null; // Loading indicator shown at top
+          }
           return (
             <div className="chart-wrapper">
-              <MonteCarloChart monteCarloHomePrices={monteCarloHomePrices} />
+              <ChartPlaceholder 
+                title="Break-Even Heatmap" 
+                description="Heatmap data is being calculated..."
+              />
             </div>
           );
-        } else if (monteCarlo && monteCarlo.runs && monteCarlo.runs.length > 0) {
-          // Legacy format support (if old endpoint is still used)
-          return renderUnavailable('Monte Carlo simulation (legacy format not supported - please use new analysis endpoint)');
-        } else {
-          return renderUnavailable('Monte Carlo simulation');
         }
+        // Heatmap chart component doesn't exist yet, but data is available
+        return (
+          <div className="chart-wrapper">
+            <ChartPlaceholder 
+              title="Break-Even Heatmap" 
+              description={`Break-even analysis across ${heatmapPoints.length} scenarios. Chart component coming soon.`}
+            />
+          </div>
+        );
+      case 'monteCarlo':
+        console.log('🎲 [CHART DEBUG] monteCarlo:', {
+          hasAnalysis: !!analysis,
+          hasMonteCarlo: !!analysis?.monteCarloHomePrices,
+          hasMonteCarloSnake: !!(analysis as any)?.monte_carlo_home_prices,
+          monteCarloData: analysis?.monteCarloHomePrices ?? (analysis as any)?.monte_carlo_home_prices,
+          hasLegacyMonteCarlo: !!monteCarlo,
+          chartLoadingType: chartLoading.type,
+          chartLoadingProgress: chartLoading.progress
+        });
+        
+        // If loading, the loading indicator is already shown at the top of renderChart
+        // But if we have data, show it
+        const monteCarloData = analysis?.monteCarloHomePrices ?? (analysis as any)?.monte_carlo_home_prices ?? monteCarlo;
+        
+        if (monteCarloData) {
+          // Handle both HomePricePathSummary format and legacy format
+          if (monteCarloData.years && monteCarloData.p10 && monteCarloData.p50 && monteCarloData.p90) {
+            // New format (HomePricePathSummary)
+            return (
+              <div className="chart-wrapper">
+                <MonteCarloChart monteCarloHomePrices={monteCarloData} />
+              </div>
+            );
+          } else if (monteCarloData.runs && monteCarloData.summary) {
+            // Legacy format - convert to new format if possible
+            console.warn('Monte Carlo legacy format detected, may need conversion');
+            return (
+              <div className="chart-wrapper">
+                <ChartPlaceholder 
+                  title="Monte Carlo Simulation" 
+                  description="Legacy format detected. Please regenerate the analysis."
+                />
+              </div>
+            );
+          }
+        }
+        
+        // If we're loading and no data yet, show loading indicator (handled at top of renderChart)
+        // Otherwise show placeholder
+        if (chartLoading.type === 'monteCarlo' && chartLoading.progress < 100) {
+          return null; // Loading indicator already shown at top
+        }
+        
+        return (
+          <div className="chart-wrapper">
+            <ChartPlaceholder 
+              title="Monte Carlo Simulation" 
+              description="Monte Carlo data is being generated. This may take 30-60 seconds..."
+            />
+          </div>
+        );
       case 'sensitivity':
         console.log('📊 [CHART DEBUG] sensitivity:', {
           hasSensitivity: !!sensitivity,
           sensitivityLength: sensitivity?.length,
-          firstSensitivity: sensitivity?.[0]
+          firstResult: sensitivity?.[0],
+          fromSnapshot: !!snapshotData?.sensitivity,
+          fromState: !!sensitivityData
         });
-        return sensitivity && sensitivity.length > 0 ? (
+        // If no data yet, show loading or placeholder
+        if (!sensitivity || sensitivity.length === 0) {
+          if (chartLoading.type === 'sensitivity' && chartLoading.progress < 100) {
+            return null; // Loading indicator shown at top
+          }
+          return (
+            <div className="chart-wrapper">
+              <ChartPlaceholder 
+                title="Sensitivity Analysis" 
+                description="Sensitivity data is being calculated..."
+              />
+            </div>
+          );
+        }
+        return (
           <div className="chart-wrapper">
             <SensitivityChart results={sensitivity} />
           </div>
-        ) : renderUnavailable('Sensitivity analysis');
+        );
       case 'scenarioOverlay':
-        console.log('📊 [CHART DEBUG] scenarioOverlay:', {
+        console.log('🔴 [SCENARIO OVERLAY DEBUG] Rendering scenarioOverlay chart:', {
           hasScenarioOverlay: !!scenarioOverlay,
-          scenarioOverlayLength: scenarioOverlay?.length,
-          firstScenario: scenarioOverlay?.[0]
+          scenarioOverlayType: typeof scenarioOverlay,
+          scenarioOverlayIsArray: Array.isArray(scenarioOverlay),
+          scenarioLength: scenarioOverlay?.length,
+          firstScenario: scenarioOverlay?.[0],
+          fromSnapshot: !!snapshotData?.scenarioOverlay,
+          snapshotScenarioType: typeof snapshotData?.scenarioOverlay,
+          snapshotScenarioIsArray: Array.isArray(snapshotData?.scenarioOverlay),
+          snapshotScenarioLength: snapshotData?.scenarioOverlay?.length,
+          fromState: !!scenarioOverlayData,
+          stateScenarioType: typeof scenarioOverlayData,
+          stateScenarioIsArray: Array.isArray(scenarioOverlayData),
+          stateScenarioLength: scenarioOverlayData?.length,
+          chartLoadingType: chartLoading.type,
+          chartLoadingProgress: chartLoading.progress,
+          fullSnapshotData: snapshotData,
+          fullScenarioOverlayData: scenarioOverlayData
         });
-        return scenarioOverlay && scenarioOverlay.length > 0 ? (
+        // If no data yet, show loading or placeholder
+        if (!scenarioOverlay || scenarioOverlay.length === 0) {
+          console.log('🔴 [SCENARIO OVERLAY DEBUG] ❌ No scenario overlay data available');
+          if (chartLoading.type === 'scenarioOverlay' && chartLoading.progress < 100) {
+            console.log('🔴 [SCENARIO OVERLAY DEBUG] ⏳ Returning null (loading indicator shown at top)');
+            return null; // Loading indicator shown at top
+          }
+          console.log('🔴 [SCENARIO OVERLAY DEBUG] 📦 Showing placeholder (no loading)');
+          return (
+            <div className="chart-wrapper">
+              <ChartPlaceholder 
+                title="Scenario Overlay" 
+                description="Scenario data is being calculated..."
+              />
+            </div>
+          );
+        }
+        // Scenario overlay chart component doesn't exist yet, but data is available
+        console.log('🔴 [SCENARIO OVERLAY DEBUG] ✅ Data available, showing chart placeholder');
+        return (
           <div className="chart-wrapper">
-            <ScenarioOverlayChart results={scenarioOverlay} />
+            <ChartPlaceholder 
+              title="Scenario Overlay" 
+              description={`Comparing ${scenarioOverlay.length} scenarios. Chart component coming soon.`}
+            />
           </div>
-        ) : renderUnavailable('Scenario overlay');
+        );
       default:
         return null;
     }
@@ -3366,20 +4099,46 @@ Restart
             for (let i = 0; i < index; i++) {
               if (messages[i].role === 'assistant') {
                 const wordCount = messages[i].content.split(' ').length;
-                delay += 50 + (wordCount * 3); // 50ms base + 3ms per word - much faster
+                delay += 300 + (wordCount * 15); // 300ms base + 15ms per word - slower, more natural
               }
             }
           }
           
           return (
             <div key={message.id} data-message-id={message.id}>
-          <ChatMessage
-            role={message.role}
-            content={message.content}
-                delay={delay}
-              />
+              {/* Only render ChatMessage if there's content or it's not a recommendation message */}
+              {message.content || !message.showRecommendation ? (
+                <ChatMessage
+                  role={message.role}
+                  content={message.content}
+                  delay={delay}
+                />
+              ) : null}
+              {/* Render recommendation card if this message has the flag */}
+              {message.showRecommendation && recommendation && unifiedAnalysisResult && userData.timeHorizonYears && (
+                <RecommendationCard
+                  recommendation={recommendation}
+                  location={locationData ? `${locationData.city}, ${locationData.state}` : undefined}
+                  timeline={userData.timeHorizonYears}
+                  onShowDetails={handleShowDetails}
+                  onTryNewScenario={handleTryNewScenario}
+                />
+              )}
               {/* Render chart right after message if it has one - uses message's snapshot data */}
-              {message.chartToShow && renderChart(message.chartToShow, message.snapshotData)}
+              {message.chartToShow && (
+                <div 
+                  key={`chart-${message.id}-${message.chartToShow}`} 
+                  data-chart-type={message.chartToShow}
+                  style={{ 
+                    display: 'block', 
+                    visibility: 'visible',
+                    width: '100%',
+                    marginTop: '20px'
+                  }}
+                >
+                  {renderChart(message.chartToShow, message.snapshotData)}
+                </div>
+              )}
             </div>
           );
         })}
@@ -3507,17 +4266,21 @@ Restart
             {/* Core Charts Section */}
             <div>
               <div className="rvb-core-charts-header">Core charts</div>
-              <div className="chart-nav-buttons-horizontal">
+              <div className="chart-button-grid core-charts">
                 {BASIC_CHART_KEYS.map(chartKey => {
                   const config = chartButtonConfig[chartKey];
                   return (
                     <button
                       key={chartKey}
-                      className="chart-nav-btn-sm"
+                      className="chart-button"
                       onClick={() => handleChipClick(config.message)}
                       title={config.title}
                     >
-                      {config.label}
+                      <span className="button-icon">{config.label.split(' ')[0]}</span>
+                      <span className="button-text">
+                        <strong>{config.label.substring(config.label.indexOf(' ') + 1)}</strong>
+                        <small>{config.description}</small>
+                      </span>
                     </button>
                   );
                 })}
@@ -3527,14 +4290,13 @@ Restart
             {/* Advanced Analysis Section (Collapsible) */}
             <div className="rvb-advanced-section">
               <button
-                className="rvb-advanced-toggle"
+                className="toggle-button"
                 onClick={() => setShowAdvancedCharts(prev => !prev)}
                 data-tour-id="advanced-charts-toggle"
               >
-                Advanced Analysis (for experts)
-                <span className="rvb-advanced-toggle-indicator">
-                  {showAdvancedCharts ? "▾" : "▸"}
-                </span>
+                <span>{showAdvancedCharts ? '▼' : '▶'}</span>
+                Advanced Analysis
+                <small>Market risk, sensitivity, tax implications</small>
               </button>
               
               {showAdvancedCharts && (
@@ -3547,17 +4309,21 @@ Restart
                   }}>
                     These charts show risk, volatility, break-even points, and more detailed scenarios. You don't need them to understand the basics, but they're here if you want to go deeper.
                   </p>
-                  <div className="chart-nav-buttons-horizontal">
+                  <div className="chart-button-grid advanced-charts">
                     {ADVANCED_CHART_KEYS.map(chartKey => {
                       const config = chartButtonConfig[chartKey];
                       return (
                         <button
                           key={chartKey}
-                          className="chart-nav-btn-sm"
+                          className="chart-button"
                           onClick={() => handleChipClick(config.message)}
                           title={config.title}
                         >
-                          {config.label}
+                          <span className="button-icon">{config.label.split(' ')[0]}</span>
+                          <span className="button-text">
+                            <strong>{config.label.substring(config.label.indexOf(' ') + 1)}</strong>
+                            <small>{config.description}</small>
+                          </span>
                         </button>
                       );
                     })}
