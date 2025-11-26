@@ -27,7 +27,7 @@
   top: -300px;
   left: -300px;
   animation-delay: 0s;
-  animation-duration: 25s;
+  animation-duration: 15s;
 }
 
 /* Blob 2 - Blue */
@@ -37,8 +37,8 @@
   background: radial-gradient(circle, rgba(59, 130, 246, 0.95) 0%, rgba(59, 130, 246, 0.65) 30%, rgba(59, 130, 246, 0.4) 60%, transparent 100%);
   top: 50%;
   right: -200px;
-  animation-delay: -5s;
-  animation-duration: 30s;
+  animation-delay: -3s;
+  animation-duration: 18s;
 }
 
 /* Blob 3 - Light Blue/Cyan */
@@ -48,8 +48,8 @@
   background: radial-gradient(circle, rgba(96, 165, 250, 0.9) 0%, rgba(96, 165, 250, 0.6) 30%, rgba(96, 165, 250, 0.35) 60%, transparent 100%);
   bottom: -200px;
   left: 20%;
-  animation-delay: -10s;
-  animation-duration: 28s;
+  animation-delay: -6s;
+  animation-duration: 17s;
 }
 
 /* Blob 4 - Pink/Rose */
@@ -59,8 +59,52 @@
   background: radial-gradient(circle, rgba(244, 63, 94, 0.9) 0%, rgba(244, 63, 94, 0.6) 30%, rgba(244, 63, 94, 0.35) 60%, transparent 100%);
   top: 20%;
   left: 50%;
-  animation-delay: -15s;
-  animation-duration: 32s;
+  animation-delay: -9s;
+  animation-duration: 19s;
+}
+
+/* Blob 5 - Toned Down Yellow/Amber */
+.blob-5 {
+  width: 680px;
+  height: 680px;
+  background: radial-gradient(circle, rgba(234, 179, 8, 0.5) 0%, rgba(234, 179, 8, 0.35) 30%, rgba(234, 179, 8, 0.2) 60%, transparent 100%);
+  top: 60%;
+  right: 30%;
+  animation-delay: -4s;
+  animation-duration: 16s;
+}
+
+/* Blob 6 - Toned Down Green/Emerald */
+.blob-6 {
+  width: 720px;
+  height: 720px;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.5) 0%, rgba(16, 185, 129, 0.35) 30%, rgba(16, 185, 129, 0.2) 60%, transparent 100%);
+  bottom: 10%;
+  right: 10%;
+  animation-delay: -7s;
+  animation-duration: 20s;
+}
+
+/* Blob 7 - Light Pink/Magenta */
+.blob-7 {
+  width: 690px;
+  height: 690px;
+  background: radial-gradient(circle, rgba(236, 72, 153, 0.5) 0%, rgba(236, 72, 153, 0.35) 30%, rgba(236, 72, 153, 0.2) 60%, transparent 100%);
+  top: 10%;
+  left: 30%;
+  animation-delay: -5s;
+  animation-duration: 18s;
+}
+
+/* Blob 8 - Violet/Indigo */
+.blob-8 {
+  width: 640px;
+  height: 640px;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.5) 0%, rgba(124, 58, 237, 0.35) 30%, rgba(124, 58, 237, 0.2) 60%, transparent 100%);
+  bottom: 30%;
+  left: 60%;
+  animation-delay: -11s;
+  animation-duration: 22s;
 }
 
 /* Smooth floating animation with rotation - More dramatic movement */
@@ -126,19 +170,35 @@
 
 /* Apply unique animations to each blob */
 .blob-1 {
-  animation: aurora-float-1 25s ease-in-out infinite;
+  animation: aurora-float-1 15s ease-in-out infinite;
 }
 
 .blob-2 {
-  animation: aurora-float-2 30s ease-in-out infinite;
+  animation: aurora-float-2 18s ease-in-out infinite;
 }
 
 .blob-3 {
-  animation: aurora-float-3 28s ease-in-out infinite;
+  animation: aurora-float-3 17s ease-in-out infinite;
 }
 
 .blob-4 {
-  animation: aurora-float-4 32s ease-in-out infinite;
+  animation: aurora-float-4 19s ease-in-out infinite;
+}
+
+.blob-5 {
+  animation: aurora-float-2 16s ease-in-out infinite;
+}
+
+.blob-6 {
+  animation: aurora-float-3 20s ease-in-out infinite;
+}
+
+.blob-7 {
+  animation: aurora-float-1 18s ease-in-out infinite;
+}
+
+.blob-8 {
+  animation: aurora-float-4 22s ease-in-out infinite;
 }
 
 /* Responsive adjustments */
@@ -166,6 +226,26 @@
   .blob-4 {
     width: 420px;
     height: 420px;
+  }
+  
+  .blob-5 {
+    width: 400px;
+    height: 400px;
+  }
+  
+  .blob-6 {
+    width: 430px;
+    height: 430px;
+  }
+  
+  .blob-7 {
+    width: 410px;
+    height: 410px;
+  }
+  
+  .blob-8 {
+    width: 400px;
+    height: 400px;
   }
 }
 

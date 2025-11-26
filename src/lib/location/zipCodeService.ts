@@ -36,7 +36,7 @@ const PROPERTY_TAX_RATES: Record<string, number> = {
 };
 
 export const getLocationData = (zipCode: string): LocationData | null => {
-  return zipCodeData[zipCode] || null;
+  return (zipCodeData as Record<string, LocationData>)[zipCode] || null;
 };
 
 export const formatLocationData = (data: LocationData): FormattedLocationData => {
@@ -60,4 +60,65 @@ export const detectZipCode = (message: string): string | null => {
   // Match 5-digit ZIP codes
   const zipMatch = message.match(/\b\d{5}\b/);
   return zipMatch ? zipMatch[0] : null;
+};
+
+// Common city name patterns (major cities that users might mention)
+const CITY_PATTERNS = [
+  /(?:i\s+(?:want|wanna|want to|plan to|am|will)\s+(?:live|move|buy|rent)\s+in|in|near|around)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi,
+  /\b(?:LA|NYC|SF|SD|Miami|Chicago|Boston|Seattle|Portland|Denver|Austin|Dallas|Houston|Phoenix|Atlanta|Detroit|Philadelphia|San\s+Francisco|Los\s+Angeles|New\s+York|San\s+Diego|Las\s+Vegas)\b/gi
+];
+
+export const detectCityMention = (message: string): { city?: string; state?: string } | null => {
+  const lowerMessage = message.toLowerCase();
+  
+  // Check for common city abbreviations
+  const cityAbbreviations: Record<string, string> = {
+    'la': 'Los Angeles',
+    'nyc': 'New York',
+    'sf': 'San Francisco',
+    'sd': 'San Diego',
+    'miami': 'Miami',
+    'chicago': 'Chicago',
+    'boston': 'Boston',
+    'seattle': 'Seattle',
+    'portland': 'Portland',
+    'denver': 'Denver',
+    'austin': 'Austin',
+    'dallas': 'Dallas',
+    'houston': 'Houston',
+    'phoenix': 'Phoenix',
+    'atlanta': 'Atlanta',
+    'detroit': 'Detroit',
+    'philadelphia': 'Philadelphia',
+    'las vegas': 'Las Vegas'
+  };
+  
+  // Check for abbreviations first
+  for (const [abbr, city] of Object.entries(cityAbbreviations)) {
+    if (lowerMessage.includes(abbr) && (lowerMessage.includes('live') || lowerMessage.includes('move') || lowerMessage.includes('buy') || lowerMessage.includes('rent') || lowerMessage.includes('in'))) {
+      return { city };
+    }
+  }
+  
+  // Check for full city names
+  const cityNames = Object.values(cityAbbreviations);
+  for (const city of cityNames) {
+    if (lowerMessage.includes(city.toLowerCase()) && (lowerMessage.includes('live') || lowerMessage.includes('move') || lowerMessage.includes('buy') || lowerMessage.includes('rent') || lowerMessage.includes('in'))) {
+      return { city };
+    }
+  }
+  
+  // Try to extract city from patterns like "I wanna live in [City]" or "in [City]"
+  for (const pattern of CITY_PATTERNS) {
+    const match = message.match(pattern);
+    if (match && match[1]) {
+      const potentialCity = match[1].trim();
+      // Only return if it looks like a city name (capitalized, not a number)
+      if (potentialCity && /^[A-Z]/.test(potentialCity) && !/\d/.test(potentialCity)) {
+        return { city: potentialCity };
+      }
+    }
+  }
+  
+  return null;
 };
