@@ -66,14 +66,9 @@ export function MonteCarloChart({ monteCarloHomePrices }: MonteCarloChartProps) 
   return (
     <div className="chart-container">
       <h3 className="chart-title">Simulated Home Value Range</h3>
-      <p className="chart-caption" style={{ marginBottom: '16px', fontSize: '14px', color: '#4a5568', lineHeight: '1.5' }}>
+      <p className="chart-caption" style={{ marginBottom: '16px', fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.5' }}>
         This shows best, typical, and worst-case home values over time based on ML estimates and market volatility. The shaded band is the range; the middle line is the typical path.
       </p>
-      <div style={{marginBottom: '16px', background: '#f7fafc', padding: '12px', borderRadius: '8px'}}>
-        <p style={{margin: 0, fontSize: '14px', color: '#2d3748'}}>
-          <strong>Based on ML-estimated appreciation and ZIP-level volatility.</strong> This chart shows the range of possible home values over {finalYear} years. The shaded area represents the 10th to 90th percentile range, with the median (50th percentile) shown as a line.
-        </p>
-      </div>
       
       <ResponsiveContainer width="100%" height={400}>
         <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
@@ -101,7 +96,7 @@ export function MonteCarloChart({ monteCarloHomePrices }: MonteCarloChartProps) 
           />
           <Tooltip 
             formatter={(value: number) => `$${value.toLocaleString()}`}
-            contentStyle={{ backgroundColor: 'white', border: '2px solid #3182ce', borderRadius: '8px' }}
+            contentStyle={{ backgroundColor: 'rgba(5, 8, 15, 0.85)', border: '1px solid rgba(124, 95, 196, 0.35)', borderRadius: '10px', color: '#f1f5f9', backdropFilter: 'blur(6px)' }}
             labelFormatter={(year) => `Year ${year}`}
           />
           <Legend />
@@ -155,16 +150,6 @@ export function MonteCarloChart({ monteCarloHomePrices }: MonteCarloChartProps) 
           />
         </AreaChart>
       </ResponsiveContainer>
-      
-      <div className="chart-description" style={{marginTop: '16px'}}>
-        <p style={{marginBottom: '8px', lineHeight: '1.6', color: '#2d3748'}}>
-          <strong>Projected median value after {finalYear} years:</strong> ${finalPriceP50.toLocaleString()} 
-          ({priceChange >= 0 ? '+' : ''}{priceChangePct.toFixed(1)}% from initial ${initialPrice.toLocaleString()})
-        </p>
-        <p style={{margin: 0, fontSize: '12px', color: '#718096', fontStyle: 'italic'}}>
-          The 10th percentile represents a conservative scenario (lower prices), while the 90th percentile represents an optimistic scenario (higher prices). The median shows the most likely outcome.
-        </p>
-      </div>
     </div>
   );
 }

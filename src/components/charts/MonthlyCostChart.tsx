@@ -30,12 +30,12 @@ export function MonthlyCostChart({ timeline }: MonthlyCostChartProps) {
     {
       name: 'Buying',
       total: Math.round(buyingCosts.total),
-      color: '#8b5cf6'
+      color: 'rgba(124, 95, 196, 0.55)'
     },
     {
       name: 'Renting',
       total: Math.round(rentingCosts.total),
-      color: '#60a5fa'
+      color: 'rgba(80, 140, 210, 0.5)'
     }
   ];
   
@@ -77,7 +77,7 @@ export function MonthlyCostChart({ timeline }: MonthlyCostChartProps) {
           />
           <Tooltip 
             formatter={(value: number) => `$${value.toLocaleString()}`}
-            contentStyle={{ backgroundColor: 'rgba(30, 30, 40, 0.95)', border: '1px solid rgba(139, 92, 246, 0.5)', borderRadius: '8px', color: 'white' }}
+            contentStyle={{ backgroundColor: 'rgba(5, 8, 15, 0.85)', border: '1px solid rgba(124, 95, 196, 0.35)', borderRadius: '10px', color: '#f1f5f9', backdropFilter: 'blur(6px)' }}
           />
           <Legend wrapperStyle={{ color: 'rgba(255, 255, 255, 0.9)' }} />
           <Bar dataKey="total" name="Monthly Cost" radius={[8, 8, 0, 0]}>
@@ -87,41 +87,6 @@ export function MonthlyCostChart({ timeline }: MonthlyCostChartProps) {
           </Bar>
         </BarChart>
       </ResponsiveContainer>
-      
-      {/* Breakdown sections */}
-      <div className="cost-breakdown">
-        <div className="breakdown-column">
-          <h4 style={{ color: 'rgba(139, 92, 246, 0.9)' }}>Buying Breakdown</h4>
-          {buyingBreakdown.map(item => (
-            <div key={item.label} className="breakdown-item">
-              <span>{item.label}:</span>
-              <span>${Math.round(item.value).toLocaleString()}/mo</span>
-            </div>
-          ))}
-          <div className="breakdown-item breakdown-total">
-            <span><strong>Total:</strong></span>
-            <span><strong>${Math.round(buyingCosts.total).toLocaleString()}/mo</strong></span>
-          </div>
-        </div>
-        
-        <div className="breakdown-column">
-          <h4 style={{ color: 'rgba(96, 165, 250, 0.9)' }}>Renting Breakdown</h4>
-          {rentingBreakdown.map(item => (
-            <div key={item.label} className="breakdown-item">
-              <span>{item.label}:</span>
-              <span>${Math.round(item.value).toLocaleString()}/mo</span>
-            </div>
-          ))}
-          <div className="breakdown-item breakdown-total">
-            <span><strong>Total:</strong></span>
-            <span><strong>${Math.round(rentingCosts.total).toLocaleString()}/mo</strong></span>
-          </div>
-        </div>
-      </div>
-      
-      <p className="chart-description">
-        This shows your monthly costs in the first year. Rent will increase over time.
-      </p>
     </div>
   );
 }

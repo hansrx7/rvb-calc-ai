@@ -65,14 +65,6 @@ export function TotalCostChart({ analysis }: TotalCostChartProps) {
         This shows the total money you spend over time if you buy versus rent. Lower is better.
       </p>
       
-      <div className="breakeven-callout" style={{ 
-        background: winner === 'Buying' 
-          ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%)' 
-          : 'linear-gradient(135deg, rgba(96, 165, 250, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%)'
-      }}>
-        <p>🏆 <strong>{winner} saves you ${savings.toLocaleString()} over {timelineYears} years!</strong></p>
-        <p>The net cost of {winner.toLowerCase()} is ${savings.toLocaleString()} lower.</p>      </div>
-      
       <ResponsiveContainer width="100%" height={400}>
         <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
@@ -91,36 +83,15 @@ export function TotalCostChart({ analysis }: TotalCostChartProps) {
           />
           <Tooltip 
             formatter={(value: number) => `$${value.toLocaleString()}`}
-            contentStyle={{ backgroundColor: 'rgba(30, 30, 40, 0.95)', border: '1px solid rgba(139, 92, 246, 0.5)', borderRadius: '8px', color: 'white' }}
+            contentStyle={{ backgroundColor: 'rgba(5, 8, 15, 0.85)', border: '1px solid rgba(124, 95, 196, 0.35)', borderRadius: '10px', color: '#f1f5f9', backdropFilter: 'blur(6px)' }}
           />
           <Legend wrapperStyle={{ color: 'rgba(255, 255, 255, 0.9)' }} />
           <Bar dataKey="netCost" name={`Net Cost (after ${timelineYears} years)`} radius={[8, 8, 0, 0]}>
-            <Cell fill="#8b5cf6" />
-            <Cell fill="#60a5fa" />
+            <Cell fill="rgba(124, 95, 196, 0.55)" />
+            <Cell fill="rgba(80, 140, 210, 0.5)" />
           </Bar>
         </BarChart>
       </ResponsiveContainer>
-      
-      <div style={{ marginTop: '20px', padding: '20px', background: 'rgba(30, 30, 40, 0.6)', borderRadius: '12px', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', textAlign: 'center' }}>
-          <div>
-            <h4 style={{ color: 'rgba(139, 92, 246, 0.9)', marginBottom: '8px' }}>💰 Buying Breakdown</h4>
-            <p style={{ color: 'rgba(255, 255, 255, 0.9)' }}><strong>Total Spent:</strong> ${totalBuyingCosts.toLocaleString()}</p>
-            <p style={{ color: 'rgba(255, 255, 255, 0.9)' }}><strong>Home Value:</strong> ${finalHomeValue.toLocaleString()}</p>
-            <p style={{ color: 'rgba(255, 255, 255, 0.9)' }}><strong>Net Cost:</strong> ${Math.round(buyingNetCost).toLocaleString()}</p>
-          </div>
-          <div>
-            <h4 style={{ color: 'rgba(96, 165, 250, 0.9)', marginBottom: '8px' }}>🏠 Renting Breakdown</h4>
-            <p style={{ color: 'rgba(255, 255, 255, 0.9)' }}><strong>Total Spent:</strong> ${totalRentingCosts.toLocaleString()}</p>
-            <p style={{ color: 'rgba(255, 255, 255, 0.9)' }}><strong>Investment Value:</strong> ${finalInvestmentValue.toLocaleString()}</p>
-            <p style={{ color: 'rgba(255, 255, 255, 0.9)' }}><strong>Net Cost:</strong> ${Math.round(rentingNetCost).toLocaleString()}</p>
-          </div>
-        </div>
-      </div>
-      
-      <p className="chart-description" style={{ marginTop: '16px' }}>
-        This shows your true cost after {timelineYears} years. <strong>Lower net cost = better financial choice!</strong>
-      </p>
     </div>
   );
 }

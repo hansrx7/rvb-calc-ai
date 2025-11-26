@@ -113,7 +113,7 @@ export function BreakEvenChart({ analysis }: BreakEvenChartProps) {
               }
               return [`$${value.toLocaleString()}`, name];
             }}
-            contentStyle={{ backgroundColor: 'rgba(30, 30, 40, 0.95)', border: '1px solid rgba(139, 92, 246, 0.5)', borderRadius: '8px', color: 'white' }}
+            contentStyle={{ backgroundColor: 'rgba(5, 8, 15, 0.85)', border: '1px solid rgba(124, 95, 196, 0.35)', borderRadius: '10px', color: '#f1f5f9', backdropFilter: 'blur(6px)' }}
           />
           <Legend wrapperStyle={{ color: 'rgba(255, 255, 255, 0.9)' }} />
           
@@ -123,30 +123,13 @@ export function BreakEvenChart({ analysis }: BreakEvenChartProps) {
           <Line 
             type="monotone" 
             dataKey="netWorthDifference" 
-            stroke="#8b5cf6" 
+            stroke="rgba(124, 95, 196, 0.65)" 
             strokeWidth={3}
             dot={false}
             name="Buying Advantage"
           />
         </LineChart>
       </ResponsiveContainer>
-      
-      <div style={{ marginTop: '20px', padding: '20px', background: 'rgba(30, 30, 40, 0.6)', borderRadius: '12px', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
-        <h4 style={{ marginBottom: '12px', color: 'rgba(255, 255, 255, 0.95)' }}>What This Shows:</h4>
-        <p style={{ marginBottom: '8px', lineHeight: '1.6', color: 'rgba(255, 255, 255, 0.9)' }}>
-          This chart shows the <strong>net worth difference</strong> between buying and renting over time.
-        </p>
-        <ul style={{ marginLeft: '20px', lineHeight: '1.8', color: 'rgba(255, 255, 255, 0.9)' }}>
-          <li><strong>Above zero:</strong> Buying is ahead (positive difference)</li>
-          <li><strong>Below zero:</strong> Renting is ahead (negative difference)</li>
-          <li><strong>Zero line:</strong> Break-even point where both options are equal</li>
-          <li><strong>Final value:</strong> Total advantage after {Math.ceil(timeline.length / 12)} years</li>
-        </ul>
-        <p style={{ marginTop: '12px', lineHeight: '1.6', color: 'rgba(255, 255, 255, 0.9)' }}>
-          <strong>Key insight:</strong> The break-even point shows when buying starts paying off. 
-          If you sell before this point, renting would have been better due to transaction costs.
-        </p>
-      </div>
     </div>
   );
 }

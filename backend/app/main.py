@@ -179,14 +179,15 @@ def analyze_finance(request: AnalysisRequest) -> AnalysisResponse:
                 sigma = fallback_sigma
                 print(f"[MC DEBUG] No ZIP code -> using fallback sigma={sigma:.4f} ({sigma*100:.2f}% annual volatility)")
             
+            runs = request.monteCarloRuns or 150
             # Run Monte Carlo simulation
-            print(f"[MC DEBUG] Running Monte Carlo simulation with {500} paths...")
+            print(f"[MC DEBUG] Running Monte Carlo simulation with {runs} paths...")
             paths = simulate_home_price_paths(
                 initial_price=initial_price,
                 annual_mu=mu,
                 annual_sigma=sigma,
                 years=years,
-                n_paths=500,
+                n_paths=runs,
             )
             print(f"[MC DEBUG] Generated {len(paths)} price paths, each with {len(paths[0]) if paths else 0} time steps")
             

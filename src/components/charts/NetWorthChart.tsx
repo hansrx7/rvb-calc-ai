@@ -47,13 +47,13 @@ export function NetWorthChart({ timeline }: NetWorthChartProps) {
           <Tooltip 
             formatter={(value: number) => `$${value.toLocaleString()}`}
             labelFormatter={(label) => `Year ${label}`}
-            contentStyle={{ backgroundColor: 'rgba(30, 30, 40, 0.95)', border: '1px solid rgba(139, 92, 246, 0.5)', borderRadius: '8px', color: 'white' }}
+            contentStyle={{ backgroundColor: 'rgba(5, 8, 15, 0.85)', border: '1px solid rgba(124, 95, 196, 0.35)', borderRadius: '10px', color: '#f1f5f9', backdropFilter: 'blur(6px)' }}
           />
           <Legend wrapperStyle={{ color: 'rgba(255, 255, 255, 0.9)' }} />
           <Line 
             type="monotone" 
             dataKey="buying" 
-            stroke="#8b5cf6" 
+            stroke="rgba(124, 95, 196, 0.65)" 
             strokeWidth={3}
             name="Buying"
             dot={false}
@@ -61,17 +61,13 @@ export function NetWorthChart({ timeline }: NetWorthChartProps) {
           <Line 
             type="monotone" 
             dataKey="renting" 
-            stroke="#60a5fa" 
+            stroke="rgba(80, 140, 210, 0.6)" 
             strokeWidth={3}
             name="Renting"
             dot={false}
           />
         </LineChart>
       </ResponsiveContainer>
-      <p className="chart-description">
-        Purple line = Your net worth if you buy the house<br/>
-        Blue line = Your net worth if you rent and invest the down payment
-      </p>
     </div>
   );
 }

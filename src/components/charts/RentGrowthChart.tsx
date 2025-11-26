@@ -31,15 +31,15 @@ export function RentGrowthChart({ timeline }: RentGrowthChartProps) {
         This shows how rent is expected to grow over time, based on local market trends and ML estimates. Lower rent growth favors renting.
       </p>
       
-      <div style={{ marginBottom: '16px', padding: '16px', background: 'rgba(139, 92, 246, 0.2)', borderRadius: '8px', border: '2px solid rgba(139, 92, 246, 0.5)' }}>
-        <p style={{ margin: 0, fontSize: '16px', color: 'rgba(255, 255, 255, 0.95)' }}>
+      <div style={{ marginBottom: '12px', padding: '12px', background: 'rgba(139, 92, 246, 0.2)', borderRadius: '8px', border: '1px solid rgba(139, 92, 246, 0.35)' }}>
+        <p style={{ margin: 0, fontSize: '15px', color: 'rgba(255, 255, 255, 0.95)', lineHeight: 1.4 }}>
           <strong>Rent grows {percentIncrease}%</strong> over {Math.ceil(timeline.length / 12)} years 
           (from <strong>${chartData[0].rent.toLocaleString()}/mo</strong> to <strong>${finalRent.toLocaleString()}/mo</strong>), 
           while your mortgage stays fixed at <strong>${monthlyMortgage.toLocaleString()}/mo</strong>
         </p>
       </div>
       
-      <ResponsiveContainer width="100%" height={400}>
+      <ResponsiveContainer width="100%" height={320}>
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
           <XAxis 
@@ -60,13 +60,13 @@ export function RentGrowthChart({ timeline }: RentGrowthChartProps) {
           <Tooltip 
             formatter={(value: number) => `$${value.toLocaleString()}/mo`}
             labelFormatter={(label) => `Year ${label}`}
-            contentStyle={{ backgroundColor: 'rgba(30, 30, 40, 0.95)', border: '1px solid rgba(139, 92, 246, 0.5)', borderRadius: '8px', color: 'white' }}
+            contentStyle={{ backgroundColor: 'rgba(5, 8, 15, 0.85)', border: '1px solid rgba(124, 95, 196, 0.35)', borderRadius: '10px', color: '#f1f5f9', backdropFilter: 'blur(6px)' }}
           />
           <Legend wrapperStyle={{ color: 'rgba(255, 255, 255, 0.9)' }} />
           <Line 
             type="monotone" 
             dataKey="rent" 
-            stroke="#60a5fa" 
+            stroke="rgba(80, 140, 210, 0.65)" 
             strokeWidth={3}
             name="Monthly Rent"
             dot={false}
@@ -74,7 +74,7 @@ export function RentGrowthChart({ timeline }: RentGrowthChartProps) {
           <Line 
             type="monotone" 
             dataKey="mortgage" 
-            stroke="#8b5cf6" 
+            stroke="rgba(124, 95, 196, 0.65)" 
             strokeWidth={3}
             name="Mortgage Payment"
             dot={false}
@@ -82,26 +82,6 @@ export function RentGrowthChart({ timeline }: RentGrowthChartProps) {
           />
         </LineChart>
       </ResponsiveContainer>
-      
-      <div style={{ marginTop: '20px', padding: '20px', background: 'rgba(30, 30, 40, 0.6)', borderRadius: '12px', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
-        <h4 style={{ marginBottom: '12px', color: 'rgba(255, 255, 255, 0.95)' }}>What This Shows:</h4>
-        <p style={{ marginBottom: '8px', lineHeight: '1.6', color: 'rgba(255, 255, 255, 0.9)' }}>
-          This illustrates the <strong>"rent trap"</strong> - rent increases every year (typically 3-4%), 
-          while your mortgage payment stays the same for {Math.ceil(timeline.length / 12)} years.
-        </p>
-        <ul style={{ marginLeft: '20px', lineHeight: '1.8', color: 'rgba(255, 255, 255, 0.9)' }}>
-          <li><strong>Blue line (Rent):</strong> Climbs steadily due to inflation</li>
-          <li><strong>Purple line (Mortgage):</strong> Flat - locked in at today's rate</li>
-        </ul>
-        <p style={{ marginTop: '12px', padding: '12px', background: 'rgba(139, 92, 246, 0.2)', borderRadius: '8px', margin: 0, color: 'rgba(255, 255, 255, 0.95)' }}>
-          <strong>Key insight:</strong> Even if buying costs more TODAY, it might be cheaper TOMORROW 
-          because your housing cost is locked in while rent keeps rising!
-        </p>
-      </div>
-      
-      <p className="chart-description" style={{ marginTop: '16px' }}>
-        Rent grows at 3.5% annually. Your mortgage stays fixed.
-      </p>
     </div>
   );
 }

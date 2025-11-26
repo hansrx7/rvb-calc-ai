@@ -1,7 +1,13 @@
 import type { AnalysisResponse, ScenarioInputs, BreakEvenHeatmapPoint, MonteCarloResponse, SensitivityRequest, SensitivityResult, ScenarioRequest, ScenarioResult } from '../../types/calculator';
 import { apiFetch } from './client';
 
-export function analyzeScenario(inputs: ScenarioInputs, includeTimeline = false, zipCode?: string, includeMonteCarlo = false): Promise<AnalysisResponse> {
+export function analyzeScenario(
+  inputs: ScenarioInputs,
+  includeTimeline = false,
+  zipCode?: string,
+  includeMonteCarlo = false,
+  monteCarloRuns?: number
+): Promise<AnalysisResponse> {
   // Very long timeout for analyze endpoint (180 seconds) - ML predictions and timeline calculations can take time
   // ML model loading (first time) + predictions + 120 months of calculations = can take 60-120 seconds
   return apiFetch<AnalysisResponse>('/api/finance/analyze', {
@@ -9,7 +15,7 @@ export function analyzeScenario(inputs: ScenarioInputs, includeTimeline = false,
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ inputs, includeTimeline, zipCode, includeMonteCarlo })
+    body: JSON.stringify({ inputs, includeTimeline, zipCode, includeMonteCarlo, monteCarloRuns })
   }, 180000); // 180 second timeout (3 minutes) - ML + timeline calculations are computationally intensive
 }
 

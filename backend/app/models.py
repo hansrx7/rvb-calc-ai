@@ -116,6 +116,7 @@ class AnalysisRequest(BaseModel):
     includeTimeline: bool = False
     zipCode: Optional[str] = None
     includeMonteCarlo: bool = False  # Make Monte Carlo optional - only run when explicitly requested
+    monteCarloRuns: Optional[int] = None
 
 
 class TimelinePoint(BaseModel):

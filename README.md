@@ -155,11 +155,55 @@ All calculations use industry-standard formulas:
 
 ### Troubleshooting
 
+#### "Sorry, I'm having trouble connecting" Error
+
+This error means the frontend can't reach the backend. Follow these steps:
+
+1. **Check if backend is running:**
+   - Open a terminal and verify you see: `Uvicorn running on http://127.0.0.1:8000`
+   - If not, start it:
+     ```bash
+     cd backend
+     source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+     uvicorn app.main:app --reload --port 8000
+     ```
+
+2. **Test backend health:**
+   - Open `http://localhost:8000/health` in your browser
+   - Should return: `{"status":"ok"}`
+   - If it doesn't load, the backend isn't running
+
+3. **Check browser console:**
+   - Open DevTools (F12) → Console tab
+   - Look for red errors like `Failed to fetch` or `NetworkError`
+   - These indicate the frontend can't reach the backend
+
+4. **Verify backend URL:**
+   - Check if `.env` file exists in root with:
+     ```env
+     VITE_BACKEND_URL=http://localhost:8000
+     ```
+   - If missing, create it (or frontend defaults to `http://localhost:8000`)
+
+5. **Check OpenAI API key:**
+   - Ensure `backend/.env` exists with:
+     ```env
+     OPENAI_API_KEY=sk-...
+     ```
+   - Without it, backend may fail on AI calls
+
+6. **Verify both terminals are running:**
+   - **Terminal 1:** Backend (`uvicorn app.main:app --reload --port 8000`)
+   - **Terminal 2:** Frontend (`npm run dev`)
+
+#### Other Common Issues
+
 | Symptom | Likely Cause | Fix |
 | --- | --- | --- |
-| `Sorry, I'm having trouble connecting right now. Can you try again?` | Backend is not running or OpenAI call failed | Restart backend (`uvicorn ...`). If logs show an OpenAI error, confirm `backend/.env` contains a valid key. |
 | Response begins with `(Mock AI)` | Backend is running in fallback mode (no key or API error) | Add/verify `OPENAI_API_KEY` in `backend/.env` and restart the backend. |
 | `Address already in use` when starting backend | Previous `uvicorn` still running | Stop old process (`Ctrl+C` or `pkill -f "uvicorn backend.app.main"`). |
+| `Module not found` errors | Dependencies not installed | Run `npm install` (frontend) or `pip install -r requirements.txt` (backend). |
+| `Python not found` | Python not installed or not in PATH | Install Python 3.11+ and ensure it's in your PATH. |
 | Git push blocked by secret scanning | `.env` accidentally staged | `git reset --soft HEAD~1`, remove `.env` from staging, recommit. |
 
 ## 📖 How to Use

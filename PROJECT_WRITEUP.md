@@ -34,6 +34,335 @@ RentVsBuy.ai is a full-stack web application that helps users make informed deci
 
 ---
 
+## User Interface & Experience (UI/UX)
+
+### Overall Structure
+
+The application features a **two-tab interface** with a modern, dark-themed design:
+
+#### **Layout Architecture**
+- **Background**: Animated aurora effect with 8 colorful blurbs (purple, blue, yellow, green, pink, violet) that move slowly across the screen
+- **Main Container**: Centered, responsive layout with max-width constraints
+- **Help Button**: Fixed position (top-right), always visible, purple/blue gradient button that triggers interactive onboarding tour
+- **Two-Tab System**: 
+  - **💬 Chat Tab**: Conversational interface with AI
+  - **📊 All Charts Tab**: Grid view of all charts with interactive controls
+- **Top Navigation Bar**: Contains tab buttons, Save Chat, Restart, and Scenario toggle buttons
+- **Reference Box**: Draggable scenario card showing current inputs (can be toggled on/off)
+
+#### **Onboarding Tour System**
+- **Auto-start**: Tour automatically begins for first-time users (stored in localStorage)
+- **Manual Start**: "Help" button in top-right corner allows restarting tour anytime
+- **Tour Features**:
+  - Interactive step-by-step guide using react-joyride
+  - Highlights key UI elements with spotlight effect
+  - Keyboard navigation (right arrow to advance)
+  - Progress indicator showing current step
+  - Skip option available
+  - Smooth scrolling to each highlighted element
+- **Tour Steps**: Covers Help button, ZIP input, scenario card, Save button, Restart button, scenario toggle, charts area, advanced charts toggle, and chat area
+
+#### **Visual Design Elements**
+- **Color Scheme**: Dark theme with purple/blue gradients (`rgba(139, 92, 246, ...)` and `rgba(59, 130, 246, ...)`)
+- **Typography**: Clean, modern fonts with varying weights for hierarchy
+- **Transitions**: Smooth animations for chart appearances, tab switches, and state changes
+- **Tooltips**: Translucent dark tooltips (`rgba(5,8,15,0.85)`) with lavender borders for charts
+- **Chart Colors**: Dull, translucent purple (`rgba(124,95,196,0.55-0.65)`) and blue (`rgba(80,140,210,0.5-0.6)`) for visual consistency
+
+---
+
+### Chat Tab Interface
+
+#### **Chat Container Structure**
+1. **Messages Area** (`messages-container`):
+   - Scrollable container with auto-scroll to bottom when new messages/charts appear
+   - Messages appear with staggered delays for natural conversation flow
+   - Each message can contain:
+     - Text content (user or assistant)
+     - Recommendation cards (special message type)
+     - Charts (rendered inline after message)
+
+2. **Message Types**:
+   - **User Messages**: Right-aligned, distinct styling
+   - **Assistant Messages**: Left-aligned with AI avatar/indicator
+   - **Recommendation Cards**: Special card component with verdict (BUY/RENT), savings, reasoning, and action buttons
+
+3. **Loading States**:
+   - **AI Thinking**: Typing dots animation
+   - **Analysis Running**: Progress bar with percentage and stage description
+   - **Chart Generation**: Individual progress bars per chart in All Charts tab
+
+4. **Chat Input** (`ChatInput`):
+   - Text input at bottom of chat
+   - Send button
+   - Auto-focus for quick typing
+
+5. **Footer**: "RentVsBuy.ai v1.0 • Built with AI-powered insights"
+
+6. **Chart Navigation Bar** (below chat, always visible):
+   - **When Charts Not Ready**: Shows placeholder message "Charts will appear here after you complete your scenario"
+   - **When Charts Ready**: Displays two sections:
+     - **Core Charts Section**: Always visible grid of 4 chart buttons:
+       - Monthly Cost Breakdown
+       - Net Worth Comparison
+       - Equity Buildup
+       - Total Cost Comparison
+     - **Advanced Analysis Section**: Collapsible section with toggle button
+       - Header: "Advanced Analysis" with subtitle "Market risk, sensitivity, tax implications"
+       - Description text: "These charts show risk, volatility, break-even points, and more detailed scenarios..."
+       - Grid of 10+ advanced chart buttons (Monte Carlo, Break-Even, Heatmaps, etc.)
+   - **Chart Button Structure**: Each button contains:
+     - Icon (emoji) on left
+     - Chart name (bold)
+     - Brief description (small text)
+   - **Button Behavior**: Clicking a chart button sends a message to AI requesting that specific chart
+
+7. **Location Card** (appears when ZIP code detected):
+   - Shows location information (city, state, ZIP)
+   - Displays market data (median home price, average rent)
+   - Two action buttons:
+     - **"Use this data"**: Accepts location data and populates scenario
+     - **"Use my own values"**: Allows user to override with custom inputs
+   - Appears as a special message in chat flow
+
+8. **Monte Carlo Progress Card** (special loading state):
+   - Appears when Monte Carlo simulation is running
+   - Shows progress percentage
+   - Displays current stage ("Starting Monte Carlo simulation...", etc.)
+   - Purple/blue gradient progress bar
+   - Positioned prominently in chat area
+
+9. **Modals**:
+   - **Restart Confirmation Modal**: 
+     - Appears when user clicks "Restart"
+     - Asks "Start Over?" with confirmation message
+     - Two buttons: "Cancel" and "Yes, Restart"
+   - **Save Progress Modal**:
+     - Appears during PDF generation
+     - Circular progress indicator (0-100%)
+     - "Generating PDF..." label
+     - Green progress ring animation
+
+#### **How Charts Appear in Chat**
+
+**Chart Rendering Flow**:
+1. User requests chart via natural language ("show me net worth" or "break even chart")
+2. AI extracts chart intent and responds with explanation text
+3. Chart component renders **directly below the assistant's message**
+4. Chart uses **snapshot data stored with the message** (ensures charts don't change when new scenarios are calculated)
+5. Charts appear with smooth fade-in animation
+
+**Chart Display Features**:
+- Each chart has a concise caption: "This shows..."
+- Charts maintain their own data snapshots (independent of current scenario)
+- Multiple charts can appear in sequence as user requests them
+- Charts scroll into view automatically when rendered
+
+#### **Recommendation Cards**
+
+**Appearance**:
+- Large, prominent card with colored header (green for RENT, blue for BUY)
+- Icon (🏢 for rent, 🏠 for buy)
+- **Verdict**: "RECOMMENDATION: RENT" or "RECOMMENDATION: BUY" in bold
+- **Savings/Gains**: Large dollar amount with timeline context
+- **Details Section**:
+  - Monthly difference (buying vs renting costs)
+  - Break-even year (if applicable)
+  - Reasoning explanation
+- **Action Buttons**:
+  - "See Why" → Shows detailed breakdown
+  - "Try Different Numbers" → Opens edit mode
+
+**Behavior**:
+- Appears automatically after initial analysis completes
+- **New recommendation card appears** after user saves changes to scenario
+- **Each recommendation persists in chat history** (stored in message, not shared state)
+- Cards remain visible for comparison across multiple scenarios
+
+#### **Scenario Reference Box**
+
+**Location**: Top-right area (draggable, can be toggled on/off)
+
+**Display Modes**:
+
+1. **View Mode** (default):
+   - Shows current scenario inputs:
+     - Home Price
+     - Monthly Rent
+     - Down Payment %
+     - Timeline (years)
+   - **ML-Predicted Values** (when using ZIP code):
+     - Home Appreciation Rate (with "ML-predicted" badge)
+     - Rent Growth Rate (with "ML-predicted" badge)
+     - Investment Return Rate
+   - **Location Info**: City, State, ZIP code (if using location data)
+   - **Data Source Indicators**: Shows whether values are from ZIP data, custom input, or defaults
+   - "Edit" button to enter edit mode
+
+2. **Edit Mode**:
+   - Input fields become editable (text inputs for numbers)
+   - Values can be modified directly
+   - **Cancel** button (discards changes)
+   - **Save Changes** button (recalculates all charts with new values)
+   - After saving:
+     - All charts recalculate with new inputs
+     - New recommendation card appears
+     - AI acknowledges changes with message
+
+**Visual Indicators**:
+- **ML Values**: Highlighted with special styling/badges (shows "ML-predicted" label)
+- **Data Source**: Color-coded or labeled (ZIP vs Custom vs Default)
+- **Location Display**: When using ZIP data, shows "🏙️ City, State" header with "Based on local market data" subtitle
+- **Placeholder State**: Shows "Your scenario will appear here once you enter your ZIP code or provide home price and rent" when no data
+- **Edit State**: Visual distinction when in edit mode (input fields become editable)
+- **Close Button**: X button in header to hide reference box
+- **Section Headers**: "Step 2: Your scenario" with descriptive subtitle
+
+---
+
+### All Charts Tab Interface
+
+#### **Layout Structure**
+
+1. **Assumption Controls Panel** (top of tab, collapsible):
+   - **Header**: "⚙️ Adjust Assumptions" with expand/collapse toggle
+   - **When Expanded**:
+     - 4 interactive sliders:
+       - **Interest Rate** (3% - 10%)
+       - **Home Appreciation** (-2% - 8%)
+       - **Rent Growth** (0% - 8%)
+       - **Investment Return** (2% - 12%)
+     - Each slider shows current value as percentage
+     - **Real-time Updates**: All charts update instantly when sliders move
+     - **Reset Button**: Returns to original assumptions
+     - **Hint Text**: Explains that charts update in real-time
+   - **Purpose**: Allows users to explore "what if" scenarios without re-entering data
+
+2. **Charts Grid**:
+   - **Two Sections**:
+     - **Core Charts**: Always visible (Monthly Cost, Net Worth, Equity, Total Cost)
+     - **Advanced Analysis**: Collapsible section (Monte Carlo, Break-Even, Heatmaps, etc.)
+   - **Grid Layout**: Responsive grid (auto-fit, min 500px per chart)
+   - **Chart Cards**: Each chart in its own card with:
+     - Header with chart title
+     - Chart content area
+     - Consistent styling (dark background, purple border)
+
+3. **Chart States**:
+
+   **Placeholder State** (before data available):
+   - Icon (📊)
+   - Chart title
+   - Message: "Chart will start generating once all the data is provided"
+
+   **Loading State** (data available, chart generating):
+   - Chart title
+   - Progress percentage
+   - Progress bar (purple/blue gradient)
+   - Loading message (e.g., "Running Monte Carlo simulation...")
+
+   **Complete State** (chart rendered):
+   - Full chart visualization
+   - Concise caption: "This shows..."
+   - Interactive tooltips on hover
+
+#### **Chart Display Features**
+
+- **Consistent Dimensions**: All charts have standardized heights (320px-360px)
+- **Scrollable Content**: Charts with long content (Scenario Overlay) have scrollbars
+- **Tooltip Styling**: Dark, translucent tooltips with lavender accents
+- **Color Consistency**: Dull, translucent purple and blue throughout
+- **Responsive**: Grid adapts to screen size (1 column on mobile, 2+ on desktop)
+
+---
+
+### Data Flow & State Management
+
+#### **Scenario Data Flow**
+
+1. **Initial Input**:
+   - User provides data via chat (ZIP code, home price, rent, etc.)
+   - AI extracts structured data
+   - Data stored in `userData` state
+
+2. **Analysis Trigger**:
+   - When all required data collected, analysis runs
+   - Backend returns `AnalysisResult` with timeline and metrics
+   - Frontend stores in `unifiedAnalysisResult` state
+
+3. **ML Values Display**:
+   - ML-predicted rates extracted from `unifiedAnalysisResult`
+   - Displayed in reference box with "ML-predicted" badges
+   - Override default/timeline-based rates
+
+4. **Chart Generation**:
+   - Charts use data from `unifiedAnalysisResult.timeline`
+   - Each chart request stores snapshot in message
+   - Charts remain independent of future recalculations
+
+5. **Edit & Recalculate**:
+   - User edits values in reference box
+   - On save, new analysis runs
+   - New `unifiedAnalysisResult` replaces old
+   - All charts in All Charts tab update
+   - New recommendation card appears in chat
+
+#### **State Persistence**
+
+- **Message History**: All messages, charts, and recommendations stored in `messages` array
+- **Chart Snapshots**: Each chart message includes `snapshotData` to preserve chart state
+- **Recommendation History**: Each recommendation stored in its message (not shared state)
+- **Scenario State**: Current inputs in `userData`, analysis in `unifiedAnalysisResult`
+
+---
+
+### Interactive Features
+
+#### **Auto-Scroll**
+- Chat automatically scrolls to bottom when:
+  - New messages added
+  - Charts appear
+  - Loading state changes
+- Smooth scroll behavior for better UX
+
+#### **Tab Switching**
+- Seamless transition between Chat and All Charts tabs
+- State preserved when switching
+- Charts tab shows all available charts in grid format
+- Assumption controls only visible in Charts tab
+
+#### **Edit Mode**
+- One-click entry to edit scenario
+- Live value updates
+- Cancel option to discard changes
+- Save triggers full recalculation
+
+#### **Chart Interactions**
+- Hover tooltips show detailed data points
+- Responsive to screen size
+- Exportable via PDF (Save Chat button)
+- Chart buttons trigger AI requests (sends message to chat)
+- Charts appear inline after AI response
+
+#### **Chart Button Navigation (Chat Tab)**
+- **Core Charts**: 4 buttons always visible when charts ready
+- **Advanced Charts**: Collapsible section with toggle (▶/▼ indicator)
+- **Button Layout**: Grid layout with icons, labels, and descriptions
+- **Disabled State**: Buttons appear but are non-interactive until charts ready
+- **Visual Feedback**: Buttons have hover effects and active states
+
+---
+
+### Visual Hierarchy
+
+1. **Primary Actions**: Tab buttons, Save, Restart (top navigation)
+2. **Secondary Actions**: Scenario toggle, Edit button (reference box)
+3. **Content**: Messages, charts, recommendations (main area)
+4. **Input**: Chat input (bottom, always visible)
+5. **Metadata**: Footer, loading indicators (subtle, non-intrusive)
+
+---
+
 ## User Flows
 
 ### Flow 1: ZIP Code Entry (Primary Flow)
