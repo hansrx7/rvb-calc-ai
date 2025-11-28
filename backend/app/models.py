@@ -1,7 +1,7 @@
 
 """Pydantic models for finance analysis inputs and outputs."""
 
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -228,3 +228,19 @@ class MonteCarloSummary(BaseModel):
     percentile10: float
     percentile50: float
     percentile90: float
+
+
+class ChartInsightConversationMessage(BaseModel):
+    question: str
+    answer: str
+
+
+class ChartInsightRequest(BaseModel):
+    chartName: str
+    chartData: Any
+    question: str
+    conversation: Optional[List[ChartInsightConversationMessage]] = None
+
+
+class ChartInsightResponse(BaseModel):
+    answer: str

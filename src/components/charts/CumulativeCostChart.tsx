@@ -12,7 +12,7 @@ export function CumulativeCostChart({ data }: CumulativeCostChartProps) {
       <p className="chart-caption" style={{ marginBottom: '16px', fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.5' }}>
         This shows how your total spending accumulates over time for buying versus renting. Lower lines are better.
       </p>
-      <ResponsiveContainer width="100%" height={400}>
+      <ResponsiveContainer width="100%" height={300}>
         <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
           <XAxis dataKey="month" stroke="rgba(255, 255, 255, 0.7)" />

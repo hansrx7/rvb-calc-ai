@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 from typing import List, Literal, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from .config import get_settings
@@ -13,7 +15,8 @@ from .finance.calculator import (
     calculate_analysis, calculate_cash_flow, calculate_cumulative_costs, calculate_liquidity_timeline,
     calculate_tax_savings, calculate_sensitivity, calculate_scenarios, calculate_heatmap, calculate_monte_carlo)
 from .models import (
-    AnalysisRequest, AnalysisResponse, TimelinePoint, ScenarioRequest, SensitivityRequest, HeatmapRequest, MonteCarloRequest, HomePricePathSummary
+    AnalysisRequest, AnalysisResponse, TimelinePoint, ScenarioRequest, SensitivityRequest,
+    HeatmapRequest, MonteCarloRequest, HomePricePathSummary, ChartInsightRequest, ChartInsightResponse
 )
 from .services.openai_service import OpenAIService
 
@@ -259,6 +262,101 @@ def tax_savings(inputs: dict) -> list:
 @app.post(f"{settings.api_prefix}/finance/monte-carlo")
 def monte_carlo_endpoint(req: MonteCarloRequest) -> dict:
     return calculate_monte_carlo(req.inputs, req.runs)
+
+
+@app.post(f"{settings.api_prefix}/finance/chart-insight")
+def chart_insight_endpoint(
+    request: ChartInsightRequest, openai_service: OpenAIService = Depends(get_openai_service)
+):
+    """Generate a natural-language explanation for a specific chart + dataset (streaming)."""
+    try:
+        chart_payload = json.dumps(
+            request.chartData,
+            default=lambda obj: getattr(obj, "__dict__", str(obj)),
+            ensure_ascii=False,
+        )
+    except (TypeError, ValueError):
+        chart_payload = str(request.chartData)
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a rent-vs-buy financial analyst helping someone new to home buying. "
+                "Be concise—aim for 40-60 words maximum. "
+                "CRITICAL: When the user says 'the chart shows X' or asks 'what does the chart show', they're referring to what they VISUALLY SEE. "
+                "The chart may display calculated values (like differences between buy/rent, percentages, or derived metrics) that aren't directly in the raw dataset. "
+                "If the user provides a specific number they see on the chart, ACKNOWLEDGE IT and explain it. Don't contradict what they're seeing. "
+                "Calculate differences, percentages, or other derived values from the dataset when needed to match what the chart displays. "
+                "When the user asks about a specific year or point, look at that exact data point and calculate any needed derived values. "
+                "If the user corrects you, acknowledge it and recalculate based on what they're seeing. "
+                "If the user expresses confusion, simplify: use fewer numbers, focus on concepts. "
+                "Always use simple language. Be accurate and acknowledge what the user sees."
+            ),
+        },
+    ]
+    
+    # Add conversation history if present
+    if request.conversation:
+        for msg in request.conversation:
+            messages.append({
+                "role": "user",
+                "content": f"Question: {msg.question}",
+            })
+            messages.append({
+                "role": "assistant",
+                "content": msg.answer,
+            })
+    
+    # Detect if user is confused
+    question_lower = request.question.lower()
+    is_confused = any(word in question_lower for word in ['lost', 'confused', "don't understand", "don't get", 'too many', 'overwhelming', 'complicated', 'hard to understand'])
+    
+    # Detect if user is correcting the AI or referring to what chart shows
+    is_correction = any(word in question_lower for word in ['no,', 'actually', 'wrong', 'incorrect', 'that\'s not', "that's not", 'you said', 'but', 'the chart shows', 'chart says', 'chart displays'])
+    
+    # Add current question
+    guidance = "Give a brief, clear answer (40-60 words max)."
+    if is_confused:
+        guidance += " The user is confused—simplify! Focus on the main concept, use minimal numbers, explain the big picture idea instead of specific figures."
+    elif is_correction:
+        guidance += " The user is telling you what they see on the chart or correcting you. ACKNOWLEDGE what they're seeing. Calculate differences or derived values from the dataset to match what the chart displays. Don't contradict them—explain what they're seeing."
+    else:
+        guidance += " Analyze the data. If the user asks what the chart shows, calculate any needed derived values (differences, percentages) to match the visual representation. Be accurate."
+    
+    messages.append({
+        "role": "user",
+        "content": (
+            f"Chart Name: {request.chartName}\n"
+            f"Dataset JSON: {chart_payload}\n"
+            f"Question: {request.question}\n"
+            f"{guidance}\n"
+            "Remember: The chart may show calculated values (like differences between buy/rent). Calculate these from the dataset to match what the user sees visually."
+        ),
+    })
+
+    def generate():
+        try:
+            for chunk in openai_service.chat_completion_stream(
+                model="gpt-4o-mini",
+                messages=messages,
+                temperature=0.4,
+                max_tokens=100,
+            ):
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 @app.post(f"{settings.api_prefix}/ai/chat")
 def chat_completion(

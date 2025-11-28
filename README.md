@@ -213,6 +213,7 @@ This error means the frontend can't reach the backend. Follow these steps:
 1. **Start a conversation**
    - The AI will greet you and ask about your situation
    - **Option A:** Mention your ZIP code (e.g., "I'm in 92129") to get local data
+     - The Phase 1 card auto-fills the “Current focus” snapshot—no buttons or inputs required
    - **Option B:** Provide your own values directly
    - Four key pieces of information needed:
      - Home price (e.g., "$500,000" or "500k")
@@ -262,16 +263,15 @@ This error means the frontend can't reach the backend. Follow these steps:
 
 #### 📍 ZIP Code Integration
 **How to use:**
-- **Mention any ZIP code** in your first message: "I'm in 90210" or "Looking at 78717"
-- **Choose your data source:**
-  - Click "Use this data" to use local market values
-  - Click "Use my own values" to enter custom numbers
+- **Mention any ZIP code** in your chat: "I'm in 90210" or "Looking at 78717"
+- The Phase 1 “Current focus” card immediately fills with that market’s snapshot
+- Just continue with your down payment % and timeline—no extra buttons needed
 - **Local data includes:**
   - Median home price for your area
   - Average rent for your ZIP code
   - Property tax rate for your state
   - Local appreciation and rent growth rates
-- **Switch locations mid-conversation** to compare different areas
+- **Switch locations mid-conversation** by mentioning a new ZIP or city name
 
 #### ✏️ Editable Input Reference Box
 **How to use:**

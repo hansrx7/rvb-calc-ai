@@ -1,5 +1,5 @@
 import type { AnalysisResponse, ScenarioInputs, BreakEvenHeatmapPoint, MonteCarloResponse, SensitivityRequest, SensitivityResult, ScenarioRequest, ScenarioResult } from '../../types/calculator';
-import { apiFetch } from './client';
+import { apiFetch, API_BASE_URL } from './client';
 
 export function analyzeScenario(
   inputs: ScenarioInputs,
@@ -57,6 +57,96 @@ export function fetchScenarios(request: ScenarioRequest): Promise<ScenarioResult
     },
     body: JSON.stringify(request)
   });
+}
+
+export interface ChartInsightPayload {
+  chartName: string;
+  chartData: unknown;
+  question: string;
+  conversation?: Array<{ question: string; answer: string }>;
+}
+
+export interface ChartInsightResponse {
+  answer: string;
+}
+
+export function fetchChartInsight(payload: ChartInsightPayload): Promise<ChartInsightResponse> {
+  return apiFetch<ChartInsightResponse>('/api/finance/chart-insight', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
+export function fetchChartInsightStream(
+  payload: ChartInsightPayload,
+  onChunk: (chunk: string) => void,
+  onError?: (error: Error) => void,
+  onComplete?: () => void
+): () => void {
+  const controller = new AbortController();
+  
+  fetch(`${API_BASE_URL}/api/finance/chart-insight`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+    signal: controller.signal,
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        throw new Error(`Request failed: ${response.status}`);
+      }
+      
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body');
+      }
+      
+      const decoder = new TextDecoder();
+      let buffer = '';
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') {
+              onComplete?.();
+              return;
+            }
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.chunk) {
+                onChunk(parsed.chunk);
+              } else if (parsed.error) {
+                onError?.(new Error(parsed.error));
+                return;
+              }
+            } catch (e) {
+              // Skip malformed JSON
+            }
+          }
+        }
+      }
+      onComplete?.();
+    })
+    .catch((error) => {
+      if (error.name !== 'AbortError') {
+        onError?.(error);
+      }
+    });
+  
+  return () => controller.abort();
 }
 
 export interface HeatmapParams {

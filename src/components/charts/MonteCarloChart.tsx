@@ -57,12 +57,6 @@ export function MonteCarloChart({ monteCarloHomePrices }: MonteCarloChartProps) 
     lastPoint: chartData[chartData.length - 1]
   });
 
-  const finalYear = chartData[chartData.length - 1]?.year ?? 0;
-  const initialPrice = chartData[0]?.p50 ?? 0;
-  const finalPriceP50 = chartData[chartData.length - 1]?.p50 ?? 0;
-  const priceChange = finalPriceP50 - initialPrice;
-  const priceChangePct = initialPrice > 0 ? ((priceChange / initialPrice) * 100) : 0;
-
   return (
     <div className="chart-container">
       <h3 className="chart-title">Simulated Home Value Range</h3>
@@ -70,7 +64,7 @@ export function MonteCarloChart({ monteCarloHomePrices }: MonteCarloChartProps) 
         This shows best, typical, and worst-case home values over time based on ML estimates and market volatility. The shaded band is the range; the middle line is the typical path.
       </p>
       
-      <ResponsiveContainer width="100%" height={400}>
+      <ResponsiveContainer width="100%" height={300}>
         <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
           <defs>
             <linearGradient id="colorBand" x1="0" y1="0" x2="0" y2="1">

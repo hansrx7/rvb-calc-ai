@@ -24,7 +24,7 @@ export function NetWorthChart({ timeline }: NetWorthChartProps) {
       <p className="chart-caption" style={{ marginBottom: '16px', fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.5' }}>
         This shows how your net worth changes over time if you buy versus rent. Higher lines are better.
       </p>
-      <ResponsiveContainer width="100%" height={400}>
+      <ResponsiveContainer width="100%" height={300}>
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
           <XAxis 

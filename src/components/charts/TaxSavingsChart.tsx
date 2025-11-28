@@ -12,7 +12,7 @@ export function TaxSavingsChart({ data }: TaxSavingsChartProps) {
       <p className="chart-caption" style={{ marginBottom: '16px', fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.5' }}>
         This shows estimated tax savings from owning a home versus renting. Higher bars mean more tax savings (better).
       </p>
-      <ResponsiveContainer width="100%" height={320}>
+      <ResponsiveContainer width="100%" height={280}>
         <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
           <XAxis dataKey="year" stroke="rgba(255, 255, 255, 0.7)" />

@@ -269,10 +269,62 @@ body {
 
 .charts-tab-container {
   flex: 1;
-  overflow-y: auto;
-  padding: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+  padding: 12px 4px;
   background: rgba(10, 13, 20, 0.95);
+  height: calc(100vh - 80px);
+  overflow-y: auto;
 }
+
+.charts-grid-wrapper {
+  flex: 1;
+  display: flex;
+  justify-content: flex-start;
+  padding-bottom: 20px;
+  width: 100%;
+}
+
+.charts-panel {
+  width: 100%;
+  max-width: 100%;
+  background: rgba(7, 10, 18, 0.92);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 28px;
+  padding: 12px 8px;
+  box-shadow: 0 20px 60px rgba(5, 8, 15, 0.65);
+}
+
+.assumption-controls-column {
+  width: 320px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 90px;
+  align-self: flex-start;
+}
+
+@media (max-width: 1200px) {
+  .charts-tab-container {
+    flex-direction: column;
+    padding: 12px 4px;
+  }
+
+  .charts-grid-wrapper {
+    width: 100%;
+  }
+
+  .assumption-controls-column {
+    width: 100%;
+    position: static;
+    margin-top: 24px;
+  }
+
+  .charts-panel {
+    padding: 12px 8px 16px;
+  }
+}
+
 
 .save-button {
   padding: 8px 16px;

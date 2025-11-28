@@ -10,6 +10,12 @@ interface AssumptionControlsProps {
     rentGrowthRate: number;
     investmentReturnRate: number;
   };
+  currentValues?: {
+    interestRate: number;
+    homeAppreciationRate: number;
+    rentGrowthRate: number;
+    investmentReturnRate: number;
+  };
   onAssumptionsChange: (values: {
     interestRate: number;
     homeAppreciationRate: number;
@@ -18,14 +24,14 @@ interface AssumptionControlsProps {
   }) => void;
 }
 
-export function AssumptionControls({ initialValues, onAssumptionsChange }: AssumptionControlsProps) {
-  const [values, setValues] = useState(initialValues);
+export function AssumptionControls({ initialValues, currentValues, onAssumptionsChange }: AssumptionControlsProps) {
+  const [values, setValues] = useState(currentValues ?? initialValues);
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Update local state when initial values change
   useEffect(() => {
-    setValues(initialValues);
-  }, [initialValues]);
+    setValues(currentValues ?? initialValues);
+  }, [initialValues, currentValues]);
 
   const handleChange = (key: keyof typeof values, newValue: number) => {
     const updated = { ...values, [key]: newValue };

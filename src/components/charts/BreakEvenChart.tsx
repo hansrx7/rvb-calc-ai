@@ -86,7 +86,7 @@ export function BreakEvenChart({ analysis }: BreakEvenChartProps) {
         </p>
       </div>
       
-      <ResponsiveContainer width="100%" height={400}>
+      <ResponsiveContainer width="100%" height={300}>
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
           <XAxis 

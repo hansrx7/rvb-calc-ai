@@ -39,7 +39,7 @@ export function RentGrowthChart({ timeline }: RentGrowthChartProps) {
         </p>
       </div>
       
-      <ResponsiveContainer width="100%" height={320}>
+      <ResponsiveContainer width="100%" height={280}>
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
           <XAxis 

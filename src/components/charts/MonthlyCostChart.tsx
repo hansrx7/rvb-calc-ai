@@ -39,20 +39,6 @@ export function MonthlyCostChart({ timeline }: MonthlyCostChartProps) {
     }
   ];
   
-  // Breakdown data for tooltip
-  const buyingBreakdown = [
-    { label: 'Mortgage', value: buyingCosts.mortgage },
-    { label: 'Property Tax', value: buyingCosts.propertyTax },
-    { label: 'Home Insurance', value: buyingCosts.insurance },
-    { label: 'HOA', value: buyingCosts.hoa },
-    { label: 'Maintenance', value: buyingCosts.maintenance }
-  ];
-  
-  const rentingBreakdown = [
-    { label: 'Rent', value: rentingCosts.rent },
-    { label: 'Renter\'s Insurance', value: rentingCosts.insurance }
-  ];
-  
   return (
     <div className="chart-container">
       <h3 className="chart-title">Monthly Cost Comparison</h3>
@@ -60,7 +46,7 @@ export function MonthlyCostChart({ timeline }: MonthlyCostChartProps) {
         This compares your monthly cost of buying (mortgage + taxes + other costs) versus renting. Lower bars are better.
       </p>
       
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={280}>
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
           <XAxis dataKey="name" stroke="rgba(255, 255, 255, 0.7)" />

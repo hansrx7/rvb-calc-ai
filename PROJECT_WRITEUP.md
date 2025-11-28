@@ -117,13 +117,11 @@ The application features a **two-tab interface** with a modern, dark-themed desi
      - Brief description (small text)
    - **Button Behavior**: Clicking a chart button sends a message to AI requesting that specific chart
 
-7. **Location Card** (appears when ZIP code detected):
-   - Shows location information (city, state, ZIP)
-   - Displays market data (median home price, average rent)
-   - Two action buttons:
-     - **"Use this data"**: Accepts location data and populates scenario
-     - **"Use my own values"**: Allows user to override with custom inputs
-   - Appears as a special message in chat flow
+7. **Phase 1 · Local Market Snapshot** (auto-updates when a ZIP/city is mentioned):
+   - Shows current focus (`📍 City, State` + ZIP)
+   - Displays median home price, typical rent, property tax, and local growth assumptions
+   - Read-only summary; users simply continue the conversation with down payment and timeline details
+   - Refreshes automatically when a new ZIP/city is provided mid-conversation
 
 8. **Monte Carlo Progress Card** (special loading state):
    - Appears when Monte Carlo simulation is running
@@ -191,10 +189,10 @@ The application features a **two-tab interface** with a modern, dark-themed desi
      - Monthly Rent
      - Down Payment %
      - Timeline (years)
-   - **ML-Predicted Values** (when using ZIP code):
-     - Home Appreciation Rate (with "ML-predicted" badge)
-     - Rent Growth Rate (with "ML-predicted" badge)
-     - Investment Return Rate
+   - **Growth Assumptions** (when using ZIP data):
+     - Home appreciation rate
+     - Rent growth rate
+     - Investment return rate
    - **Location Info**: City, State, ZIP code (if using location data)
    - **Data Source Indicators**: Shows whether values are from ZIP data, custom input, or defaults
    - "Edit" button to enter edit mode
@@ -210,7 +208,7 @@ The application features a **two-tab interface** with a modern, dark-themed desi
      - AI acknowledges changes with message
 
 **Visual Indicators**:
-- **ML Values**: Highlighted with special styling/badges (shows "ML-predicted" label)
+- **Growth assumptions**: Highlighted with badges showing their data source
 - **Data Source**: Color-coded or labeled (ZIP vs Custom vs Default)
 - **Location Display**: When using ZIP data, shows "🏙️ City, State" header with "Based on local market data" subtitle
 - **Placeholder State**: Shows "Your scenario will appear here once you enter your ZIP code or provide home price and rent" when no data
@@ -366,20 +364,18 @@ The application features a **two-tab interface** with a modern, dark-themed desi
 ## User Flows
 
 ### Flow 1: ZIP Code Entry (Primary Flow)
-1. **User enters ZIP code** (e.g., "92127" or "I'm in 90210")
+1. **User mentions a ZIP code** (e.g., "92127" or "I'm in 90210")
 2. **System detects ZIP** via regex pattern matching
 3. **Backend fetches location data**:
    - Median home price for ZIP code
    - Average monthly rent
    - State-specific property tax rate
    - City and state information
-4. **Location card appears** with two options:
-   - "Use this data" → Populates scenario with local market values
-   - "Use my own values" → Allows custom input override
-5. **User provides remaining inputs** (down payment %, timeline)
-6. **ML predictions applied**:
-   - Home appreciation rate (ML-predicted for ZIP)
-   - Rent growth rate (ML-predicted for ZIP)
+4. **Phase 1 snapshot updates automatically** with the new "Current focus" (no user interaction required)
+5. **Assistant acknowledges the location** and prompts for any missing assumptions (typically down payment % and timeline)
+6. **Growth assumptions applied**:
+   - Home appreciation rate (location-specific prediction)
+   - Rent growth rate (location-specific prediction)
    - ZIP-specific volatility for Monte Carlo
 7. **Analysis runs** with location-specific rates
 8. **Charts generate** showing personalized projections

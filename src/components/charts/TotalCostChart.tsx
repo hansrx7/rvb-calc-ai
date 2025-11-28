@@ -29,8 +29,6 @@ export function TotalCostChart({ analysis }: TotalCostChartProps) {
     hasNaN: Object.values(lastPoint || {}).some(v => typeof v === 'number' && isNaN(v))
   });
   
-  const buyerFinalNetWorth = lastPoint?.netWorthBuy ?? 0;
-  const renterFinalNetWorth = lastPoint?.netWorthRent ?? 0;
   const totalBuyingCosts = analysis.totalBuyCost ?? 0;
   const totalRentingCosts = analysis.totalRentCost ?? 0;
   const finalHomeValue = lastPoint?.homeValue ?? 0;
@@ -40,9 +38,6 @@ export function TotalCostChart({ analysis }: TotalCostChartProps) {
   const buyingNetCost = totalBuyingCosts - finalHomeValue;
   const rentingNetCost = totalRentingCosts - finalInvestmentValue;
   
-  const winner = buyerFinalNetWorth > renterFinalNetWorth ? 'Buying' : 'Renting';
-  const savings = Math.abs(buyerFinalNetWorth - renterFinalNetWorth);
-
   const data = [
     {
       name: 'Buying',
@@ -65,7 +60,7 @@ export function TotalCostChart({ analysis }: TotalCostChartProps) {
         This shows the total money you spend over time if you buy versus rent. Lower is better.
       </p>
       
-      <ResponsiveContainer width="100%" height={400}>
+      <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
           <XAxis dataKey="name" stroke="rgba(255, 255, 255, 0.7)" />

@@ -23,10 +23,7 @@ export function EquityBuildupChart({ timeline }: EquityBuildupChartProps) {
         percentOwned: parseFloat(percentOwned)
       };
     });
-  
-  const finalEquity = chartData[chartData.length - 1].equity;
-  const finalPercent = chartData[chartData.length - 1].percentOwned;
-  
+
   return (
     <div className="chart-container">
       <h3 className="chart-title">Home Equity Buildup Over {Math.ceil(timeline.length / 12)} Years</h3>
@@ -34,7 +31,7 @@ export function EquityBuildupChart({ timeline }: EquityBuildupChartProps) {
         This shows how much of the home you actually own (equity) over time when you buy. Higher is better.
       </p>
       
-      <ResponsiveContainer width="100%" height={400}>
+      <ResponsiveContainer width="100%" height={300}>
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
           <XAxis 

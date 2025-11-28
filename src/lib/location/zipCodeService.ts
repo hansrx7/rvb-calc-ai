@@ -36,7 +36,27 @@ const PROPERTY_TAX_RATES: Record<string, number> = {
 };
 
 export const getLocationData = (zipCode: string): LocationData | null => {
-  return (zipCodeData as Record<string, LocationData>)[zipCode] || null;
+  const raw = (zipCodeData as Record<string, Partial<LocationData>>)[zipCode];
+  if (
+    !raw ||
+    raw.state === undefined ||
+    raw.city === undefined ||
+    raw.homeValue === undefined ||
+    raw.homeValueGrowthRate === undefined ||
+    raw.rentValueGrowthRate === undefined
+  ) {
+    return null;
+  }
+
+  return {
+    state: raw.state,
+    city: raw.city,
+    homeValue: raw.homeValue,
+    homeValueGrowthRate: raw.homeValueGrowthRate,
+    propertyTaxRate: raw.propertyTaxRate,
+    rentValue: raw.rentValue,
+    rentValueGrowthRate: raw.rentValueGrowthRate,
+  };
 };
 
 export const formatLocationData = (data: LocationData): FormattedLocationData => {

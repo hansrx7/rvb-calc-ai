@@ -1,6 +1,6 @@
 // src/components/chat/ChatContainer.tsx
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { NetWorthChart } from '../charts/NetWorthChart';
@@ -18,6 +18,8 @@ import { MonteCarloChart } from '../charts/MonteCarloChart';
 import { SensitivityChart } from '../charts/SensitivityChart';
 import { ChartPlaceholder } from '../charts/ChartPlaceholder';
 import { ChartsGrid } from '../charts/ChartsGrid';
+import { BasicInputsCard } from './BasicInputsCard';
+import { AdvancedInputsCard } from './AdvancedInputsCard';
 import { generateRecommendation, type Recommendation } from '../../types/recommendation';
 import { RecommendationCard } from '../RecommendationCard/RecommendationCard';
 import { calculateNetWorthComparison, calculateBuyingCosts, calculateRentingCosts, getTimelineBasedRates, getZIPBasedRates } from '../../lib/finance/calculator';
@@ -49,6 +51,7 @@ import { getAIResponse, createChatCompletion } from '../../lib/ai/openai';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { analyzeScenario, fetchBreakEvenHeatmap, fetchSensitivity, fetchScenarios } from '../../lib/api/finance';
+import { OnboardingTour } from '../onboarding/OnboardingTour';
 // import { CashFlowChart } from '../charts/CashFlowChart';
 // import { CumulativeCostChart } from '../charts/CumulativeCostChart';
 // import { LiquidityTimeline } from '../charts/LiquidityTimeline';
@@ -95,12 +98,6 @@ const ADVANCED_CHART_KEYS: ChartType[] = [
   'taxSavings',
   'scenarioOverlay',
   'sensitivity'
-];
-
-// All chart keys (for backward compatibility)
-const chartKeys: ChartType[] = [
-  ...BASIC_CHART_KEYS,
-  ...ADVANCED_CHART_KEYS
 ];
 
 // Helper to map chart keys to button labels and messages - Plain English labels
@@ -228,6 +225,7 @@ interface Message {
       homePrice: number;
       monthlyRent: number;
       downPaymentPercent: number;
+      timeHorizonYears: number;
     };
   };
 }
@@ -238,6 +236,23 @@ interface UserData {
   downPaymentPercent: number | null;
   timeHorizonYears: number | null;
 }
+
+type AssumptionValues = {
+  interestRate: number;
+  homeAppreciationRate: number;
+  rentGrowthRate: number;
+  investmentReturnRate: number;
+};
+
+type AdvancedInputs = {
+  loanTermYears: number;
+  interestRate: number;
+  propertyTaxRate: number;
+  maintenanceRate: number;
+  homeInsuranceAnnual: number;
+  renterInsuranceAnnual: number;
+  hoaMonthly: number;
+};
 
 export function ChatContainer() {
   const [messages, setMessages] = useState<Message[]>([
@@ -255,18 +270,7 @@ export function ChatContainer() {
     timeHorizonYears: null
   });
   
-  const createVisibleChartState = () =>
-    chartKeys.reduce(
-      (acc, key) => {
-        acc[key] = false;
-        return acc;
-      },
-      {} as Record<ChartType, boolean>
-    );
-
   const [chartData, setChartData] = useState<MonthlySnapshot[] | null>(null);
-  // Track which charts are visible
-  const [visibleCharts, setVisibleCharts] = useState<Record<ChartType, boolean>>(createVisibleChartState());
 
 // Track if charts are ready to show (data calculated)
 const [chartsReady, setChartsReady] = useState(false);
@@ -291,7 +295,6 @@ const [chartsReady, setChartsReady] = useState(false);
   // Location data state
   const [locationData, setLocationData] = useState<FormattedLocationData | null>(null);
   const [currentZipCode, setCurrentZipCode] = useState<string | null>(null); // Track current ZIP code for ML predictions
-  const [showLocationCard, setShowLocationCard] = useState(false);
   const [isLocationLocked, setIsLocationLocked] = useState(false); // Track if user made a choice
   const [usingZipData, setUsingZipData] = useState(false); // Track which scenario
   const [isBackendAvailable, setIsBackendAvailable] = useState(true);
@@ -300,6 +303,16 @@ const [chartsReady, setChartsReady] = useState(false);
   // Edit mode state
   const [isEditMode, setIsEditMode] = useState(false);
   const [editableValues, setEditableValues] = useState<UserData | null>(null);
+  const [advancedInputs, setAdvancedInputs] = useState<AdvancedInputs>({
+    loanTermYears: 30,
+    interestRate: 7,
+    propertyTaxRate: 1,
+    maintenanceRate: 1,
+    homeInsuranceAnnual: 1200,
+    renterInsuranceAnnual: 240,
+    hoaMonthly: 150,
+  });
+  const [editableAdvancedValues, setEditableAdvancedValues] = useState<AdvancedInputs | null>(null);
   
   // Advanced assumptions visibility state
   const [showAdvancedAssumptions, setShowAdvancedAssumptions] = useState(false);
@@ -307,10 +320,6 @@ const [chartsReady, setChartsReady] = useState(false);
   // Advanced charts visibility state
   const [showAdvancedCharts, setShowAdvancedCharts] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'charts'>('chat');
-  
-  // Reference box visibility and position state
-  const [isReferenceBoxVisible, setIsReferenceBoxVisible] = useState(true);
-  const [referenceBoxPosition, setReferenceBoxPosition] = useState({ x: 20, y: 20 });
   
   // Ref for scrolling to charts
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -339,8 +348,16 @@ const [chartsReady, setChartsReady] = useState(false);
   const [scenarioOverlayData, setScenarioOverlayData] = useState<ScenarioResult[] | null>(null);
   const [unifiedAnalysisResult, setUnifiedAnalysisResult] = useState<AnalysisResult | null>(null);
   const [recommendation, setRecommendation] = useState<any | null>(null);
-  const [showRecommendation, setShowRecommendation] = useState(false);
   
+  useEffect(() => {
+    if (locationData && usingZipData) {
+      setAdvancedInputs(prev => ({
+        ...prev,
+        propertyTaxRate: locationData.propertyTaxRate * 100,
+      }));
+    }
+  }, [locationData, usingZipData]);
+
   useEffect(() => {
     return () => {
       if (monteCarloProgressTimer.current) {
@@ -356,7 +373,7 @@ const [chartsReady, setChartsReady] = useState(false);
     if (heatmapData && heatmapData.length > 0) {
       return;
     }
-    const inputs = buildScenarioInputs(userData, locationData, unifiedAnalysisResult ?? null);
+    const inputs = buildScenarioInputs(userData, locationData, unifiedAnalysisResult ?? null, advancedInputs);
     if (!inputs) {
       return;
     }
@@ -375,7 +392,7 @@ const [chartsReady, setChartsReady] = useState(false);
     if (chartLoading.type === 'sensitivity') {
       return;
     }
-    const baseInputs = buildScenarioInputs(userData, locationData, unifiedAnalysisResult ?? null);
+    const baseInputs = buildScenarioInputs(userData, locationData, unifiedAnalysisResult ?? null, advancedInputs);
     if (!baseInputs) {
       return;
     }
@@ -415,7 +432,7 @@ const [chartsReady, setChartsReady] = useState(false);
     if (chartLoading.type === 'scenarioOverlay') {
       return;
     }
-    const baseInputs = buildScenarioInputs(userData, locationData, unifiedAnalysisResult ?? null);
+    const baseInputs = buildScenarioInputs(userData, locationData, unifiedAnalysisResult ?? null, advancedInputs);
     if (!baseInputs) {
       return;
     }
@@ -490,7 +507,7 @@ const [chartsReady, setChartsReady] = useState(false);
         } else if (next >= 40) {
           setMonteCarloProgressStage('Simulating hundreds of random price paths...');
         } else {
-          setMonteCarloProgressStage('Loading ML-driven appreciation + volatility...');
+          setMonteCarloProgressStage('Loading local appreciation + volatility assumptions...');
         }
         return next;
       });
@@ -717,7 +734,6 @@ const [chartsReady, setChartsReady] = useState(false);
       timeHorizonYears: null
     });
     setChartData(null);
-    setVisibleCharts(createVisibleChartState());
     setChartsReady(false);
     setMonthlyCosts(null);
     setTotalCostData(null);
@@ -734,44 +750,54 @@ const [chartsReady, setChartsReady] = useState(false);
     setShowRestartModal(false);
     setLocationData(null);
     setCurrentZipCode(null); // Clear ZIP code
-    setShowLocationCard(false);
     setIsLocationLocked(false);
     setUsingZipData(false);
     setIsEditMode(false);
     setEditableValues(null);
     setIsReferenceBoxVisible(true);
     setHasShownScenarioSummary(false); // Reset scenario summary flag
-    setReferenceBoxPosition({ x: 20, y: 20 });
     setRecommendation(null);
-    setShowRecommendation(false);
   };
 
   // Edit mode handlers
   const handleEditValues = () => {
     setIsEditMode(true);
     setEditableValues({ ...userData });
+    setEditableAdvancedValues({ ...advancedInputs });
   };
 
   const handleCancelEdit = () => {
     setIsEditMode(false);
     setEditableValues(null);
+    setEditableAdvancedValues(null);
   };
 
   const handleSaveEdit = async () => {
     if (!editableValues) return;
     
-    // Check if any values actually changed
-    const hasChanges = 
+    const hasBasicChanges = 
       editableValues.homePrice !== userData.homePrice ||
       editableValues.monthlyRent !== userData.monthlyRent ||
       editableValues.downPaymentPercent !== userData.downPaymentPercent ||
       editableValues.timeHorizonYears !== userData.timeHorizonYears;
+
+    const advancedSnapshot = editableAdvancedValues ?? advancedInputs;
+    const advancedChanged =
+      editableAdvancedValues !== null &&
+      (
+        editableAdvancedValues.loanTermYears !== advancedInputs.loanTermYears ||
+        editableAdvancedValues.interestRate !== advancedInputs.interestRate ||
+        editableAdvancedValues.propertyTaxRate !== advancedInputs.propertyTaxRate ||
+        editableAdvancedValues.maintenanceRate !== advancedInputs.maintenanceRate ||
+        editableAdvancedValues.homeInsuranceAnnual !== advancedInputs.homeInsuranceAnnual ||
+        editableAdvancedValues.renterInsuranceAnnual !== advancedInputs.renterInsuranceAnnual ||
+        editableAdvancedValues.hoaMonthly !== advancedInputs.hoaMonthly
+      );
     
-    if (!hasChanges) {
-      // No changes made
+    if (!hasBasicChanges && !advancedChanged) {
       setIsEditMode(false);
       setEditableValues(null);
-      
+      setEditableAdvancedValues(null);
       const noChangeMessage: Message = {
         id: Date.now().toString(),
         role: 'assistant',
@@ -781,13 +807,13 @@ const [chartsReady, setChartsReady] = useState(false);
       return;
     }
     
-    // Update user data with edited values
     setUserData(editableValues);
+    setAdvancedInputs(advancedSnapshot);
     setIsEditMode(false);
     setEditableValues(null);
+    setEditableAdvancedValues(null);
     
-    // Recalculate charts with new values
-    const analysisUpdate = await calculateAndShowChart(editableValues, locationData);
+    const analysisUpdate = await calculateAndShowChart(editableValues, locationData, advancedSnapshot);
     const fallbackNotice = analysisUpdate?.source === 'local'
       ? "\n\nHeads up: I'm using the built-in calculator while the analysis service reconnects."
       : '';
@@ -819,23 +845,8 @@ const [chartsReady, setChartsReady] = useState(false);
     }
   };
 
-  // Reference box handlers
-  const handleCloseReferenceBox = () => {
-    setIsReferenceBoxVisible(false);
-  };
-
-  const handleToggleReferenceBox = () => {
-    setIsReferenceBoxVisible(!isReferenceBoxVisible);
-  };
-
   // Recommendation card handlers
   const handleShowDetails = () => {
-    // Show the Net Worth chart automatically
-    setVisibleCharts(prev => ({
-      ...prev,
-      netWorth: true
-    }));
-    
     // Add Net Worth chart message
     const chartMessage: Message = {
       id: Date.now().toString(),
@@ -847,7 +858,8 @@ const [chartsReady, setChartsReady] = useState(false);
         inputValues: {
           homePrice: userData.homePrice || 0,
           monthlyRent: userData.monthlyRent || 0,
-          downPaymentPercent: userData.downPaymentPercent || 0
+          downPaymentPercent: userData.downPaymentPercent || 0,
+          timeHorizonYears: userData.timeHorizonYears || 0,
         }
       } : undefined
     };
@@ -857,100 +869,51 @@ const [chartsReady, setChartsReady] = useState(false);
   const handleTryNewScenario = () => {
     setIsEditMode(true);
     setEditableValues({ ...userData });
+    setEditableAdvancedValues({ ...advancedInputs });
     // No automatic message - user can see the edit fields and make changes directly
   };
 
-  // Drag functionality for reference box
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const startX = e.clientX - referenceBoxPosition.x;
-    const startY = e.clientY - referenceBoxPosition.y;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      setReferenceBoxPosition({
-        x: e.clientX - startX,
-        y: e.clientY - startY
-      });
+  const applyLocalMarketAutoFill = (zipCode: string | null, data: FormattedLocationData) => {
+    const autoFilledData: UserData = {
+      homePrice: data.medianHomePrice,
+      monthlyRent: data.averageRent,
+      downPaymentPercent: null,
+      timeHorizonYears: null,
     };
 
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
+    setUserData(autoFilledData);
+    setLocationData(data);
+    if (zipCode) {
+      setCurrentZipCode(zipCode);
+    }
+    setIsLocationLocked(true);
+    setUsingZipData(true);
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    const rentLine = data.averageRent
+      ? `$${data.averageRent.toLocaleString()}/mo`
+      : 'rent data not available yet';
+
+    return `Here is the local market snapshot for ${data.city}, ${data.state}${
+      zipCode ? ` (ZIP ${zipCode})` : ''
+    }:\n\n• Median home: $${data.medianHomePrice.toLocaleString()}\n• Typical rent: ${rentLine}\n• Property tax: ${data.propertyTaxRate.toFixed(
+      2
+    )}%\n\nShare your down payment percentage and how long you plan to stay so I can finish the analysis.`;
   };
 
-  const handleUseLocalData = () => {
-    if (locationData) {
-      // Add user message showing the choice
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-        content: `Use this data`
-    };
-    setMessages(prev => [...prev, userMessage]);
-    
-      // Set the ZIP data immediately, but preserve user's custom home price if they provided one
-      const newUserData: UserData = {
-        homePrice: userData.homePrice || locationData.medianHomePrice, // Use user's price if provided, otherwise use ZIP median
-        monthlyRent: locationData.averageRent || userData.monthlyRent, // Use local average rent if available, otherwise keep user's rent
-        downPaymentPercent: userData.downPaymentPercent,
-        timeHorizonYears: userData.timeHorizonYears
-      };
-      
-    setUserData(newUserData);
-      setIsLocationLocked(true);
-      setUsingZipData(true);
-      
-      // Add AI message asking for down payment and timeline
-      const homePriceText = newUserData.homePrice ? `your $${newUserData.homePrice.toLocaleString()} home price` : `the local median home price ($${locationData.medianHomePrice.toLocaleString()})`;
-      const rentText = locationData.averageRent 
-        ? `the local average rent ($${locationData.averageRent.toLocaleString()}/mo)` 
-        : newUserData.monthlyRent 
-          ? `your rent ($${newUserData.monthlyRent.toLocaleString()}/mo)` 
-          : `your rent`;
-      
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: `Perfect! I'll use ${homePriceText} and ${rentText} with the ${locationData.city}, ${locationData.state} market data for property taxes and growth rates. Now I just need two more details:\n\n1. What down payment percentage are you thinking? (e.g., 10%, 20%)\n2. How long do you plan to stay in this home? (e.g., 3, 5, 10 years)`
-      };
-      setMessages(prev => [...prev, aiMessage]);
-      
-      // Hide the location card
-      setShowLocationCard(false);
-    }
+  const handleBasicFieldChange = (field: keyof UserData, value: number | null) => {
+    setEditableValues(prev => {
+      const next = prev ? { ...prev } : { ...userData };
+      next[field] = value;
+      return next;
+    });
   };
 
-  const handleKeepMyData = () => {
-    if (locationData) {
-      // Add user message showing the choice
-      const userMessage: Message = {
-        id: Date.now().toString(),
-        role: 'user',
-        content: `Use my own values`
-      };
-      setMessages(prev => [...prev, userMessage]);
-      
-      // Lock the card in reference mode and show it immediately with blanks
-      setIsLocationLocked(true);
-      setUsingZipData(false);
-      setShowLocationCard(false); // Hide the decision card
-      
-      // Clear location data so reference box uses custom values, not ZIP data
-        setLocationData(null);
-        setCurrentZipCode(null); // Clear ZIP code
-        
-        // Add AI message referencing the box
-      const aiMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-        content: `Got it! You can use your own values instead. The default assumptions are shown in the box on the top right. What home price and monthly rent are you working with?`
-      };
-      setMessages(prev => [...prev, aiMessage]);
-    }
+  const handleAdvancedFieldChange = (field: keyof AdvancedInputs, value: number) => {
+    setEditableAdvancedValues(prev => {
+      const next = prev ? { ...prev } : { ...advancedInputs };
+      next[field] = value;
+      return next;
+    });
   };
 
   // Simple function to check if AI response indicates a chart should be shown
@@ -995,6 +958,32 @@ function shouldShowChart(aiResponse: string): ChartType | null {
   // Keyboard shortcuts - placed after function declarations
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
+      // COMPLETELY IGNORE arrow keys - let Joyride handle them
+      const isArrowKey = e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown';
+      if (isArrowKey) {
+        // Check if event is coming from or targeting Joyride elements
+        const target = e.target as HTMLElement;
+        const isFromJoyride = target?.closest('[class*="react-joyride"]') !== null;
+        const hasJoyrideOverlay = !!document.querySelector('.react-joyride__overlay');
+        const hasJoyrideTooltip = !!document.querySelector('[class*="react-joyride__tooltip"]');
+        const tourActive = hasJoyrideOverlay || hasJoyrideTooltip || isFromJoyride;
+        
+        console.log(`[Keyboard Handler] Arrow key pressed: ${e.key}`, {
+          tourActive,
+          isFromJoyride,
+          hasJoyrideOverlay,
+          hasJoyrideTooltip,
+          defaultPrevented: e.defaultPrevented,
+          target: target?.tagName,
+          targetClass: target?.className,
+          action: 'Completely ignoring - letting Joyride handle'
+        });
+        
+        // If tour is active, do absolutely nothing - let event bubble to Joyride
+        // Even if tour not active, we don't handle arrow keys anyway
+        return;
+      }
+      
       // Don't trigger shortcuts when user is typing in an input/textarea
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
@@ -1025,11 +1014,24 @@ function shouldShowChart(aiResponse: string): ChartType | null {
       }
     };
 
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
+    // Use normal bubbling phase (not capture) so we don't intercept before Joyride
+    // Arrow keys are completely ignored in our handler, so they pass through to Joyride
+    document.addEventListener('keydown', handleKeyPress, false);
+    return () => document.removeEventListener('keydown', handleKeyPress, false);
   }, []); // Functions are stable, empty deps is fine
 
   const handleSendMessage = async (content: string) => {
+    const trimmed = content.trim();
+    const assumptionHint = extractAssumptionHints(trimmed);
+    const numberCount = (trimmed.match(/\d+(?:,\d{3})*(?:\.\d+)?/g) ?? []).length;
+    const hasBaseInputs = userData.homePrice != null && userData.monthlyRent != null;
+    const onlyAssumptions =
+      hasBaseInputs &&
+      (assumptionHint.downPayment !== undefined || assumptionHint.timeHorizon !== undefined) &&
+      numberCount <= 2 &&
+      !/\b(home|rent|price|mortgage|payment|loan|value|cost)\b/i.test(trimmed) &&
+      !detectZipCode(trimmed);
+    const normalizedContent = onlyAssumptions ? buildAssumptionSentence(assumptionHint) : trimmed;
     // PATH 14: Check if user is changing their mind after making a choice
     if (isLocationLocked && locationData) {
       const lowerContent = content.toLowerCase();
@@ -1073,56 +1075,48 @@ function shouldShowChart(aiResponse: string): ChartType | null {
       }
     }
     
-    // Check if user is responding to ZIP code choice via text
-    if (showLocationCard && locationData && !isLocationLocked) {
-      const lowerContent = content.toLowerCase();
-      
-      // Detect "use local data" intent
-      if ((lowerContent.includes('use') && (lowerContent.includes('those') || lowerContent.includes('local') || lowerContent.includes('zip') || lowerContent.includes('that') || lowerContent.includes('data'))) ||
-          lowerContent.includes('use those') ||
-          lowerContent.includes('use local') ||
-          lowerContent.includes('use that data') ||
-          lowerContent.includes('use the data') ||
-          lowerContent === 'yes' || lowerContent === 'yeah' || lowerContent === 'sure') {
-        // Add user message first
-  const userMessage: Message = {
-    id: Date.now().toString(),
-    role: 'user',
-          content
-  };
-  setMessages(prev => [...prev, userMessage]);
-  
-        // Then trigger the action
-        handleUseLocalData();
-        return;
-      }
-      
-      // Detect "keep my numbers" intent
-      if ((lowerContent.includes('my') && (lowerContent.includes('own') || lowerContent.includes('numbers'))) ||
-          lowerContent.includes('enter my') ||
-          lowerContent.includes('keep my') ||
-          lowerContent.includes('custom') ||
-          (lowerContent.includes('no') && (lowerContent.includes('enter') || lowerContent.includes('own'))) ||
-          lowerContent === 'no') {
-        // Add user message first
-        const userMessage: Message = {
-          id: Date.now().toString(),
-          role: 'user',
-          content
-        };
-        setMessages(prev => [...prev, userMessage]);
-        
-        // Then trigger the action
-        handleKeepMyData();
-        return;
-      }
+  const trimmedContent = content.trim();
+  const zipOnlyMatch = trimmedContent.match(/^(?:zip\s*)?(\d{5})$/i);
+  if (zipOnlyMatch) {
+    const zipCodeOnly = zipOnlyMatch[1];
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content,
+    };
+    setMessages((prev) => [...prev, userMessage]);
+
+    const rawLocation = getLocationData(zipCodeOnly);
+    if (!rawLocation) {
+      const invalidZipMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `I couldn't find market data for ZIP code ${zipCodeOnly}. Could you double-check it or share a nearby ZIP?`,
+      };
+      setMessages((prev) => [...prev, invalidZipMessage]);
+      setIsLoading(false);
+      setIsAnalyzing(false);
+      return;
     }
-    
+
+    const formattedLocation = formatLocationData(rawLocation);
+    const summaryText = applyLocalMarketAutoFill(zipCodeOnly, formattedLocation);
+    const assistantMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
+      content: summaryText,
+    };
+    setMessages((prev) => [...prev, assistantMessage]);
+    setIsLoading(false);
+    setIsAnalyzing(false);
+    return;
+  }
+
   // Add user message
   const userMessage: Message = {
     id: Date.now().toString(),
     role: 'user',
-      content
+    content,
   };
     
   setMessages(prev => [...prev, userMessage]);
@@ -1130,7 +1124,24 @@ function shouldShowChart(aiResponse: string): ChartType | null {
     
     try {
     // Extract data from message using AI
-    const { userData: newUserData, locationData: detectedLocationData } = await extractUserDataWithAI(content, userData);
+    const extractionResult = onlyAssumptions
+      ? {
+          userData: {
+            ...userData,
+            downPaymentPercent:
+              assumptionHint.downPayment !== undefined
+                ? assumptionHint.downPayment
+                : userData.downPaymentPercent,
+            timeHorizonYears:
+              assumptionHint.timeHorizon !== undefined
+                ? assumptionHint.timeHorizon
+                : userData.timeHorizonYears,
+          },
+          locationData: null,
+        }
+      : await extractUserDataWithAI(normalizedContent, userData);
+
+    const { userData: newUserData, locationData: detectedLocationData } = extractionResult;
     
     // Debug logging
     
@@ -1189,7 +1200,7 @@ function shouldShowChart(aiResponse: string): ChartType | null {
         if (hasAllDataNow) {
           // Run analysis in background
           setTimeout(async () => {
-            const inputs = buildScenarioInputs(newUserData, detectedLocationData, null);
+            const inputs = buildScenarioInputs(newUserData, detectedLocationData, null, advancedInputs);
             if (inputs) {
               const result = await runAnalysis(inputs, zipCode);
               setUnifiedAnalysisResult(result.unifiedAnalysis ?? null);
@@ -1227,22 +1238,11 @@ function shouldShowChart(aiResponse: string): ChartType | null {
         return; // Continue with custom home price collection
       }
       
-      // Normal ZIP flow (no custom data provided) - always auto-fill from ZIP data
-      const autoFilledData: UserData = {
-        homePrice: detectedLocationData.medianHomePrice,
-        monthlyRent: detectedLocationData.averageRent,
-        downPaymentPercent: null, // Still need to ask
-        timeHorizonYears: null // Still need to ask
-      };
-      setUserData(autoFilledData);
-      setIsLocationLocked(true);
-      setUsingZipData(true);
-      setShowLocationCard(false); // Don't show location card - just auto-fill
-      
+      const summaryText = applyLocalMarketAutoFill(zipCode ?? null, detectedLocationData);
       const autoFillMessage: Message = {
         id: Date.now().toString(),
         role: 'assistant',
-        content: `Perfect! I've auto-filled values based on market data for ${detectedLocationData.city}, ${detectedLocationData.state}:\n\n🏠 Home: $${detectedLocationData.medianHomePrice.toLocaleString()}\n💵 Rent: ${detectedLocationData.averageRent ? `$${detectedLocationData.averageRent.toLocaleString()}/mo` : '___'}\n\nWhat's your down payment percentage and how long do you plan to stay in this home?`
+        content: summaryText
       };
       setMessages(prev => [...prev, autoFillMessage]);
       setIsLoading(false);
@@ -1279,10 +1279,10 @@ function shouldShowChart(aiResponse: string): ChartType | null {
       const processingMessage: Message = {
         id: Date.now().toString(),
         role: 'assistant',
-        content: "Perfect! I'm calculating your analysis. This may take 60-90 seconds as I'm running ML predictions for your ZIP code and computing your full timeline (calculating every month for the next " + newUserData.timeHorizonYears + " years). Please be patient..."
+        content: "Perfect! I'm calculating your analysis. This may take a minute while I crunch every month for the next " + newUserData.timeHorizonYears + " years using the local appreciation, rent growth, and cost assumptions. Thanks for your patience!"
       };
       setMessages(prev => [...prev, processingMessage]);
-      const inputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult);
+      const inputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult, advancedInputs);
 
       if (inputs) {
         analysisInputs = inputs;
@@ -1345,8 +1345,8 @@ function shouldShowChart(aiResponse: string): ChartType | null {
                                    !isNaN(mlHomeRate) && !isNaN(mlRentRate) &&
                                    mlHomeRate !== 0 && mlRentRate !== 0; // 0 would be suspicious
           
-          if (hasValidMLRates) {
-            ratesText = `\n• ML predictions: ${mlHomeRate.toFixed(2)}% home appreciation, ${mlRentRate.toFixed(2)}% rent growth`;
+        if (hasValidMLRates) {
+          ratesText = `\n• Growth assumptions: ${mlHomeRate.toFixed(2)}% home appreciation, ${mlRentRate.toFixed(2)}% rent growth`;
           } else if (locationData) {
             ratesText = `\n• Using local market data for growth rates`;
           }
@@ -1382,14 +1382,11 @@ function shouldShowChart(aiResponse: string): ChartType | null {
           }, 100);
           setHasShownScenarioSummary(true); // Mark as shown so we don't show scenario summary later
         }
-
-        // Reset visible charts (all become available again)
-        setVisibleCharts(createVisibleChartState());
       }
     }
 
     if (hasAllData && !analysisApplied) {
-      const calcResult = await calculateAndShowChart(newUserData, locationData);
+      const calcResult = await calculateAndShowChart(newUserData, locationData, advancedInputs);
 
       if (calcResult) {
         analysisInputs = analysisInputs ?? calcResult.inputs;
@@ -1424,8 +1421,8 @@ function shouldShowChart(aiResponse: string): ChartType | null {
                                    !isNaN(mlHomeRate) && !isNaN(mlRentRate) &&
                                    mlHomeRate !== 0 && mlRentRate !== 0; // 0 would be suspicious
           
-          if (hasValidMLRates) {
-            ratesText = `\n• ML predictions: ${mlHomeRate.toFixed(2)}% home appreciation, ${mlRentRate.toFixed(2)}% rent growth`;
+        if (hasValidMLRates) {
+          ratesText = `\n• Growth assumptions: ${mlHomeRate.toFixed(2)}% home appreciation, ${mlRentRate.toFixed(2)}% rent growth`;
           } else if (locationData) {
             ratesText = `\n• Using local market data for growth rates`;
           }
@@ -1537,7 +1534,7 @@ function shouldShowChart(aiResponse: string): ChartType | null {
     if (chartToShow === 'breakEvenHeatmap') {
       // Always build fresh inputs from current user data to ensure heatmap uses latest values
       setHeatmapData(null); // Clear old cached data
-      const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult);
+      const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult, advancedInputs);
       if (baseInputs) {
         setChartLoading({ type: 'breakEvenHeatmap', progress: 10, message: 'Calculating break-even points...' });
         try {
@@ -1558,6 +1555,9 @@ function shouldShowChart(aiResponse: string): ChartType | null {
           }
         } catch (error) {
           setChartLoading({ 
+            type: 'breakEvenHeatmap',
+            progress: 0,
+            message: 'Heatmap data failed to load. Please try again.'
           });
           setTimeout(() => setChartLoading({ type: null, progress: 0, message: '' }), 3000);
           console.error('Failed to load heatmap data:', error);
@@ -1568,7 +1568,7 @@ function shouldShowChart(aiResponse: string): ChartType | null {
     if (chartToShow === 'monteCarlo') {
       // Load Monte Carlo simulation data using unified analysis endpoint
       // This ensures we get the new HomePricePathSummary format
-      const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult);
+      const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult, advancedInputs);
       if (baseInputs) {
         // Use unified chart loading system
         setChartLoading({ type: 'monteCarlo', progress: 5, message: 'Starting Monte Carlo simulation...' });
@@ -1647,6 +1647,9 @@ function shouldShowChart(aiResponse: string): ChartType | null {
         } catch (error) {
           console.error('Failed to load Monte Carlo data:', error);
           setChartLoading({ 
+            type: 'monteCarlo',
+            progress: 0,
+            message: 'Monte Carlo simulation failed. Please try again.'
           });
           stopMonteCarloProgress(false);
           // Clear error after 5 seconds
@@ -1658,7 +1661,7 @@ function shouldShowChart(aiResponse: string): ChartType | null {
     if (chartToShow === 'sensitivity') {
       // Load sensitivity analysis data (default deltas: ±1% interest, ±10% price, ±10% rent)
       setSensitivityData(null); // Clear old cached data
-      const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult);
+      const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult, advancedInputs);
       if (baseInputs) {
         setChartLoading({ type: 'sensitivity', progress: 10, message: 'Running sensitivity analysis...' });
         try {
@@ -1679,6 +1682,9 @@ function shouldShowChart(aiResponse: string): ChartType | null {
           }
         } catch (error) {
           setChartLoading({ 
+            type: 'sensitivity',
+            progress: 0,
+            message: 'Sensitivity analysis failed. Please try again.'
           });
           setTimeout(() => setChartLoading({ type: null, progress: 0, message: '' }), 3000);
           console.error('Failed to load sensitivity data:', error);
@@ -1690,7 +1696,7 @@ function shouldShowChart(aiResponse: string): ChartType | null {
       // Load scenario overlay data (for now, use current scenario as single scenario)
       // TODO: Allow users to specify multiple scenarios
       setScenarioOverlayData(null); // Clear old cached data
-      const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult);
+      const baseInputs = buildScenarioInputs(newUserData, locationData, unifiedAnalysisResult, advancedInputs);
       if (baseInputs) {
         setChartLoading({ type: 'scenarioOverlay', progress: 10, message: 'Preparing scenario comparison...' });
         try {
@@ -1712,6 +1718,9 @@ function shouldShowChart(aiResponse: string): ChartType | null {
           }
         } catch (error) {
           setChartLoading({ 
+            type: 'scenarioOverlay',
+            progress: 0,
+            message: 'Scenario comparison failed. Please try again.'
           });
           setTimeout(() => setChartLoading({ type: null, progress: 0, message: '' }), 3000);
           console.error('Failed to load scenario overlay data:', error);
@@ -1740,6 +1749,22 @@ function shouldShowChart(aiResponse: string): ChartType | null {
         }
       : (freshChartData && freshMonthlyCosts && freshTotalCostData && newUserData.homePrice && newUserData.monthlyRent && newUserData.downPaymentPercent
           ? {
+              chartData: freshChartData,
+              monthlyCosts: freshMonthlyCosts,
+              totalCostData: freshTotalCostData,
+              cashFlow: advancedMetrics.cashFlow,
+              cumulativeCosts: advancedMetrics.cumulativeCosts,
+              liquidityTimeline: advancedMetrics.liquidityTimeline,
+              taxSavings: advancedMetrics.taxSavings,
+              heatmapPoints: heatmapData ?? undefined,
+              sensitivity: sensitivityData ?? undefined,
+              scenarioOverlay: scenarioOverlayData ?? undefined,
+              inputValues: {
+                homePrice: newUserData.homePrice,
+                monthlyRent: newUserData.monthlyRent,
+                downPaymentPercent: newUserData.downPaymentPercent,
+                timeHorizonYears: newUserData.timeHorizonYears ?? 0,
+              }
             }
           : null);
     
@@ -1768,12 +1793,6 @@ function shouldShowChart(aiResponse: string): ChartType | null {
         chartToShow,
         snapshotData
       };
-      
-      // Mark this chart as visible
-      setVisibleCharts(prev => ({
-        ...prev,
-        [chartToShow]: true
-      }));
       
       // Smooth scroll to the new chart after a brief delay
       setTimeout(() => {
@@ -1813,7 +1832,7 @@ function shouldShowChart(aiResponse: string): ChartType | null {
       const errorMessage: Message = {
         id: Date.now().toString(),
         role: 'assistant',
-        content: "Sorry, I'm having trouble processing that. Could you try again? If the problem persists, you can also enter your numbers directly (e.g., 'home price $500k, rent $3k')."
+        content: "I didn't quite catch that. Could you share the home price, monthly rent, down payment %, and timeline you're comparing? Mention a ZIP or city if you want me to refresh the local assumptions."
       };
       setMessages(prev => [...prev, errorMessage]);
     }
@@ -1850,25 +1869,6 @@ const handleChipClick = (message: string) => {
       homeEquity: point.home_equity ?? point.homeEquity ?? 0,
       renterInvestmentBalance: point.renter_investment_balance ?? point.renterInvestmentBalance ?? 0,
       buyerCashAccount: point.buyer_cash_account ?? point.buyerCashAccount ?? 0,
-    };
-  };
-
-  // Helper to normalize entire AnalysisResult (convert snake_case to camelCase)
-  const normalizeAnalysisResult = (analysis: any): AnalysisResult | null => {
-    if (!analysis) return null;
-    
-    return {
-      timeline: analysis.timeline?.map(normalizeTimelinePoint) ?? [],
-      breakEven: analysis.breakEven ? {
-        monthIndex: (analysis.breakEven as any).month_index ?? analysis.breakEven.monthIndex ?? null,
-        year: (analysis.breakEven as any).year ?? analysis.breakEven.year ?? null
-      } : { monthIndex: null, year: null },
-      totalBuyCost: (analysis as any).total_buy_cost ?? analysis.totalBuyCost ?? 0,
-      totalRentCost: (analysis as any).total_rent_cost ?? analysis.totalRentCost ?? 0,
-      homeAppreciationRate: (analysis as any).home_appreciation_rate ?? analysis.homeAppreciationRate,
-      rentGrowthRate: (analysis as any).rent_growth_rate ?? analysis.rentGrowthRate,
-      home_appreciation_rate: (analysis as any).home_appreciation_rate ?? analysis.homeAppreciationRate,
-      rent_growth_rate: (analysis as any).rent_growth_rate ?? analysis.rentGrowthRate,
     };
   };
 
@@ -2030,7 +2030,7 @@ const handleChipClick = (message: string) => {
     
     // Progress indicator
     const progressStages = [
-      { stage: 'Loading ML models...', progress: 15 },
+      { stage: 'Loading growth models...', progress: 15 },
       { stage: 'Predicting market rates...', progress: 35 },
       { stage: 'Calculating timeline...', progress: 60 },
       { stage: 'Finalizing analysis...', progress: 85 }
@@ -2094,10 +2094,6 @@ const handleChipClick = (message: string) => {
           setTimeout(() => setChartLoading({ type: null, progress: 0, message: '' }), 2000);
         }
       }
-      
-      // EXPECTED VALUES (what backend should return for ML predictions)
-      const expectedHomeRate = zipCode ? 'ML prediction (varies by ZIP)' : inputs.homeAppreciationRate;
-      const expectedRentRate = zipCode ? 'ML prediction (varies by ZIP)' : inputs.rentGrowthRate;
       
       if (!isBackendAvailable) {
         setIsBackendAvailable(true);
@@ -2174,9 +2170,15 @@ const handleChipClick = (message: string) => {
 
   const calculateAndShowChart = async (
     data: UserData,
-    currentLocationData?: FormattedLocationData | null
+    currentLocationData?: FormattedLocationData | null,
+    advancedOverride?: AdvancedInputs
   ) => {
-    const inputs = buildScenarioInputs(data, currentLocationData, unifiedAnalysisResult ?? null);
+    const inputs = buildScenarioInputs(
+      data,
+      currentLocationData,
+      unifiedAnalysisResult ?? null,
+      advancedOverride ?? advancedInputs
+    );
     if (!inputs) return null;
 
     const result = await runAnalysis(inputs, currentZipCode);
@@ -2185,12 +2187,6 @@ const handleChipClick = (message: string) => {
     if (result.unifiedAnalysis) {
       setUnifiedAnalysisResult(result.unifiedAnalysis);
     }
-
-    // Automatically show the Net Worth chart when all data is collected
-    setVisibleCharts(prev => ({
-      ...prev,
-      netWorth: true
-    }));
 
     return {
       analysis: result.analysis,
@@ -2203,7 +2199,8 @@ const handleChipClick = (message: string) => {
   const buildScenarioInputs = (
     data: UserData,
     currentLocationData?: FormattedLocationData | null,
-    analysisResult?: AnalysisResult | null
+    analysisResult?: AnalysisResult | null,
+    overrides?: AdvancedInputs
   ): ScenarioInputs | null => {
     // Safety check - if data is incomplete, return null early
     if (!data || data.homePrice == null || data.monthlyRent == null || 
@@ -2212,9 +2209,9 @@ const handleChipClick = (message: string) => {
     }
 
     const locationDataToUse = currentLocationData ?? locationData;
-    const propertyTaxRate = locationDataToUse?.propertyTaxRate
+    const propertyTaxRate = overrides?.propertyTaxRate ?? (locationDataToUse?.propertyTaxRate
       ? locationDataToUse.propertyTaxRate * 100
-      : 1.0;
+      : 1.0);
 
     // Use rates from analysis result if available (ML predictions), otherwise fall back to ZIP/timeline rates
     let rateSource = locationDataToUse
@@ -2238,15 +2235,15 @@ const handleChipClick = (message: string) => {
     return {
       homePrice: data.homePrice,
       downPaymentPercent: data.downPaymentPercent,
-      interestRate: 7.0,
-      loanTermYears: 30,
+      interestRate: overrides?.interestRate ?? 7.0,
+      loanTermYears: overrides?.loanTermYears ?? 30,
       timeHorizonYears: data.timeHorizonYears,
       monthlyRent: data.monthlyRent,
       propertyTaxRate,
-      homeInsuranceAnnual: 1200,
-      hoaMonthly: 150,
-      maintenanceRate: 1.0,
-      renterInsuranceAnnual: 240,
+      homeInsuranceAnnual: overrides?.homeInsuranceAnnual ?? 1200,
+      hoaMonthly: overrides?.hoaMonthly ?? 150,
+      maintenanceRate: overrides?.maintenanceRate ?? 1.0,
+      renterInsuranceAnnual: overrides?.renterInsuranceAnnual ?? 240,
       homeAppreciationRate: rateSource.homeAppreciationRate,
       rentGrowthRate: rateSource.rentGrowthRate,
       investmentReturnRate: rateSource.investmentReturnRate
@@ -2435,14 +2432,6 @@ const handleChipClick = (message: string) => {
     } : null;
     const costs = chartType === 'monthlyCost' ? monthlyCosts : (snapshotData?.monthlyCosts || monthlyCosts);
     const totalData = snapshotData?.totalCostData || totalCostData;
-    
-    const renderUnavailable = (label: string) => (
-      <div className="chart-wrapper">
-        <div className="chart-placeholder">
-          {label} data isn't available yet for this scenario.
-        </div>
-      </div>
-    );
     
     // Use new structure if available, otherwise require legacy data
     if (!timeline && !data) return null;
@@ -2969,926 +2958,230 @@ const handleChipClick = (message: string) => {
     inputValues: {
       homePrice: inputs.homePrice,
       monthlyRent: inputs.monthlyRent,
-      downPaymentPercent: inputs.downPaymentPercent
+      downPaymentPercent: inputs.downPaymentPercent,
+      timeHorizonYears: inputs.timeHorizonYears,
     }
   });
 
   // Determine step states
-  const hasScenario = (isLocationLocked && userData.homePrice && userData.monthlyRent) || 
-    (userData.homePrice && userData.monthlyRent && userData.downPaymentPercent && userData.timeHorizonYears);
   const hasResults = chartsReady;
+  const fallbackTimeHorizonYears = userData.timeHorizonYears ?? 10;
+  const chartsTabRates = useMemo(
+    () => getZIPBasedRates(locationData, fallbackTimeHorizonYears),
+    [locationData, fallbackTimeHorizonYears]
+  );
+  const assumptionInitialValues: AssumptionValues = useMemo(
+    () => ({
+    interestRate: 7,
+    homeAppreciationRate: (unifiedAnalysisResult as any)?.home_appreciation_rate ?? unifiedAnalysisResult?.homeAppreciationRate ?? chartsTabRates.homeAppreciationRate,
+    rentGrowthRate: (unifiedAnalysisResult as any)?.rent_growth_rate ?? unifiedAnalysisResult?.rentGrowthRate ?? chartsTabRates.rentGrowthRate,
+    investmentReturnRate: chartsTabRates.investmentReturnRate
+    }),
+    [
+      chartsTabRates,
+      unifiedAnalysisResult?.homeAppreciationRate,
+      unifiedAnalysisResult?.home_appreciation_rate,
+      unifiedAnalysisResult?.rentGrowthRate,
+      unifiedAnalysisResult?.rent_growth_rate
+    ]
+  );
+  const [adjustedAssumptions, setAdjustedAssumptions] = useState<AssumptionValues | null>(null);
+  useEffect(() => {
+    setAdjustedAssumptions(null);
+  }, [
+    assumptionInitialValues.interestRate,
+    assumptionInitialValues.homeAppreciationRate,
+    assumptionInitialValues.rentGrowthRate,
+    assumptionInitialValues.investmentReturnRate,
+    chartsReady
+  ]);
+  const handleAssumptionControlChange = (values: AssumptionValues) => {
+    setAdjustedAssumptions(values);
+  };
+
+  const basicValues = {
+    homePrice: userData.homePrice,
+    monthlyRent: userData.monthlyRent,
+    downPaymentPercent: userData.downPaymentPercent,
+    timeHorizonYears: userData.timeHorizonYears,
+  };
+
+  const resolvedHomeGrowth =
+    (unifiedAnalysisResult as any)?.home_appreciation_rate ??
+    unifiedAnalysisResult?.homeAppreciationRate ??
+    locationData?.homeAppreciationRate ??
+    null;
+
+  const resolvedRentGrowth =
+    (unifiedAnalysisResult as any)?.rent_growth_rate ??
+    unifiedAnalysisResult?.rentGrowthRate ??
+    locationData?.rentGrowthRate ??
+    null;
+
+  const locationMetrics = [
+    {
+      label: 'Median home',
+      value: locationData ? `$${locationData.medianHomePrice.toLocaleString()}` : 'Awaiting data',
+    },
+    {
+      label: 'Median rent',
+      value: locationData?.averageRent ? `$${locationData.averageRent.toLocaleString()}/mo` : 'Awaiting data',
+    },
+    {
+      label: 'Property tax',
+      value:
+        typeof locationData?.propertyTaxRate === 'number'
+          ? `${locationData.propertyTaxRate.toFixed(2)}%`
+          : 'Awaiting data',
+    },
+    {
+      label: 'Home appreciation',
+      value: resolvedHomeGrowth !== null ? `${resolvedHomeGrowth.toFixed(2)}%/yr` : 'Pending',
+    },
+    {
+      label: 'Rent growth',
+      value: resolvedRentGrowth !== null ? `${resolvedRentGrowth.toFixed(2)}%/yr` : 'Pending',
+    },
+  ];
+
+  const locationCardStyle = {
+    background: 'rgba(12, 16, 27, 0.85)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    borderRadius: '18px',
+    padding: '20px',
+    marginBottom: '20px',
+  };
+
+  const phaseLabelStyle = {
+    fontSize: '12px',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.6)',
+  };
+
+  const metricGridStyle = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '16px',
+    marginTop: '20px',
+  };
+
+  const metricItemStyle = {
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: '12px',
+    padding: '12px',
+    background: 'rgba(255,255,255,0.02)',
+  };
+
+  const metricLabelStyle = {
+    fontSize: '12px',
+    color: 'rgba(255,255,255,0.6)',
+  };
+
+  const metricValueStyle = {
+    fontSize: '15px',
+    fontWeight: 600,
+    color: 'rgba(255,255,255,0.95)',
+    marginTop: '4px',
+  };
+
+  const cityBadgeStyle: React.CSSProperties = {
+    border: '1px solid rgba(255,255,255,0.15)',
+    borderRadius: '14px',
+    padding: '10px 14px',
+    background: 'rgba(255,255,255,0.03)',
+    minWidth: '200px',
+  };
+
+  const locationDescriptionStyle: React.CSSProperties = {
+    marginTop: '8px',
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: '13px',
+    maxWidth: '520px',
+  };
+
+  const locationFooterStyle: React.CSSProperties = {
+    marginTop: '14px',
+    fontSize: '12px',
+    color: 'rgba(255,255,255,0.55)',
+  };
 
   return (
     <div className="rvb-layout">
+      <OnboardingTour activeTab={activeTab} />
       {/* Step Indicator */}
 
       <div className="rvb-main">
-        {/* Left Column: Scenario Card */}
-        <div className="rvb-left">
-          {/* Location Data Card */}
-          {showLocationCard && locationData && !isLocationLocked && (
-        // Decision Mode: Show big card with buttons
-        <div className="location-data-card">
-          <div className="location-card-header">
-            <h3>📍 {locationData.city}, {locationData.state}</h3>
-            <button 
-              className="location-card-close"
-              onClick={() => setShowLocationCard(false)}
-              title="Close"
-            >
-              ×
-            </button>
-          </div>
-          <div className="location-card-content">
-            <div className="location-section-title">Local Market Data:</div>
-            <div className="location-data-item">
-              <span className="location-icon">🏠</span>
-              <span className="location-label">Median home price:</span>
-              <span className="location-value">${locationData.medianHomePrice.toLocaleString()}</span>
-            </div>
-            <div className="location-data-item">
-              <span className="location-icon">💵</span>
-              <span className="location-label">Average rent:</span>
-              <span className="location-value">
-                {locationData.averageRent 
-                  ? `$${locationData.averageRent.toLocaleString()}/mo` 
-                  : 'Not available'}
-              </span>
-            </div>
-            <div className="location-data-item">
-              <span className="location-icon">🏛️</span>
-              <span className="location-label">Property tax rate:</span>
-              <span className="location-value">{locationData.propertyTaxRate}%</span>
-            </div>
-            
-            <div className="location-section-title" style={{ marginTop: '12px' }}>National Averages:</div>
-            <div className="location-data-item">
-              <span className="location-icon">📈</span>
-              <span className="location-label">Rent growth:</span>
-              <span className="location-value">3.5%/year</span>
-            </div>
-            <div className="location-data-item">
-              <span className="location-icon">🏘️</span>
-              <span className="location-label">Home appreciation:</span>
-              <span className="location-value">3.0%/year</span>
-            </div>
-            <div className="location-data-item">
-              <span className="location-icon">💹</span>
-              <span className="location-label">Investment return:</span>
-              <span className="location-value">7.0%/year</span>
-            </div>
-          </div>
-          <div className="location-card-actions">
-            <button 
-              className="location-btn location-btn-primary"
-              onClick={handleUseLocalData}
-            >
-              Use this data
-            </button>
-            <button 
-              className="location-btn location-btn-secondary"
-              onClick={handleKeepMyData}
-            >
-              Keep my numbers
-            </button>
-          </div>
-        </div>
-      )}
-      
-      {/* TEST ML RATES BOX - REMOVED (ML rates are now working!) */}
-      {/* 
-      <div style={{
-        position: 'fixed',
-        top: '20px',
-        right: '20px',
-        width: '350px',
-        backgroundColor: '#fef3c7',
-        border: '4px solid #f59e0b',
-        borderRadius: '8px',
-        padding: '20px',
-        zIndex: 10000,
-        boxShadow: '0 8px 16px rgba(0,0,0,0.3)',
-        maxHeight: '80vh',
-        overflow: 'auto'
-      }}>
-        <div style={{ fontWeight: 'bold', marginBottom: '12px', color: '#92400e', fontSize: '16px' }}>
-          🧪 ML RATES TEST BOX (ALWAYS VISIBLE)
-        </div>
-        <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #f59e0b' }}>
-          <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>unifiedAnalysisResult exists:</div>
-          <div style={{ fontSize: '18px', color: unifiedAnalysisResult ? '#059669' : '#dc2626', fontWeight: 'bold' }}>
-            {unifiedAnalysisResult ? '✅ YES' : '❌ NO - NULL'}
-          </div>
-        </div>
-        {unifiedAnalysisResult ? (
-          <>
-            <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #f59e0b' }}>
-              <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Home Appreciation (ML):</div>
-              <div style={{ fontSize: '24px', color: '#059669', fontWeight: 'bold' }}>
-                {(unifiedAnalysisResult as any)?.home_appreciation_rate ?? unifiedAnalysisResult?.homeAppreciationRate ?? '❌ NOT FOUND'}
-              </div>
-              {(unifiedAnalysisResult as any)?.home_appreciation_rate !== undefined && (
-                <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)' }}>
-                  Value: {(unifiedAnalysisResult as any).home_appreciation_rate}
+        {/* Left Column: Inputs (Chat tab only) */}
+        {activeTab === 'chat' && (
+          <div className="rvb-left">
+            <section style={locationCardStyle} data-tour-id="phase-one-card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+                <div style={{ flex: '1 1 320px' }}>
+                  <span style={phaseLabelStyle}>Phase 1 · Local market data</span>
+                  <h3 style={{ margin: '4px 0 0 0', fontSize: '18px', color: 'rgba(255,255,255,0.92)' }}>
+                    Local market snapshot
+                  </h3>
+                  <p style={locationDescriptionStyle}>
+                    I anchor every analysis to real market data. Mention any ZIP code or city in the chat and I’ll refresh these
+                    numbers automatically.
+                  </p>
                 </div>
-              )}
-            </div>
-            <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #f59e0b' }}>
-              <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Rent Growth (ML):</div>
-              <div style={{ fontSize: '24px', color: '#059669', fontWeight: 'bold' }}>
-                {(unifiedAnalysisResult as any)?.rent_growth_rate ?? unifiedAnalysisResult?.rentGrowthRate ?? '❌ NOT FOUND'}
-              </div>
-              {(unifiedAnalysisResult as any)?.rent_growth_rate !== undefined && (
-                <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)' }}>
-                  Value: {(unifiedAnalysisResult as any).rent_growth_rate}
+                <div style={cityBadgeStyle}>
+                  <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.55)' }}>
+                    Current focus
+                  </div>
+                  <div style={{ fontSize: '16px', fontWeight: 600, marginTop: '4px', color: 'rgba(255,255,255,0.95)' }}>
+                    {locationData ? `📍 ${locationData.city}, ${locationData.state}` : '📍 Waiting for a ZIP'}
+                  </div>
+                  <div style={{ fontSize: '12px', marginTop: '4px', color: 'rgba(255,255,255,0.6)' }}>
+                    {currentZipCode ? `ZIP ${currentZipCode}` : 'Share a ZIP in chat to preload data'}
+                  </div>
                 </div>
-              )}
-            </div>
-            <div style={{ marginTop: '12px', padding: '8px', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #f59e0b' }}>
-              <strong style={{ fontSize: '12px' }}>All Keys in unifiedAnalysisResult:</strong>
-              <pre style={{ fontSize: '10px', overflow: 'auto', maxHeight: '150px', marginTop: '4px' }}>
-                {Object.keys(unifiedAnalysisResult).join(', ')}
-              </pre>
-            </div>
-          </>
-        ) : (
-          <div style={{ padding: '8px', backgroundColor: '#fee2e2', borderRadius: '4px', border: '1px solid #dc2626' }}>
-            <div style={{ color: '#dc2626', fontWeight: 'bold' }}>⚠️ unifiedAnalysisResult is NULL</div>
-            <div style={{ fontSize: '12px', marginTop: '4px' }}>This means the analysis hasn't run yet or failed.</div>
-          </div>
-        )}
-      </div>
-
-      {/* DUPLICATE REMOVED */}
-      {false && unifiedAnalysisResult && (
-        <div style={{
-          position: 'fixed',
-          top: '20px',
-          right: '20px',
-          width: '350px',
-          backgroundColor: '#fef3c7',
-          border: '4px solid #f59e0b',
-          borderRadius: '8px',
-          padding: '20px',
-          zIndex: 10000,
-          boxShadow: '0 8px 16px rgba(0,0,0,0.3)',
-          maxHeight: '80vh',
-          overflow: 'auto'
-        }}>
-          <div style={{ fontWeight: 'bold', marginBottom: '12px', color: '#92400e', fontSize: '16px' }}>
-            🧪 ML RATES TEST BOX (ALWAYS VISIBLE)
-          </div>
-          <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #f59e0b' }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Home Appreciation (ML):</div>
-            <div style={{ fontSize: '24px', color: '#059669', fontWeight: 'bold' }}>
-              {(unifiedAnalysisResult as any)?.home_appreciation_rate ?? unifiedAnalysisResult?.homeAppreciationRate ?? '❌ NOT FOUND'}
-            </div>
-            {(unifiedAnalysisResult as any)?.home_appreciation_rate !== undefined && (
-              <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)' }}>
-                Value: {(unifiedAnalysisResult as any).home_appreciation_rate}
               </div>
-            )}
-          </div>
-          <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #f59e0b' }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Rent Growth (ML):</div>
-            <div style={{ fontSize: '24px', color: '#059669', fontWeight: 'bold' }}>
-              {(unifiedAnalysisResult as any)?.rent_growth_rate ?? unifiedAnalysisResult?.rentGrowthRate ?? '❌ NOT FOUND'}
-            </div>
-            {(unifiedAnalysisResult as any)?.rent_growth_rate !== undefined && (
-              <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)' }}>
-                Value: {(unifiedAnalysisResult as any).rent_growth_rate}
-              </div>
-            )}
-          </div>
-          <div style={{ marginTop: '12px', padding: '8px', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #f59e0b' }}>
-            <strong style={{ fontSize: '12px' }}>All Keys in unifiedAnalysisResult:</strong>
-            <pre style={{ fontSize: '10px', overflow: 'auto', maxHeight: '150px', marginTop: '4px' }}>
-              {unifiedAnalysisResult ? Object.keys(unifiedAnalysisResult as object).join(', ') : 'null'}
-            </pre>
-          </div>
-        </div>
-      )}
-      
-          {/* Reference Box: Always visible for tour, show placeholder when no scenario */}
-          <div 
-            className={`reference-box ${hasScenario ? 'rvb-fade-in' : ''}`}
-            data-tour-id="scenario-card"
-            style={{ 
-              display: isReferenceBoxVisible || !hasScenario ? 'block' : 'none',
-              opacity: hasScenario ? 1 : 0.6 
-            }}
-          >
-            {!hasScenario ? (
-              <div className="reference-box-placeholder">
-                <p>Your scenario will appear here once you enter your ZIP code or provide home price and rent.</p>
-              </div>
-            ) : (
-              <>
-              <div 
-                className="reference-box-header"
-              >
-            <div style={{ flex: 1 }}>
-              <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.95)' }}>Step 2: Your scenario</h4>
-              <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)', fontWeight: 400, lineHeight: '1.4' }}>
-                These are the numbers I'm using for your analysis. You can edit anything if it doesn't match your situation.
-              </p>
-            </div>
-            <button 
-              className="close-reference-btn"
-              onClick={handleCloseReferenceBox}
-              title="Close"
-            >
-              ×
-            </button>
-          </div>
-
-          <div className="reference-box-content">
-            {(() => {
-              const currentInputs = buildScenarioInputs(userData, locationData, unifiedAnalysisResult);
-              const downPaymentAmount = userData.homePrice && userData.downPaymentPercent 
-                ? (userData.homePrice * userData.downPaymentPercent / 100) 
-                : null;
-              // Use rates from analysis result if available (ML predictions), otherwise fall back
-              let rateSource = locationData && userData.timeHorizonYears
-                ? getZIPBasedRates(locationData, userData.timeHorizonYears)
-                : userData.timeHorizonYears
-                ? getTimelineBasedRates(userData.timeHorizonYears)
-                : null;
-              
-              // Override with rates from analysis if available (these are the actual rates used)
-              // Backend returns snake_case, so we need to check both formats
-              const mlHomeRate = (unifiedAnalysisResult as any)?.home_appreciation_rate ?? unifiedAnalysisResult?.homeAppreciationRate;
-              const mlRentRate = (unifiedAnalysisResult as any)?.rent_growth_rate ?? unifiedAnalysisResult?.rentGrowthRate;
-              
-              
-              // TEST: Compare expected vs actual
-              if (unifiedAnalysisResult) {
-                const expectedHome = (unifiedAnalysisResult as any)?.home_appreciation_rate ?? unifiedAnalysisResult?.homeAppreciationRate;
-                const expectedRent = (unifiedAnalysisResult as any)?.rent_growth_rate ?? unifiedAnalysisResult?.rentGrowthRate;
-                const actualHome = rateSource?.homeAppreciationRate;
-                const actualRent = rateSource?.rentGrowthRate;
-              }
-              
-              if (mlHomeRate !== undefined && mlRentRate !== undefined && rateSource) {
-                rateSource = {
-                  ...rateSource,
-                  homeAppreciationRate: mlHomeRate,
-                  rentGrowthRate: mlRentRate
-                };
-              }
-              
-              return usingZipData && locationData ? (
-                // Scenario 1: Using ZIP data
+              {locationData ? (
                 <>
-                  <div style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '2px solid rgba(139, 92, 246, 0.3)' }}>
-                    <div style={{ fontSize: '22px', fontWeight: 'bold', color: 'rgba(255, 255, 255, 0.95)', marginBottom: '8px', textAlign: 'center' }}>
-                      🏙️ {locationData.city}, {locationData.state}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)', marginBottom: '8px', textAlign: 'center' }}>
-                      Based on local market data (you can override anything)
-                    </div>
-                  </div>
-                  
-                  {/* Basics Section */}
-                  <div style={{ marginBottom: '16px' }}>
-                    <strong style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.95)', display: 'block', marginBottom: '8px' }}>Basics</strong>
-                    <div className="reference-item">
-                      <span className="ref-label">🏠 Home:</span>
-                      {isEditMode ? (
-                        <div className="ref-input-container">
-                          <input
-                            type="number"
-                            value={editableValues?.homePrice || ''}
-                            onChange={(e) => setEditableValues(prev => prev ? {...prev, homePrice: parseInt(e.target.value) || null} : null)}
-                            className="ref-input"
-                            placeholder="Home price"
-                          />
-                          <small>({locationData.city})</small>
-                        </div>
-                      ) : (
-                        <span className="ref-value">
-                          {userData.homePrice ? `$${userData.homePrice.toLocaleString()}` : '___'} 
-                          <small>({locationData.city})</small>
-                        </span>
-                      )}
-                    </div>
-                    <div className="reference-item">
-                      <span className="ref-label">💵 Rent:</span>
-                      {isEditMode ? (
-                        <div className="ref-input-container">
-                          <input
-                            type="number"
-                            value={editableValues?.monthlyRent || ''}
-                            onChange={(e) => setEditableValues(prev => prev ? {...prev, monthlyRent: parseInt(e.target.value) || null} : null)}
-                            className="ref-input"
-                            placeholder="Monthly rent"
-                          />
-                          <small>({locationData.city})</small>
-                        </div>
-                      ) : (
-                        <span className="ref-value">
-                          {userData.monthlyRent ? `$${userData.monthlyRent.toLocaleString()}/mo` : '___'} 
-                          <small>({locationData.city})</small>
-                        </span>
-                      )}
-                    </div>
-                    <div className="reference-item">
-                      <span className="ref-label">💰 Down:</span>
-                      {isEditMode ? (
-                        <div className="ref-input-container">
-                          <input
-                            type="number"
-                            value={editableValues?.downPaymentPercent || ''}
-                            onChange={(e) => setEditableValues(prev => prev ? {...prev, downPaymentPercent: parseInt(e.target.value) || null} : null)}
-                            className="ref-input"
-                            placeholder="Down payment %"
-                            min="1"
-                            max="100"
-                          />
-                          <small>(you chose)</small>
-                        </div>
-                      ) : (
-                        <span className="ref-value">
-                          {userData.downPaymentPercent ? `${userData.downPaymentPercent}%` : '___'} 
-                          {downPaymentAmount && <small> (${downPaymentAmount.toLocaleString()})</small>}
-                          <small>(you chose)</small>
-                        </span>
-                      )}
-                    </div>
-                    <div className="reference-item">
-                      <span className="ref-label">⏰ Timeline:</span>
-                      {isEditMode ? (
-                        <div className="ref-input-container">
-                          <input
-                            type="number"
-                            value={editableValues?.timeHorizonYears || ''}
-                            onChange={(e) => setEditableValues(prev => prev ? {...prev, timeHorizonYears: parseInt(e.target.value) || null} : null)}
-                            className="ref-input"
-                            placeholder="Years"
-                            min="1"
-                            max="30"
-                          />
-                          <small>(you chose)</small>
-                        </div>
-                      ) : (
-                        <span className="ref-value">
-                          {userData.timeHorizonYears ? `${userData.timeHorizonYears} years` : '___'} 
-                          <small>(you chose)</small>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Assumptions & Market Data Section (Collapsible) */}
-                  <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '2px solid rgba(139, 92, 246, 0.3)' }}>
-                    <button
-                      onClick={() => setShowAdvancedAssumptions(!showAdvancedAssumptions)}
-                      className="rvb-advanced-toggle"
-                      style={{
-                        width: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        background: 'rgba(30, 30, 40, 0.6)',
-                        border: '1px solid rgba(139, 92, 246, 0.3)',
-                        borderRadius: '12px',
-                        color: 'rgba(255, 255, 255, 0.9)',
-                        fontSize: '14px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        padding: '10px 12px',
-                        margin: 0,
-                        transition: 'background 0.2s ease'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)';
-                        e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.5)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = 'rgba(30, 30, 40, 0.6)';
-                        e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)';
-                      }}
-                    >
-                      <span>Assumptions & Market Data</span>
-                      <span style={{ opacity: 0.7, fontSize: '14px', marginLeft: '8px', color: 'rgba(255, 255, 255, 0.9)' }}>
-                        {showAdvancedAssumptions ? '▾' : '▸'}
-                      </span>
-                    </button>
-                    
-                    {/* Always show ML predictions as summary */}
-                    {(rateSource || mlRentRate !== undefined || mlHomeRate !== undefined) && (
-                      <div style={{ marginTop: '8px' }}>
-                        <div className="reference-item">
-                          <span className="ref-label">📈 Rent growth:</span>
-                          <span className="ref-value">
-                            {(() => {
-                              const displayRate = mlRentRate !== undefined ? mlRentRate : (rateSource?.rentGrowthRate ?? 0);
-                              return displayRate > 0 ? `${displayRate.toFixed(1)}%/year` : '___';
-                            })()}
-                            <small>({mlRentRate !== undefined ? 'ML prediction' : locationData ? `${locationData.city} market` : 'national avg'})</small>
-                          </span>
-                        </div>
-                        <div className="reference-item">
-                          <span className="ref-label">🏘️ Appreciation:</span>
-                          <span className="ref-value">
-                            {(() => {
-                              const displayRate = mlHomeRate !== undefined ? mlHomeRate : (rateSource?.homeAppreciationRate ?? 0);
-                              return displayRate > 0 ? `${displayRate.toFixed(1)}%/year` : '___';
-                            })()}
-                            <small>({mlHomeRate !== undefined ? 'ML prediction' : locationData ? `${locationData.city} market` : 'based on timeline'})</small>
-                          </span>
-                        </div>
+                  <div style={metricGridStyle}>
+                    {locationMetrics.map((metric) => (
+                      <div key={metric.label} style={metricItemStyle}>
+                        <span style={metricLabelStyle}>{metric.label}: </span>
+                        <span style={metricValueStyle}>{metric.value}</span>
                       </div>
-                    )}
-                    
-                    {/* Show detailed assumptions when expanded */}
-                    {showAdvancedAssumptions && (
-                      <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(139, 92, 246, 0.2)' }}>
-                        {currentInputs && (
-                          <>
-                            <div className="reference-item">
-                              <span className="ref-label">📋 Loan term:</span>
-                              <span className="ref-value">{currentInputs.loanTermYears} years <small>(standard)</small></span>
-                            </div>
-                            <div className="reference-item">
-                              <span className="ref-label">📊 Mortgage rate:</span>
-                              {isEditMode ? (
-                                <div className="ref-input-container">
-                                  <input
-                                    type="number"
-                                    value={currentInputs.interestRate}
-                                    className="ref-input"
-                                    placeholder="Mortgage rate"
-                                    step="0.1"
-                                    disabled
-                                  />
-                                  <small>(read-only for now)</small>
-                                </div>
-                              ) : (
-                                <span className="ref-value">{currentInputs.interestRate}% <small>(default)</small></span>
-                              )}
-                            </div>
-                            <div className="reference-item">
-                              <span className="ref-label">🏛️ Property tax:</span>
-                              {isEditMode ? (
-                                <div className="ref-input-container">
-                                  <input
-                                    type="number"
-                                    value={(locationData.propertyTaxRate * 100).toFixed(2)}
-                                    className="ref-input"
-                                    placeholder="Property tax rate"
-                                    step="0.01"
-                                    disabled
-                                  />
-                                  <small>(read-only for now)</small>
-                                </div>
-                              ) : (
-                                <span className="ref-value">
-                                  {(locationData.propertyTaxRate * 100).toFixed(2)}% 
-                                  <small>({locationData.state} state avg)</small>
-                                </span>
-                              )}
-                            </div>
-                            <div className="reference-item">
-                              <span className="ref-label">🔧 Maintenance:</span>
-                              {isEditMode ? (
-                                <div className="ref-input-container">
-                                  <input
-                                    type="number"
-                                    value={currentInputs.maintenanceRate}
-                                    className="ref-input"
-                                    placeholder="Maintenance %"
-                                    step="0.1"
-                                    disabled
-                                  />
-                                  <small>(read-only for now)</small>
-                                </div>
-                              ) : (
-                                <span className="ref-value">{currentInputs.maintenanceRate}% of home value/year <small>(default)</small></span>
-                              )}
-                            </div>
-                            <div className="reference-item">
-                              <span className="ref-label">🛡️ Home insurance:</span>
-                              {isEditMode ? (
-                                <div className="ref-input-container">
-                                  <input
-                                    type="number"
-                                    value={currentInputs.homeInsuranceAnnual}
-                                    className="ref-input"
-                                    placeholder="Home insurance annual"
-                                    disabled
-                                  />
-                                  <small>(read-only for now)</small>
-                                </div>
-                              ) : (
-                                <span className="ref-value">${currentInputs.homeInsuranceAnnual.toLocaleString()}/year <small>(default)</small></span>
-                              )}
-                            </div>
-                            <div className="reference-item">
-                              <span className="ref-label">🛡️ Renter insurance:</span>
-                              {isEditMode ? (
-                                <div className="ref-input-container">
-                                  <input
-                                    type="number"
-                                    value={currentInputs.renterInsuranceAnnual}
-                                    className="ref-input"
-                                    placeholder="Renter insurance annual"
-                                    disabled
-                                  />
-                                  <small>(read-only for now)</small>
-                                </div>
-                              ) : (
-                                <span className="ref-value">${currentInputs.renterInsuranceAnnual.toLocaleString()}/year <small>(default)</small></span>
-                              )}
-                            </div>
-                            {currentInputs.hoaMonthly > 0 && (
-                              <div className="reference-item">
-                                <span className="ref-label">🏘️ HOA:</span>
-                                {isEditMode ? (
-                                  <div className="ref-input-container">
-                                    <input
-                                      type="number"
-                                      value={currentInputs.hoaMonthly}
-                                      className="ref-input"
-                                      placeholder="HOA monthly"
-                                      disabled
-                                    />
-                                    <small>(read-only for now)</small>
-                                  </div>
-                                ) : (
-                                  <span className="ref-value">${currentInputs.hoaMonthly.toLocaleString()}/mo <small>(default)</small></span>
-                                )}
-                              </div>
-                            )}
-                            <div className="reference-item">
-                              <span className="ref-label">💹 Investment:</span>
-                              {isEditMode ? (
-                                <div className="ref-input-container">
-                                  <input
-                                    type="number"
-                                    value={rateSource?.investmentReturnRate ?? 0}
-                                    className="ref-input"
-                                    placeholder="Investment return %"
-                                    step="0.1"
-                                    disabled
-                                  />
-                                  <small>(read-only for now)</small>
-                                </div>
-                              ) : (
-                                <span className="ref-value">
-                                  {rateSource ? `${rateSource.investmentReturnRate}%/year` : '___'} 
-                                  <small>(based on timeline)</small>
-                                </span>
-                              )}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
+                    ))}
                   </div>
+                  <p style={locationFooterStyle}>
+                    Want to compare a different neighborhood? Just mention another ZIP or city in the chat.
+                  </p>
                 </>
               ) : (
-                // Scenario 2: Using custom data
-                <>
-                  {/* Basics Section */}
-                  <div style={{ marginBottom: '16px' }}>
-                    <strong style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.95)', display: 'block', marginBottom: '8px' }}>Basics</strong>
-                    <div className="reference-item">
-                      <span className="ref-label">🏠 Home:</span>
-                      {isEditMode ? (
-                        <div className="ref-input-container">
-                          <input
-                            type="number"
-                            value={editableValues?.homePrice || ''}
-                            onChange={(e) => setEditableValues(prev => prev ? {...prev, homePrice: parseInt(e.target.value) || null} : null)}
-                            className="ref-input"
-                            placeholder="Home price"
-                          />
-                          <small>(you chose)</small>
-                        </div>
-                      ) : (
-                        <span className="ref-value">
-                          {userData.homePrice ? `$${userData.homePrice.toLocaleString()}` : '___'} 
-                          <small>(you chose)</small>
-                        </span>
-                      )}
-                    </div>
-                    <div className="reference-item">
-                      <span className="ref-label">💵 Rent:</span>
-                      {isEditMode ? (
-                        <div className="ref-input-container">
-                          <input
-                            type="number"
-                            value={editableValues?.monthlyRent || ''}
-                            onChange={(e) => setEditableValues(prev => prev ? {...prev, monthlyRent: parseInt(e.target.value) || null} : null)}
-                            className="ref-input"
-                            placeholder="Monthly rent"
-                          />
-                          <small>(you chose)</small>
-                        </div>
-                      ) : (
-                        <span className="ref-value">
-                          {userData.monthlyRent ? `$${userData.monthlyRent.toLocaleString()}/mo` : '___'} 
-                          <small>(you chose)</small>
-                        </span>
-                      )}
-                    </div>
-                    <div className="reference-item">
-                      <span className="ref-label">💰 Down:</span>
-                      {isEditMode ? (
-                        <div className="ref-input-container">
-                          <input
-                            type="number"
-                            value={editableValues?.downPaymentPercent || ''}
-                            onChange={(e) => setEditableValues(prev => prev ? {...prev, downPaymentPercent: parseInt(e.target.value) || null} : null)}
-                            className="ref-input"
-                            placeholder="Down payment %"
-                            min="1"
-                            max="100"
-                          />
-                          <small>(you chose)</small>
-                        </div>
-                      ) : (
-                        <span className="ref-value">
-                          {userData.downPaymentPercent ? `${userData.downPaymentPercent}%` : '___'} 
-                          {downPaymentAmount && <small> (${downPaymentAmount.toLocaleString()})</small>}
-                          <small>(you chose)</small>
-                        </span>
-                      )}
-                    </div>
-                    <div className="reference-item">
-                      <span className="ref-label">⏰ Timeline:</span>
-                      {isEditMode ? (
-                        <div className="ref-input-container">
-                          <input
-                            type="number"
-                            value={editableValues?.timeHorizonYears || ''}
-                            onChange={(e) => setEditableValues(prev => prev ? {...prev, timeHorizonYears: parseInt(e.target.value) || null} : null)}
-                            className="ref-input"
-                            placeholder="Years"
-                            min="1"
-                            max="30"
-                          />
-                          <small>(you chose)</small>
-                        </div>
-                      ) : (
-                        <span className="ref-value">
-                          {userData.timeHorizonYears ? `${userData.timeHorizonYears} years` : '___'} 
-                          <small>(you chose)</small>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Assumptions & Market Data Section (Collapsible) */}
-                  <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '2px solid rgba(139, 92, 246, 0.3)' }}>
-                    <button
-                      onClick={() => setShowAdvancedAssumptions(!showAdvancedAssumptions)}
-                      className="rvb-advanced-toggle"
-                      style={{
-                        width: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        background: 'rgba(30, 30, 40, 0.6)',
-                        border: '1px solid rgba(139, 92, 246, 0.3)',
-                        borderRadius: '12px',
-                        color: 'rgba(255, 255, 255, 0.9)',
-                        fontSize: '14px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        padding: '10px 12px',
-                        margin: 0,
-                        transition: 'background 0.2s ease'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)';
-                        e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.5)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = 'rgba(30, 30, 40, 0.6)';
-                        e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)';
-                      }}
-                    >
-                      <span>Assumptions & Market Data</span>
-                      <span style={{ opacity: 0.7, fontSize: '14px', marginLeft: '8px', color: 'rgba(255, 255, 255, 0.9)' }}>
-                        {showAdvancedAssumptions ? '▾' : '▸'}
-                      </span>
-                    </button>
-                    
-                    {/* Always show ML predictions as summary */}
-                    {(rateSource || mlRentRate !== undefined || mlHomeRate !== undefined) && (
-                      <div style={{ marginTop: '8px' }}>
-                        <div className="reference-item">
-                          <span className="ref-label">📈 Rent growth:</span>
-                          <span className="ref-value">
-                            {(() => {
-                              const displayRate = mlRentRate !== undefined ? mlRentRate : (rateSource?.rentGrowthRate ?? 0);
-                              return displayRate > 0 ? `${displayRate.toFixed(1)}%/year` : '___';
-                            })()}
-                            <small>({mlRentRate !== undefined ? 'ML prediction' : 'national avg'})</small>
-                          </span>
-                        </div>
-                        <div className="reference-item">
-                          <span className="ref-label">🏘️ Appreciation:</span>
-                          <span className="ref-value">
-                            {(() => {
-                              const displayRate = mlHomeRate !== undefined ? mlHomeRate : (rateSource?.homeAppreciationRate ?? 0);
-                              return displayRate > 0 ? `${displayRate.toFixed(1)}%/year` : '___';
-                            })()}
-                            <small>({mlHomeRate !== undefined ? 'ML prediction' : 'based on timeline'})</small>
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Show detailed assumptions when expanded */}
-                    {showAdvancedAssumptions && (
-                      <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(139, 92, 246, 0.2)' }}>
-                        {currentInputs && (
-                          <>
-                            <div className="reference-item">
-                              <span className="ref-label">📋 Loan term:</span>
-                              <span className="ref-value">{currentInputs.loanTermYears} years <small>(standard)</small></span>
-                            </div>
-                            <div className="reference-item">
-                              <span className="ref-label">📊 Mortgage rate:</span>
-                              {isEditMode ? (
-                                <div className="ref-input-container">
-                                  <input
-                                    type="number"
-                                    value={currentInputs.interestRate}
-                                    className="ref-input"
-                                    placeholder="Mortgage rate"
-                                    step="0.1"
-                                    disabled
-                                  />
-                                  <small>(read-only for now)</small>
-                                </div>
-                              ) : (
-                                <span className="ref-value">{currentInputs.interestRate}% <small>(default)</small></span>
-                              )}
-                            </div>
-                            <div className="reference-item">
-                              <span className="ref-label">🏛️ Property tax:</span>
-                              {isEditMode ? (
-                                <div className="ref-input-container">
-                                  <input
-                                    type="number"
-                                    value={currentInputs.propertyTaxRate.toFixed(2)}
-                                    className="ref-input"
-                                    placeholder="Property tax rate"
-                                    step="0.01"
-                                    disabled
-                                  />
-                                  <small>(read-only for now)</small>
-                                </div>
-                              ) : (
-                                <span className="ref-value">
-                                  {currentInputs.propertyTaxRate.toFixed(2)}% 
-                                  <small>(national avg)</small>
-                                </span>
-                              )}
-                            </div>
-                            <div className="reference-item">
-                              <span className="ref-label">🔧 Maintenance:</span>
-                              {isEditMode ? (
-                                <div className="ref-input-container">
-                                  <input
-                                    type="number"
-                                    value={currentInputs.maintenanceRate}
-                                    className="ref-input"
-                                    placeholder="Maintenance %"
-                                    step="0.1"
-                                    disabled
-                                  />
-                                  <small>(read-only for now)</small>
-                                </div>
-                              ) : (
-                                <span className="ref-value">{currentInputs.maintenanceRate}% of home value/year <small>(default)</small></span>
-                              )}
-                            </div>
-                            <div className="reference-item">
-                              <span className="ref-label">🛡️ Home insurance:</span>
-                              {isEditMode ? (
-                                <div className="ref-input-container">
-                                  <input
-                                    type="number"
-                                    value={currentInputs.homeInsuranceAnnual}
-                                    className="ref-input"
-                                    placeholder="Home insurance annual"
-                                    disabled
-                                  />
-                                  <small>(read-only for now)</small>
-                                </div>
-                              ) : (
-                                <span className="ref-value">${currentInputs.homeInsuranceAnnual.toLocaleString()}/year <small>(default)</small></span>
-                              )}
-                            </div>
-                            <div className="reference-item">
-                              <span className="ref-label">🛡️ Renter insurance:</span>
-                              {isEditMode ? (
-                                <div className="ref-input-container">
-                                  <input
-                                    type="number"
-                                    value={currentInputs.renterInsuranceAnnual}
-                                    className="ref-input"
-                                    placeholder="Renter insurance annual"
-                                    disabled
-                                  />
-                                  <small>(read-only for now)</small>
-                                </div>
-                              ) : (
-                                <span className="ref-value">${currentInputs.renterInsuranceAnnual.toLocaleString()}/year <small>(default)</small></span>
-                              )}
-                            </div>
-                            {currentInputs.hoaMonthly > 0 && (
-                              <div className="reference-item">
-                                <span className="ref-label">🏘️ HOA:</span>
-                                {isEditMode ? (
-                                  <div className="ref-input-container">
-                                    <input
-                                      type="number"
-                                      value={currentInputs.hoaMonthly}
-                                      className="ref-input"
-                                      placeholder="HOA monthly"
-                                      disabled
-                                    />
-                                    <small>(read-only for now)</small>
-                                  </div>
-                                ) : (
-                                  <span className="ref-value">${currentInputs.hoaMonthly.toLocaleString()}/mo <small>(default)</small></span>
-                                )}
-                              </div>
-                            )}
-                            <div className="reference-item">
-                              <span className="ref-label">💹 Investment:</span>
-                              {isEditMode ? (
-                                <div className="ref-input-container">
-                                  <input
-                                    type="number"
-                                    value={rateSource?.investmentReturnRate ?? 0}
-                                    className="ref-input"
-                                    placeholder="Investment return %"
-                                    step="0.1"
-                                    disabled
-                                  />
-                                  <small>(read-only for now)</small>
-                                </div>
-                              ) : (
-                                <span className="ref-value">
-                                  {rateSource ? `${rateSource.investmentReturnRate}%/year` : '___'} 
-                                  <small>(based on timeline)</small>
-                                </span>
-                              )}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </>
-              );
-            })()}
-          </div>
-          
-          {/* Edit Mode Buttons */}
-          <div className="reference-box-actions">
-            {!isEditMode ? (
-              <div style={{ width: '100%' }}>
-                <button 
-                  className="edit-values-btn"
-                  onClick={handleEditValues}
-                  title="Change home price, rent, down payment, or timeframe"
-                >
-                  Edit scenario
-                </button>
-                <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: '#a0aec0', textAlign: 'center' }}>
-                  Change home price, rent, down payment, or timeframe.
+                <p style={locationDescriptionStyle}>
+                  Tell me a ZIP code like “95125” or say “Analyze Austin” and I’ll pull the local prices, rents, taxes, and growth
+                  rates for you.
                 </p>
-              </div>
-            ) : (
-              <div className="edit-actions">
-                <button 
-                  className="save-edit-btn"
-                  onClick={handleSaveEdit}
-                >
-                  Save Changes
-                </button>
-                <button 
-                  className="cancel-edit-btn"
-                  onClick={handleCancelEdit}
-                >
-                  Cancel
-                </button>
-              </div>
-            )}
+              )}
+            </section>
+
+            <BasicInputsCard
+              values={basicValues}
+              editingValues={editableValues ?? basicValues}
+              isEditMode={isEditMode}
+              onFieldChange={handleBasicFieldChange}
+              onEdit={handleEditValues}
+              onSave={handleSaveEdit}
+              onCancel={handleCancelEdit}
+            />
+
+            <AdvancedInputsCard
+              values={advancedInputs}
+              editingValues={editableAdvancedValues ?? advancedInputs}
+              isEditMode={isEditMode}
+              isExpanded={showAdvancedAssumptions}
+              onToggle={() => setShowAdvancedAssumptions(prev => !prev)}
+              onFieldChange={handleAdvancedFieldChange}
+            />
           </div>
-              </>
-            )}
-          </div>
-        </div>
-        
+        )}
+
         {/* Right Column: Chat Container */}
         <div className="rvb-right">
           <div className="chat-container">
@@ -3900,52 +3193,40 @@ const handleChipClick = (message: string) => {
               <button
                 className={`tab-button ${activeTab === 'chat' ? 'active' : ''}`}
                 onClick={() => setActiveTab('chat')}
+                data-tour-id="chat-tab-button"
               >
-                💬 Chat
+                💬 Chat & Setup
               </button>
               <button
                 className={`tab-button ${activeTab === 'charts' ? 'active' : ''}`}
                 onClick={() => setActiveTab('charts')}
-                title="View all charts"
+                title="View the charts dashboard"
+                data-tour-id="charts-tab-button"
               >
-                📊 All Charts
+                📊 Charts Dashboard
               </button>
             </div>
-            <button 
-              className="save-button"
-              onClick={handleSaveChat}
-              title="Save current chat"
-              data-tour-id="save-button"
-            >
-              Save Chat
-            </button>
-            <button 
-              className="restart-button"
-              onClick={() => setShowRestartModal(true)}
-              title="Start over"
-              data-tour-id="restart-button"
-            >
-Restart
-            </button>
+            {activeTab === 'chat' && (
+              <>
+                <button 
+                  className="save-button"
+                  onClick={handleSaveChat}
+                  title="Save current chat"
+                  data-tour-id="save-button"
+                >
+                  Save Chat
+                </button>
+                <button 
+                  className="restart-button"
+                  onClick={() => setShowRestartModal(true)}
+                  title="Start over"
+                  data-tour-id="restart-button"
+                >
+                  Restart
+                </button>
+              </>
+            )}
             {/* Toggle Reference Box Button - Always visible */}
-            <button 
-              className="toggle-reference-btn"
-              onClick={handleToggleReferenceBox}
-              title={isReferenceBoxVisible ? "Hide scenario" : "Show scenario"}
-              data-tour-id="scenario-toggle-button"
-              disabled={!((isLocationLocked && userData.homePrice && userData.monthlyRent) || 
-                (userData.homePrice && userData.monthlyRent && userData.downPaymentPercent && userData.timeHorizonYears))}
-              style={{
-                opacity: ((isLocationLocked && userData.homePrice && userData.monthlyRent) || 
-                  (userData.homePrice && userData.monthlyRent && userData.downPaymentPercent && userData.timeHorizonYears)) ? 1 : 0.5,
-                cursor: ((isLocationLocked && userData.homePrice && userData.monthlyRent) || 
-                  (userData.homePrice && userData.monthlyRent && userData.downPaymentPercent && userData.timeHorizonYears)) ? 'pointer' : 'not-allowed'
-              }}
-            >
-              <span className="toggle-btn-content">
-                <span className="toggle-btn-label">Scenario</span>
-              </span>
-            </button>
           </div>
       </div>
       
@@ -4054,41 +3335,48 @@ Restart
         </>
       ) : (
         <div className="charts-tab-container">
-          <ChartsGrid
-            snapshotData={messages.find(m => m.snapshotData)?.snapshotData || null}
-            timeline={unifiedAnalysisResult?.timeline?.map(p => ({
-              monthIndex: (p as any).month_index ?? p.monthIndex ?? 0,
-              year: (p as any).year ?? Math.ceil(((p as any).month_index ?? p.monthIndex ?? 0) / 12),
-              netWorthBuy: (p as any).net_worth_buy ?? p.netWorthBuy ?? 0,
-              netWorthRent: (p as any).net_worth_rent ?? p.netWorthRent ?? 0,
-              totalCostBuyToDate: (p as any).total_cost_buy_to_date ?? p.totalCostBuyToDate ?? 0,
-              totalCostRentToDate: (p as any).total_cost_rent_to_date ?? p.totalCostRentToDate ?? 0,
-              buyMonthlyOutflow: (p as any).buy_monthly_outflow ?? p.buyMonthlyOutflow ?? 0,
-              rentMonthlyOutflow: (p as any).rent_monthly_outflow ?? p.rentMonthlyOutflow ?? 0,
-              mortgagePayment: (p as any).mortgage_payment ?? p.mortgagePayment ?? 0,
-              propertyTaxMonthly: (p as any).property_tax_monthly ?? p.propertyTaxMonthly ?? 0,
-              insuranceMonthly: (p as any).insurance_monthly ?? p.insuranceMonthly ?? 0,
-              maintenanceMonthly: (p as any).maintenance_monthly ?? p.maintenanceMonthly ?? 0,
-              hoaMonthly: (p as any).hoa_monthly ?? p.hoaMonthly ?? 0,
-              principalPaid: (p as any).principal_paid ?? p.principalPaid ?? 0,
-              interestPaid: (p as any).interest_paid ?? p.interestPaid ?? 0,
-              remainingBalance: (p as any).remaining_balance ?? p.remainingBalance ?? 0,
-              homeValue: (p as any).home_value ?? p.homeValue ?? 0,
-              homeEquity: (p as any).home_equity ?? p.homeEquity ?? 0,
-              renterInvestmentBalance: (p as any).renter_investment_balance ?? p.renterInvestmentBalance ?? 0,
-              buyerCashAccount: (p as any).buyer_cash_account ?? p.buyerCashAccount ?? 0,
-            })) || undefined}
-            data={chartData || undefined}
-            monthlyCosts={monthlyCosts || undefined}
-            totalCostData={totalCostData || undefined}
-            advancedMetrics={advancedMetrics}
-            heatmapData={heatmapData || undefined}
-            monteCarloData={monteCarloData || undefined}
-            sensitivityData={sensitivityData || undefined}
-            scenarioOverlayData={scenarioOverlayData || undefined}
-            chartsReady={chartsReady}
-            chartLoading={chartLoading}
-          />
+          <div className="charts-grid-wrapper">
+            <div className="charts-panel">
+              <ChartsGrid
+                snapshotData={messages.find(m => m.snapshotData)?.snapshotData || null}
+                timeline={unifiedAnalysisResult?.timeline?.map(p => ({
+                  monthIndex: (p as any).month_index ?? p.monthIndex ?? 0,
+                  year: (p as any).year ?? Math.ceil(((p as any).month_index ?? p.monthIndex ?? 0) / 12),
+                  netWorthBuy: (p as any).net_worth_buy ?? p.netWorthBuy ?? 0,
+                  netWorthRent: (p as any).net_worth_rent ?? p.netWorthRent ?? 0,
+                  totalCostBuyToDate: (p as any).total_cost_buy_to_date ?? p.totalCostBuyToDate ?? 0,
+                  totalCostRentToDate: (p as any).total_cost_rent_to_date ?? p.totalCostRentToDate ?? 0,
+                  buyMonthlyOutflow: (p as any).buy_monthly_outflow ?? p.buyMonthlyOutflow ?? 0,
+                  rentMonthlyOutflow: (p as any).rent_monthly_outflow ?? p.rentMonthlyOutflow ?? 0,
+                  mortgagePayment: (p as any).mortgage_payment ?? p.mortgagePayment ?? 0,
+                  propertyTaxMonthly: (p as any).property_tax_monthly ?? p.propertyTaxMonthly ?? 0,
+                  insuranceMonthly: (p as any).insurance_monthly ?? p.insuranceMonthly ?? 0,
+                  maintenanceMonthly: (p as any).maintenance_monthly ?? p.maintenanceMonthly ?? 0,
+                  hoaMonthly: (p as any).hoa_monthly ?? p.hoaMonthly ?? 0,
+                  principalPaid: (p as any).principal_paid ?? p.principalPaid ?? 0,
+                  interestPaid: (p as any).interest_paid ?? p.interestPaid ?? 0,
+                  remainingBalance: (p as any).remaining_balance ?? p.remainingBalance ?? 0,
+                  homeValue: (p as any).home_value ?? p.homeValue ?? 0,
+                  homeEquity: (p as any).home_equity ?? p.homeEquity ?? 0,
+                  renterInvestmentBalance: (p as any).renter_investment_balance ?? p.renterInvestmentBalance ?? 0,
+                  buyerCashAccount: (p as any).buyer_cash_account ?? p.buyerCashAccount ?? 0,
+                })) || undefined}
+                data={chartData || undefined}
+                monthlyCosts={monthlyCosts || undefined}
+                totalCostData={totalCostData || undefined}
+                advancedMetrics={advancedMetrics}
+                heatmapData={heatmapData || undefined}
+                monteCarloData={monteCarloData || undefined}
+                sensitivityData={sensitivityData || undefined}
+                scenarioOverlayData={scenarioOverlayData || undefined}
+                chartsReady={chartsReady}
+                chartLoading={chartLoading}
+                userData={userData}
+                unifiedAnalysisResult={unifiedAnalysisResult}
+                adjustedAssumptions={adjustedAssumptions ?? undefined}
+              />
+            </div>
+          </div>
         </div>
       )}
           </div>
@@ -4116,7 +3404,8 @@ Restart
           </div>
         )}
         
-        {/* Chart Navigation Buttons - Always visible for tour */}
+        {/* Chart Navigation Buttons - Only visible in Chat & Setup tab */}
+        {activeTab === 'chat' && (
         <div 
           className={`chart-nav-bar ${hasResults ? 'rvb-fade-in' : ''}`} 
           data-tour-id="charts-area"
@@ -4227,6 +3516,7 @@ Restart
             </>
           )}
         </div>
+        )}
       </div>
       
       {/* Restart Confirmation Modal */}
@@ -4517,6 +3807,8 @@ If you can't find a value, use null. Only extract numbers that make sense for ea
       newData.timeHorizonYears = extractedData.timeHorizonYears;
     }
     
+    enrichDownPaymentAndTimeline(message, newData);
+
   } catch (error) {
     console.error('AI extraction failed:', error);
     // Fall back to basic number extraction if AI fails
@@ -4527,6 +3819,50 @@ If you can't find a value, use null. Only extract numbers that make sense for ea
 }
 
 // Fallback extraction for when AI fails
+type AssumptionHint = {
+  downPayment?: number;
+  timeHorizon?: number;
+};
+
+function extractAssumptionHints(message: string): AssumptionHint {
+  const hint: AssumptionHint = {};
+  
+  const percentMatch = message.match(/(\d+(?:\.\d+)?)\s*%/);
+  if (percentMatch) {
+    hint.downPayment = parseFloat(percentMatch[1]);
+  }
+  
+  const yearsMatch = message.match(/(\d+(?:\.\d+)?)\s*(?:years?|yrs?|yr)/i);
+  if (yearsMatch) {
+    hint.timeHorizon = parseFloat(yearsMatch[1]);
+  }
+  
+  return hint;
+}
+
+function buildAssumptionSentence(hint: AssumptionHint): string {
+  const parts: string[] = [];
+  if (hint.downPayment !== undefined) {
+    parts.push(`down payment ${hint.downPayment}%`);
+  }
+  if (hint.timeHorizon !== undefined) {
+    parts.push(`timeline ${hint.timeHorizon} years`);
+  }
+  return parts.join(' and ');
+}
+
+function enrichDownPaymentAndTimeline(message: string, data: UserData) {
+  const percentMatch = message.match(/(\d+(?:\.\d+)?)\s*%/);
+  if (percentMatch && !data.downPaymentPercent) {
+    data.downPaymentPercent = parseFloat(percentMatch[1]);
+  }
+
+  const yearsMatch = message.match(/(\d+(?:\.\d+)?)\s*(?:years?|yrs?|yr)/i);
+  if (yearsMatch && !data.timeHorizonYears) {
+    data.timeHorizonYears = parseFloat(yearsMatch[1]);
+  }
+}
+
 function extractUserDataFallback(message: string, currentData: UserData, locationData: FormattedLocationData | null): { userData: UserData; locationData: FormattedLocationData | null } {
   const newData = { ...currentData };
   const lowerMessage = message.toLowerCase();
@@ -4565,6 +3901,8 @@ function extractUserDataFallback(message: string, currentData: UserData, locatio
     }
   }
   
+  enrichDownPaymentAndTimeline(message, newData);
+
   return { userData: newData, locationData };
 }
 

@@ -54,13 +54,13 @@ export function BreakEvenHeatmap({ points }: BreakEvenHeatmapProps) {
   };
 
   return (
-    <div className="chart-container">
+    <div className="chart-container" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <h3 className="chart-title">Break-Even Heatmap</h3>
       <p className="chart-caption">
         Each cell shows how long it takes buying to beat renting for the timeline (rows) and down payment (columns).
       </p>
 
-      <div className="heatmap-table-wrapper">
+      <div className="heatmap-table-wrapper" style={{ flex: 1, overflow: 'auto', maxHeight: '100%' }}>
         <table className="heatmap-table">
           <thead>
             <tr>
