@@ -206,6 +206,32 @@ This error means the frontend can't reach the backend. Follow these steps:
 | `Python not found` | Python not installed or not in PATH | Install Python 3.11+ and ensure it's in your PATH. |
 | Git push blocked by secret scanning | `.env` accidentally staged | `git reset --soft HEAD~1`, remove `.env` from staging, recommit. |
 
+### Staying Up-To-Date Locally
+
+Whenever new work lands on the shared branch (`dev/charts`), pull it down like this:
+
+```bash
+git fetch origin
+git checkout dev/charts
+git pull origin dev/charts
+```
+
+Then start both services:
+
+```bash
+# Backend
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+
+# Frontend (new terminal)
+cd ../
+npm install
+npm run dev
+```
+
+After these steps, your local environment will match the latest committed state (all tabs, design updates, charts, docs, etc.).
+
 ## 📖 How to Use
 
 ### Basic Workflow
