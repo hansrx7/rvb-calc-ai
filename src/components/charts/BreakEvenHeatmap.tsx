@@ -1,54 +1,86 @@
-import React from 'react';
-import { ResponsiveContainer } from 'recharts';
+// src/components/charts/BreakEvenHeatmap.tsx
 
-interface BreakEvenHeatmapPoint {
-  timelineYears: number;
-  downPaymentPercent: number;
-  breakevenMonth: number | null;
-}
+import './BreakEvenHeatmap.css';
+import type { BreakEvenHeatmapPoint } from '../../types/calculator';
 
 interface BreakEvenHeatmapProps {
   points: BreakEvenHeatmapPoint[];
 }
 
-function getColor(month: number | null) {
-  if (month == null) return '#ccc';
-  if (month <= 36) return '#38a169'; // under 3 yrs bright green
-  if (month <= 60) return '#68d391';
-  if (month <= 108) return '#ecc94b'; // 5-9 yrs yellow
-  if (month <= 180) return '#ed8936'; // 10-15 yrs orange
-  return '#e53e3e'; // very late/never red
-}
-
 export function BreakEvenHeatmap({ points }: BreakEvenHeatmapProps) {
-  // Compose unique X (timeline) and Y (downPayment) labels
-  const xVals = Array.from(new Set(points.map(p => p.timelineYears))).sort((a,b)=>a-b);
-  const yVals = Array.from(new Set(points.map(p => p.downPaymentPercent))).sort((a,b)=>a-b);
-  return (
-    <div className="chart-container">
-      <h3 className="chart-title">Break-Even Heatmap (Timeline × Down Payment)</h3>
-      <div style={{marginBottom: '12px', background: '#f7fafc', padding: '12px', borderRadius: '8px'}}>
-        <strong>Interpretation:</strong> Each cell shows after how many months buying "breaks even" vs renting for a given timeline and down payment. Earlier = greener!
+  if (!points || points.length === 0) {
+    return (
+      <div className="chart-container">
+        <div className="chart-placeholder">No heatmap data available.</div>
       </div>
-      <ResponsiveContainer width="100%" height={yVals.length * 40 + 100}>
-        <table style={{borderCollapse: 'collapse', width:'100%'}}>
+    );
+  }
+
+  const timelines = Array.from(new Set(points.map(p => p.timelineYears))).sort((a, b) => a - b);
+  const downPayments = Array.from(new Set(points.map(p => p.downPaymentPercent))).sort((a, b) => a - b);
+
+  const pointMap = new Map<string, BreakEvenHeatmapPoint>();
+  points.forEach(point => {
+    pointMap.set(`${point.timelineYears}-${point.downPaymentPercent}`, point);
+  });
+
+  const validMonths = points
+    .map(p => p.breakevenMonth ?? null)
+    .filter((value): value is number => typeof value === 'number' && value > 0);
+
+  const maxMonth = validMonths.length > 0 ? Math.max(...validMonths) : 0;
+
+  const formatValue = (month: number | null) => {
+    if (!month || month <= 0) return 'Rent wins';
+    if (month < 12) return `${month} mo`;
+    const years = month / 12;
+    if (years % 1 === 0) return `${years} yr`;
+    return `${years.toFixed(1)} yr`;
+  };
+
+  const getCellStyle = (month: number | null) => {
+    if (!month || month <= 0) {
+      return { background: 'rgba(248, 113, 113, 0.25)', color: '#f87171' };
+    }
+    if (maxMonth === 0) {
+      return { background: 'rgba(139, 92, 246, 0.4)' };
+    }
+    const ratio = month / maxMonth; // 0 -> fastest break-even, 1 -> slowest
+    const hue = 150 - ratio * 120; // green to orange/red
+    return {
+      background: `hsla(${hue}, 70%, 45%, 0.8)`,
+      color: 'white',
+    };
+  };
+
+  return (
+    <div className="chart-container" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <h3 className="chart-title">Break-Even Heatmap</h3>
+      <p className="chart-caption">
+        Each cell shows how long it takes buying to beat renting for the timeline (rows) and down payment (columns).
+      </p>
+
+      <div className="heatmap-table-wrapper" style={{ flex: 1, overflow: 'auto', maxHeight: '100%' }}>
+        <table className="heatmap-table">
           <thead>
             <tr>
-              <th style={{padding: 6, background: '#edf2f7'}}></th>
-              {xVals.map(x => (<th key={x} style={{padding: 6, background: '#edf2f7'}}>{x} yr</th>))}
+              <th>Timeline ↓ / Down Payment →</th>
+              {downPayments.map(dp => (
+                <th key={dp}>{dp}%</th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {yVals.map(y => (
-              <tr key={y}>
-                <th style={{padding: 6, background: '#edf2f7'}}>{y}%</th>
-                {xVals.map(x => {
-                  const match = points.find(p => p.timelineYears === x && p.downPaymentPercent === y);
+            {timelines.map(years => (
+              <tr key={years}>
+                <th>{years} yr</th>
+                {downPayments.map(dp => {
+                  const key = `${years}-${dp}`;
+                  const point = pointMap.get(key);
+                  const month = point?.breakevenMonth ?? null;
                   return (
-                    <td key={x+"_"+y} style={{padding: 4}}>
-                      <div style={{height: 36, display:'flex', alignItems:'center', justifyContent:'center', borderRadius:8, background: getColor(match?.breakevenMonth ?? null)}}>
-                        {match?.breakevenMonth != null ? `${Math.round(match.breakevenMonth / 12)} yr` : 'Never'}
-                      </div>
+                    <td key={key} style={getCellStyle(month)}>
+                      <span>{formatValue(month)}</span>
                     </td>
                   );
                 })}
@@ -56,10 +88,23 @@ export function BreakEvenHeatmap({ points }: BreakEvenHeatmapProps) {
             ))}
           </tbody>
         </table>
-      </ResponsiveContainer>
-      <div className="chart-description" style={{marginTop: '16px'}}>
-        Use this heatmap to find the best combination of timeline and down payment for fast break-even.
+      </div>
+
+      <div className="heatmap-legend">
+        <div className="legend-item">
+          <span className="legend-color legend-fast" />
+          <span>Breaks even fast</span>
+        </div>
+        <div className="legend-item">
+          <span className="legend-color legend-slow" />
+          <span>Breaks even late</span>
+        </div>
+        <div className="legend-item">
+          <span className="legend-color legend-never" />
+          <span>Rent wins over this horizon</span>
+        </div>
       </div>
     </div>
   );
 }
+

@@ -1,0 +1,114 @@
+.scenario-overlay-scroll {
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.scenario-overlay-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scenario-overlay-scroll::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.4);
+  border-radius: 999px;
+}
+
+.scenario-overlay-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+}
+
+.scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.scenario-card {
+  background: rgba(30, 30, 40, 0.9);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scenario-card.is-best {
+  border-color: rgba(16, 185, 129, 0.7);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.25);
+}
+
+.scenario-badge {
+  position: absolute;
+  top: -10px;
+  right: 16px;
+  background: linear-gradient(135deg, #34d399, #10b981);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+.scenario-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12;
+}
+
+.scenario-header h4 {
+  margin: 0;
+  font-size: 16px;
+  color: white;
+}
+
+.scenario-outcome {
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.scenario-outcome.positive {
+  color: #bbf7d0;
+  background-color: rgba(16, 185, 129, 0.15);
+}
+
+.scenario-outcome.negative {
+  color: #fecaca;
+  background-color: rgba(239, 68, 68, 0.15);
+}
+
+.scenario-details,
+.scenario-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.scenario-details div,
+.scenario-metrics div {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.scenario-details span,
+.scenario-metrics span {
+  font-size: 12px;
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.scenario-details strong,
+.scenario-metrics strong {
+  color: white;
+  font-size: 14px;
+}
+

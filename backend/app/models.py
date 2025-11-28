@@ -1,6 +1,7 @@
+
 """Pydantic models for finance analysis inputs and outputs."""
 
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -113,21 +114,73 @@ class CalculatorOutput(BaseModel):
 class AnalysisRequest(BaseModel):
     inputs: ScenarioInputs
     includeTimeline: bool = False
+    zipCode: Optional[str] = None
+    includeMonteCarlo: bool = False  # Make Monte Carlo optional - only run when explicitly requested
+    monteCarloRuns: Optional[int] = None
 
 
 class TimelinePoint(BaseModel):
-    month: int
-    buyerNetWorth: float
-    renterNetWorth: float
-    netWorthDelta: float
+    """Unified timeline point containing all data needed for charts."""
+    month_index: int
+    year: int
+
+    net_worth_buy: float
+    net_worth_rent: float
+
+    total_cost_buy_to_date: float
+    total_cost_rent_to_date: float
+
+    buy_monthly_outflow: float
+    rent_monthly_outflow: float
+
+    mortgage_payment: float
+    property_tax_monthly: float
+    insurance_monthly: float
+    maintenance_monthly: float
+    hoa_monthly: float
+
+    # Additional fields for backward compatibility and advanced charts
+    principal_paid: float = 0.0
+    interest_paid: float = 0.0
+    remaining_balance: float = 0.0
+    home_value: float = 0.0
+    home_equity: float = 0.0
+    renter_investment_balance: float = 0.0
+    buyer_cash_account: float = 0.0
+
+
+class BreakEvenInfo(BaseModel):
+    month_index: Optional[int]
+    year: Optional[int]
+
+
+class HomePricePathSummary(BaseModel):
+    """Monte Carlo home price path summary with percentile bands."""
+    years: List[int]
+    p10: List[float]  # 10th percentile prices for each year
+    p50: List[float]  # 50th percentile (median) prices for each year
+    p90: List[float]  # 90th percentile prices for each year
+
+
+class AnalysisResult(BaseModel):
+    """Unified analysis result - single source of truth for all charts."""
+    timeline: List[TimelinePoint]
+    break_even: BreakEvenInfo
+    total_buy_cost: float
+    total_rent_cost: float
+    # Rates actually used in calculations (for frontend display)
+    home_appreciation_rate: Optional[float] = None
+    rent_growth_rate: Optional[float] = None
+    # Monte Carlo home price path simulation (optional)
+    monte_carlo_home_prices: Optional[HomePricePathSummary] = None
 
 
 class AnalysisResponse(BaseModel):
-    analysis: CalculatorOutput
-    timeline: Optional[List[TimelinePoint]] = None
+    analysis: AnalysisResult
 
 
 class HeatmapRequest(BaseModel):
+    base: ScenarioInputs
     timelines: List[int]           # e.g., [5, 10, 15, 20]
     downPayments: List[float]      # percent list
 
@@ -175,3 +228,19 @@ class MonteCarloSummary(BaseModel):
     percentile10: float
     percentile50: float
     percentile90: float
+
+
+class ChartInsightConversationMessage(BaseModel):
+    question: str
+    answer: str
+
+
+class ChartInsightRequest(BaseModel):
+    chartName: str
+    chartData: Any
+    question: str
+    conversation: Optional[List[ChartInsightConversationMessage]] = None
+
+
+class ChartInsightResponse(BaseModel):
+    answer: str

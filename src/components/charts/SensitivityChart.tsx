@@ -1,4 +1,3 @@
-import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { SensitivityResult } from '../../types/calculator';
 
@@ -17,10 +16,10 @@ export function SensitivityChart({ results }: SensitivityChartProps) {
   return (
     <div className="chart-container">
       <h3 className="chart-title">Sensitivity Analysis: Parameter Sweep</h3>
-      <div style={{marginBottom: '12px', background: '#ebf8ff', padding: '12px', borderRadius: '8px'}}>
-        <strong>Interpretation:</strong> Shows how changing one variable (interest, home price, rent) affects your decision.
-      </div>
-      <ResponsiveContainer width="100%" height={350}>
+      <p className="chart-caption" style={{ marginBottom: '16px', fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.5' }}>
+        This shows how changing one variable (interest, home price, rent) affects your decision.
+      </p>
+      <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="variant" />
@@ -30,9 +29,6 @@ export function SensitivityChart({ results }: SensitivityChartProps) {
           <Bar dataKey="netWorthDelta" name="Net Worth Delta" fill="#2b6cb0" />
         </BarChart>
       </ResponsiveContainer>
-      <div className="chart-description" style={{marginTop: '16px'}}>
-        This chart reveals <strong>which factors matter most</strong> for your scenario. Bars above zero indicate buying fares better, below zero renting is ahead.
-      </div>
     </div>
   );
 }

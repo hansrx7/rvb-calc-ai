@@ -1,50 +1,43 @@
 // src/components/charts/EquityBuildupChart.tsx
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import type { MonthlySnapshot } from '../../types/calculator';
+import type { TimelinePoint } from '../../types/calculator';
 
 interface EquityBuildupChartProps {
-  data: MonthlySnapshot[];
+  timeline: TimelinePoint[];
 }
 
-export function EquityBuildupChart({ data }: EquityBuildupChartProps) {
+export function EquityBuildupChart({ timeline }: EquityBuildupChartProps) {
   // Transform data - show every year
-  const chartData = data
-    .filter((_, index) => index % 12 === 0 || index === data.length - 1)
-    .map(snapshot => {
-      const year = snapshot.month / 12;
-      const equity = Math.round(snapshot.homeEquity);
-      const homeValue = Math.round(snapshot.homeValue);
+  const chartData = timeline
+    .filter((_, index) => index % 12 === 0 || index === timeline.length - 1)
+    .map(point => {
+      const equity = Math.round(point.homeEquity);
+      const homeValue = Math.round(point.homeValue);
       const percentOwned = ((equity / homeValue) * 100).toFixed(1);
       
       return {
-        year: parseFloat(year.toFixed(1)),
+        year: point.year,
         equity,
         homeValue,
         percentOwned: parseFloat(percentOwned)
       };
     });
-  
-  const finalEquity = chartData[chartData.length - 1].equity;
-  const finalPercent = chartData[chartData.length - 1].percentOwned;
-  
+
   return (
     <div className="chart-container">
-      <h3 className="chart-title">Home Equity Buildup Over {Math.ceil(data.length / 12)} Years</h3>
+      <h3 className="chart-title">Home Equity Buildup Over {Math.ceil(timeline.length / 12)} Years</h3>
+      <p className="chart-caption" style={{ marginBottom: '16px', fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.5' }}>
+        This shows how much of the home you actually own (equity) over time when you buy. Higher is better.
+      </p>
       
-      <div style={{ marginBottom: '16px', padding: '16px', background: '#f0f4ff', borderRadius: '8px', border: '2px solid #667eea' }}>
-        <p style={{ margin: 0, fontSize: '16px', color: '#2d3748' }}>
-          <strong>After {Math.ceil(data.length / 12)} years:</strong> You'll have <strong>${finalEquity.toLocaleString()}</strong> in equity 
-          ({finalPercent}% of your home's value)
-        </p>
-      </div>
-      
-      <ResponsiveContainer width="100%" height={400}>
+      <ResponsiveContainer width="100%" height={300}>
         <LineChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
           <XAxis 
             dataKey="year" 
             label={{ value: 'Years', position: 'insideBottom', offset: -5 }}
+            stroke="rgba(255, 255, 255, 0.7)"
           />
           <YAxis 
             label={{ value: 'Home Equity ($)', angle: -90, position: 'insideLeft' }}
@@ -56,6 +49,7 @@ export function EquityBuildupChart({ data }: EquityBuildupChartProps) {
               }
               return `$${value}`;
             }}
+            stroke="rgba(255, 255, 255, 0.7)"
           />
           <Tooltip 
             formatter={(value: number, name: string) => {
@@ -65,39 +59,19 @@ export function EquityBuildupChart({ data }: EquityBuildupChartProps) {
               return value;
             }}
             labelFormatter={(label) => `Year ${label}`}
-            contentStyle={{ backgroundColor: 'white', border: '2px solid #667eea', borderRadius: '8px' }}
+            contentStyle={{ backgroundColor: 'rgba(5, 8, 15, 0.85)', border: '1px solid rgba(124, 95, 196, 0.35)', borderRadius: '10px', color: '#f1f5f9', backdropFilter: 'blur(6px)' }}
           />
-          <Legend />
+          <Legend wrapperStyle={{ color: 'rgba(255, 255, 255, 0.9)' }} />
           <Line 
             type="monotone" 
             dataKey="equity" 
-            stroke="#667eea" 
+            stroke="rgba(124, 95, 196, 0.65)" 
             strokeWidth={3}
             name="Home Equity"
             dot={false}
           />
         </LineChart>
       </ResponsiveContainer>
-      
-      <div style={{ marginTop: '20px', padding: '20px', background: '#f7fafc', borderRadius: '12px' }}>
-        <h4 style={{ marginBottom: '12px', color: '#2d3748' }}>What This Shows:</h4>
-        <p style={{ marginBottom: '8px', lineHeight: '1.6', color: '#2d3748' }}>
-          This chart shows how much of your home you actually <strong>own</strong> over time (your equity).
-        </p>
-        <ul style={{ marginLeft: '20px', lineHeight: '1.8', color: '#2d3748' }}>
-          <li><strong>Early years (0-10):</strong> Most payments go to interest, equity builds slowly</li>
-          <li><strong>Middle years (10-20):</strong> More goes to principal, equity builds faster</li>
-          <li><strong>Later years (20-30):</strong> Mostly principal payments, equity accelerates</li>
-        </ul>
-        <p style={{ marginTop: '12px', padding: '12px', background: '#edf2f7', borderRadius: '8px', margin: 0, color: '#2d3748' }}>
-          <strong>Key insight:</strong> If you sell early (5-10 years), you won't have much equity due to closing costs 
-          and the fact that early payments are mostly interest!
-        </p>
-      </div>
-      
-      <p className="chart-description" style={{ marginTop: '16px' }}>
-        Your equity = Home value - Remaining mortgage balance
-      </p>
     </div>
   );
 }

@@ -5,14 +5,7 @@ import './SuggestionChips.css';
 
 interface SuggestionChipsProps {
   onChipClick: (message: string) => void;
-  visibleCharts: {
-    netWorth: boolean;
-    monthlyCost: boolean;
-    totalCost: boolean;
-    equity: boolean;
-    rentGrowth: boolean;
-    breakEven: boolean;
-  };
+  visibleCharts: Record<string, boolean>;
 }
 
 interface Suggestion {
@@ -23,8 +16,20 @@ interface Suggestion {
 }
 
 export function SuggestionChips({ onChipClick, visibleCharts }: SuggestionChipsProps) {
-  // All possible suggestions - only general questions now (charts have dedicated buttons)
+  // All possible suggestions - prioritize ZIP code entry, then general questions
   const allSuggestions: Suggestion[] = [
+    {
+      id: 'zipCode',
+      text: '📍 Start with my ZIP code',
+      message: 'I\'m in 92127',
+      type: 'general'
+    },
+    {
+      id: 'example',
+      text: '💡 Try an example scenario',
+      message: 'I want to buy a $500k home, rent is $3k, 20% down, 10 years',
+      type: 'general'
+    },
     {
       id: 'advice',
       text: '💡 Should I buy in my situation?',
@@ -102,7 +107,7 @@ export function SuggestionChips({ onChipClick, visibleCharts }: SuggestionChipsP
     // Show first 2, keep rest in queue
     setDisplayedChips(shuffled.slice(0, 2));
     setRemainingChips(shuffled.slice(2));
-  }, [visibleCharts.netWorth, visibleCharts.monthlyCost, visibleCharts.totalCost, visibleCharts.equity, visibleCharts.rentGrowth, visibleCharts.breakEven]);
+  }, [visibleCharts]);
 
   const handleChipClick = (chip: Suggestion) => {
     // Send the message

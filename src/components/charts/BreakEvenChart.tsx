@@ -1,51 +1,75 @@
 // src/components/charts/BreakEvenChart.tsx
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
-import type { MonthlySnapshot } from '../../types/calculator';
+import type { AnalysisResult } from '../../types/calculator';
 
 interface BreakEvenChartProps {
-  data: MonthlySnapshot[];
+  analysis: AnalysisResult;
 }
 
-export function BreakEvenChart({ data }: BreakEvenChartProps) {
+export function BreakEvenChart({ analysis }: BreakEvenChartProps) {
+  // Safety checks
+  if (!analysis || !analysis.timeline || analysis.timeline.length === 0) {
+    console.error('❌ [BreakEvenChart] Invalid analysis data:', { analysis });
+    return (
+      <div className="chart-container">
+        <div className="chart-placeholder">Break-even data is not available.</div>
+      </div>
+    );
+  }
+  
+  const { timeline, breakEven } = analysis;
+  
+  console.log('📊 [BreakEvenChart] Rendering with:', {
+    timelineLength: timeline.length,
+    breakEven,
+    firstPoint: timeline[0],
+    hasNaN: timeline.some(p => 
+      typeof p.netWorthBuy === 'number' && isNaN(p.netWorthBuy) ||
+      typeof p.netWorthRent === 'number' && isNaN(p.netWorthRent)
+    )
+  });
+  
   // Transform data for the chart - show net worth difference over time
-  const chartData = data
-    .filter((_, index) => index % 12 === 0 || index === data.length - 1) // Every year + final month
-    .map(snapshot => ({
-      year: Math.round(snapshot.month / 12),
-      netWorthDifference: Math.round(snapshot.buyerNetWorth - snapshot.renterNetWorth),
-      buyerNetWorth: Math.round(snapshot.buyerNetWorth),
-      renterNetWorth: Math.round(snapshot.renterNetWorth)
+  const chartData = timeline
+    .filter((_, index) => index % 12 === 0 || index === timeline.length - 1) // Every year + final month
+    .map(point => ({
+      year: point.year ?? 0,
+      netWorthDifference: Math.round((point.netWorthBuy ?? 0) - (point.netWorthRent ?? 0)),
+      buyerNetWorth: Math.round(point.netWorthBuy ?? 0),
+      renterNetWorth: Math.round(point.netWorthRent ?? 0)
     }));
 
   // Add a starting point at year 0 with the actual month-0 values
   // This shows the real initial positions (buyer spent down payment + closing, renter kept the cash)
   if (chartData.length > 0 && chartData[0].year > 0) {
     // Use the actual month-1 values as our starting point (month-0 equivalent)
-    const month0Data = data[0];
+    const month0Data = timeline[0];
     if (month0Data) {
       chartData.unshift({
         year: 0,
-        netWorthDifference: Math.round(month0Data.buyerNetWorth - month0Data.renterNetWorth),
-        buyerNetWorth: Math.round(month0Data.buyerNetWorth),
-        renterNetWorth: Math.round(month0Data.renterNetWorth)
+        netWorthDifference: Math.round(month0Data.netWorthBuy - month0Data.netWorthRent),
+        buyerNetWorth: Math.round(month0Data.netWorthBuy),
+        renterNetWorth: Math.round(month0Data.netWorthRent)
       });
     }
   }
 
-  // Find break-even point (where difference crosses zero)
-  const breakEvenPoint = chartData.find(point => point.netWorthDifference >= 0);
-  const breakEvenYear = breakEvenPoint ? breakEvenPoint.year : null;
+  // Use break-even from analysis result
+  const breakEvenYear = breakEven?.year ?? null;
   
   // Calculate final difference
   
 
   return (
     <div className="chart-container">
-      <h3 className="chart-title">Break-Even Timeline Over {chartData.length > 0 ? chartData[chartData.length - 1].year : Math.ceil(data.length / 12)} Years</h3>
+      <h3 className="chart-title">Break-Even Timeline Over {chartData.length > 0 ? chartData[chartData.length - 1].year : Math.ceil(timeline.length / 12)} Years</h3>
+      <p className="chart-caption" style={{ marginBottom: '16px', fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.5' }}>
+        This shows when buying starts to financially beat renting under different conditions. Higher values above zero mean buying is better.
+      </p>
       
-      <div style={{ marginBottom: '16px', padding: '16px', background: '#f0f4ff', borderRadius: '8px', border: '2px solid #667eea' }}>
-        <p style={{ margin: 0, fontSize: '16px', color: '#2d3748' }}>
+      <div style={{ marginBottom: '16px', padding: '16px', background: 'rgba(139, 92, 246, 0.2)', borderRadius: '8px', border: '2px solid rgba(139, 92, 246, 0.5)' }}>
+        <p style={{ margin: 0, fontSize: '16px', color: 'rgba(255, 255, 255, 0.95)' }}>
           {breakEvenYear === 0 ? (
             <>
               <strong>Buying wins from the start</strong> - Buying is advantageous throughout your timeline
@@ -62,12 +86,13 @@ export function BreakEvenChart({ data }: BreakEvenChartProps) {
         </p>
       </div>
       
-      <ResponsiveContainer width="100%" height={400}>
+      <ResponsiveContainer width="100%" height={300}>
         <LineChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
           <XAxis 
             dataKey="year" 
             label={{ value: 'Years', position: 'insideBottom', offset: -5 }}
+            stroke="rgba(255, 255, 255, 0.7)"
           />
           <YAxis 
             label={{ value: 'Net Worth Difference ($)', angle: -90, position: 'insideLeft' }}
@@ -79,6 +104,7 @@ export function BreakEvenChart({ data }: BreakEvenChartProps) {
               }
               return `$${value}`;
             }}
+            stroke="rgba(255, 255, 255, 0.7)"
           />
           <Tooltip 
             formatter={(value: number, name: string) => {
@@ -87,40 +113,23 @@ export function BreakEvenChart({ data }: BreakEvenChartProps) {
               }
               return [`$${value.toLocaleString()}`, name];
             }}
-            contentStyle={{ backgroundColor: 'white', border: '2px solid #667eea', borderRadius: '8px' }}
+            contentStyle={{ backgroundColor: 'rgba(5, 8, 15, 0.85)', border: '1px solid rgba(124, 95, 196, 0.35)', borderRadius: '10px', color: '#f1f5f9', backdropFilter: 'blur(6px)' }}
           />
-          <Legend />
+          <Legend wrapperStyle={{ color: 'rgba(255, 255, 255, 0.9)' }} />
           
           {/* Zero line (break-even point) */}
-          <ReferenceLine y={0} stroke="#666" strokeDasharray="5 5" />
+          <ReferenceLine y={0} stroke="rgba(255, 255, 255, 0.5)" strokeDasharray="5 5" />
           
           <Line 
             type="monotone" 
             dataKey="netWorthDifference" 
-            stroke="#667eea" 
+            stroke="rgba(124, 95, 196, 0.65)" 
             strokeWidth={3}
             dot={false}
             name="Buying Advantage"
           />
         </LineChart>
       </ResponsiveContainer>
-      
-      <div style={{ marginTop: '20px', padding: '20px', background: '#f7fafc', borderRadius: '12px' }}>
-        <h4 style={{ marginBottom: '12px', color: '#2d3748' }}>What This Shows:</h4>
-        <p style={{ marginBottom: '8px', lineHeight: '1.6', color: '#2d3748' }}>
-          This chart shows the <strong>net worth difference</strong> between buying and renting over time.
-        </p>
-        <ul style={{ marginLeft: '20px', lineHeight: '1.8', color: '#2d3748' }}>
-          <li><strong>Above zero:</strong> Buying is ahead (positive difference)</li>
-          <li><strong>Below zero:</strong> Renting is ahead (negative difference)</li>
-          <li><strong>Zero line:</strong> Break-even point where both options are equal</li>
-          <li><strong>Final value:</strong> Total advantage after {Math.ceil(data.length / 12)} years</li>
-        </ul>
-        <p style={{ marginTop: '12px', lineHeight: '1.6', color: '#2d3748' }}>
-          <strong>Key insight:</strong> The break-even point shows when buying starts paying off. 
-          If you sell before this point, renting would have been better due to transaction costs.
-        </p>
-      </div>
     </div>
   );
 }

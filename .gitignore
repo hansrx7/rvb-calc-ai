@@ -23,3 +23,12 @@ dist-ssr
 *.sln
 *.sw?
 backend/.env
+
+# Large data files
+src/data/*.csv
+backend/app/ml/models/*.joblib
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python

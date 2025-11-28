@@ -18,14 +18,23 @@ RentVsBuy.ai is a web application that analyzes your housing situation and provi
 - No complicated forms—just chat naturally
 
 ### 📊 Interactive Financial Charts
-The app generates **6 comprehensive charts** to help you visualize your financial future:
+The app generates **comprehensive charts** to help you visualize your financial future:
 
+**Core Charts:**
 1. **Net Worth Comparison** - Shows how your wealth grows over your timeline when buying vs. renting
 2. **Monthly Cost Breakdown** - Compares monthly expenses for buying (mortgage, taxes, insurance, maintenance) vs. renting
 3. **Total Cost Comparison** - Calculates the true cost of each option after your timeline, factoring in home appreciation and investment returns
 4. **Home Equity Buildup** - Visualizes how much equity you build in a home over time
 5. **Rent Growth vs Fixed Mortgage** - Demonstrates how rent increases over time while mortgage payments stay fixed
 6. **Break-Even Timeline** - Shows exactly when buying starts paying off with visual timeline
+
+**Advanced Charts:**
+- **Cash Flow Analysis** - Monthly cash flow comparison
+- **Cumulative Cost Tracking** - Running totals over time
+- **Tax Savings** - Mortgage interest deduction benefits
+- **Monte Carlo Simulation** - 1,000+ simulated scenarios for risk analysis
+- **Sensitivity Analysis** - Impact of rate changes on outcomes
+- **Break-Even Heatmap** - Visual break-even analysis across scenarios
 
 ### ⏰ Time Horizon Analysis (NEW!)
 - **Custom timeline support** - Analyze any timeframe (3, 5, 10+ years)
@@ -50,6 +59,12 @@ The app generates **6 comprehensive charts** to help you visualize your financia
 - Choose to use local data OR enter your own custom values
 - Reference box shows exactly what data is being used (local vs. custom vs. national averages)
 - Switch ZIP codes mid-conversation to compare different areas
+
+### 🎯 AI-Powered Recommendations
+- **Smart recommendations** - Get personalized "Buy" or "Rent" recommendations based on your scenario
+- **Savings calculations** - See exactly how much you'll save with each option
+- **Reasoning explanations** - Understand why the AI recommends one option over another
+- **Interactive cards** - Click to see detailed breakdowns and explore different scenarios
 
 ### 💾 Professional PDF Export
 - Save your entire conversation and all charts in a single PDF
@@ -140,12 +155,82 @@ All calculations use industry-standard formulas:
 
 ### Troubleshooting
 
+#### "Sorry, I'm having trouble connecting" Error
+
+This error means the frontend can't reach the backend. Follow these steps:
+
+1. **Check if backend is running:**
+   - Open a terminal and verify you see: `Uvicorn running on http://127.0.0.1:8000`
+   - If not, start it:
+     ```bash
+     cd backend
+     source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+     uvicorn app.main:app --reload --port 8000
+     ```
+
+2. **Test backend health:**
+   - Open `http://localhost:8000/health` in your browser
+   - Should return: `{"status":"ok"}`
+   - If it doesn't load, the backend isn't running
+
+3. **Check browser console:**
+   - Open DevTools (F12) → Console tab
+   - Look for red errors like `Failed to fetch` or `NetworkError`
+   - These indicate the frontend can't reach the backend
+
+4. **Verify backend URL:**
+   - Check if `.env` file exists in root with:
+     ```env
+     VITE_BACKEND_URL=http://localhost:8000
+     ```
+   - If missing, create it (or frontend defaults to `http://localhost:8000`)
+
+5. **Check OpenAI API key:**
+   - Ensure `backend/.env` exists with:
+     ```env
+     OPENAI_API_KEY=sk-...
+     ```
+   - Without it, backend may fail on AI calls
+
+6. **Verify both terminals are running:**
+   - **Terminal 1:** Backend (`uvicorn app.main:app --reload --port 8000`)
+   - **Terminal 2:** Frontend (`npm run dev`)
+
+#### Other Common Issues
+
 | Symptom | Likely Cause | Fix |
 | --- | --- | --- |
-| `Sorry, I'm having trouble connecting right now. Can you try again?` | Backend is not running or OpenAI call failed | Restart backend (`uvicorn ...`). If logs show an OpenAI error, confirm `backend/.env` contains a valid key. |
 | Response begins with `(Mock AI)` | Backend is running in fallback mode (no key or API error) | Add/verify `OPENAI_API_KEY` in `backend/.env` and restart the backend. |
 | `Address already in use` when starting backend | Previous `uvicorn` still running | Stop old process (`Ctrl+C` or `pkill -f "uvicorn backend.app.main"`). |
+| `Module not found` errors | Dependencies not installed | Run `npm install` (frontend) or `pip install -r requirements.txt` (backend). |
+| `Python not found` | Python not installed or not in PATH | Install Python 3.11+ and ensure it's in your PATH. |
 | Git push blocked by secret scanning | `.env` accidentally staged | `git reset --soft HEAD~1`, remove `.env` from staging, recommit. |
+
+### Staying Up-To-Date Locally
+
+Whenever new work lands on the shared branch (`dev/charts`), pull it down like this:
+
+```bash
+git fetch origin
+git checkout dev/charts
+git pull origin dev/charts
+```
+
+Then start both services:
+
+```bash
+# Backend
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+
+# Frontend (new terminal)
+cd ../
+npm install
+npm run dev
+```
+
+After these steps, your local environment will match the latest committed state (all tabs, design updates, charts, docs, etc.).
 
 ## 📖 How to Use
 
@@ -154,6 +239,7 @@ All calculations use industry-standard formulas:
 1. **Start a conversation**
    - The AI will greet you and ask about your situation
    - **Option A:** Mention your ZIP code (e.g., "I'm in 92129") to get local data
+     - The Phase 1 card auto-fills the “Current focus” snapshot—no buttons or inputs required
    - **Option B:** Provide your own values directly
    - Four key pieces of information needed:
      - Home price (e.g., "$500,000" or "500k")
@@ -203,16 +289,15 @@ All calculations use industry-standard formulas:
 
 #### 📍 ZIP Code Integration
 **How to use:**
-- **Mention any ZIP code** in your first message: "I'm in 90210" or "Looking at 78717"
-- **Choose your data source:**
-  - Click "Use this data" to use local market values
-  - Click "Use my own values" to enter custom numbers
+- **Mention any ZIP code** in your chat: "I'm in 90210" or "Looking at 78717"
+- The Phase 1 “Current focus” card immediately fills with that market’s snapshot
+- Just continue with your down payment % and timeline—no extra buttons needed
 - **Local data includes:**
   - Median home price for your area
   - Average rent for your ZIP code
   - Property tax rate for your state
   - Local appreciation and rent growth rates
-- **Switch locations mid-conversation** to compare different areas
+- **Switch locations mid-conversation** by mentioning a new ZIP or city name
 
 #### ✏️ Editable Input Reference Box
 **How to use:**
@@ -432,18 +517,28 @@ This project is in **active development** and currently operates at a foundation
 rentvsbuy-ai/
 ├── src/
 │   ├── components/
-│   │   ├── charts/           # 6 chart components
+│   │   ├── charts/           # Chart components
 │   │   │   ├── NetWorthChart.tsx
 │   │   │   ├── MonthlyCostChart.tsx
 │   │   │   ├── TotalCostChart.tsx
 │   │   │   ├── EquityBuildupChart.tsx
 │   │   │   ├── RentGrowthChart.tsx
-│   │   │   └── BreakEvenChart.tsx
-│   │   └── chat/             # Chat interface
-│   │       ├── ChatContainer.tsx
-│   │       ├── ChatInput.tsx
-│   │       ├── ChatMessage.tsx
-│   │       └── SuggestionChips.tsx
+│   │   │   ├── BreakEvenChart.tsx
+│   │   │   ├── CashFlowChart.tsx
+│   │   │   ├── CumulativeCostChart.tsx
+│   │   │   ├── TaxSavingsChart.tsx
+│   │   │   ├── MonteCarloChart.tsx
+│   │   │   ├── SensitivityChart.tsx
+│   │   │   ├── ChartPlaceholder.tsx
+│   │   │   └── ChartExplanation.tsx
+│   │   ├── chat/             # Chat interface
+│   │   │   ├── ChatContainer.tsx
+│   │   │   ├── ChatInput.tsx
+│   │   │   ├── ChatMessage.tsx
+│   │   │   └── SuggestionChips.tsx
+│   │   ├── RecommendationCard/  # AI recommendation display
+│   │   ├── LoadingIndicator/    # Loading states
+│   │   └── ErrorBoundary.tsx     # Error handling
 │   ├── data/
 │   │   └── zipCodeData.json  # 26,000+ ZIP codes with market data
 │   ├── lib/
@@ -455,7 +550,10 @@ rentvsbuy-ai/
 │   │   └── location/
 │   │       └── zipCodeService.ts  # ZIP code data service
 │   ├── types/
-│   │   └── calculator.ts      # TypeScript types
+│   │   ├── calculator.ts      # TypeScript types
+│   │   └── recommendation.ts  # Recommendation types
+│   ├── hooks/
+│   │   └── useScenarioState.ts  # Scenario state management
 │   ├── App.tsx
 │   └── main.tsx
 ├── public/

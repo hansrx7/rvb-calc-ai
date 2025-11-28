@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Iterator, List, Optional
 
 from openai import OpenAI
 
@@ -58,3 +58,30 @@ class OpenAIService:
             # Fall back to mock response so the UI keeps working
             print(f"[OpenAIService] Falling back to mock response due to error: {exc}")
             return self._mock_response(messages)
+
+    def chat_completion_stream(self, model: str, messages: List[dict], temperature: float = 0.7, max_tokens: int = 150) -> Iterator[str]:
+        """Stream chat completion tokens as they arrive."""
+        if self._is_mock_mode or self._client is None:
+            # For mock mode, yield the response word by word to simulate streaming
+            mock_text = self._mock_response(messages)
+            for word in mock_text.split():
+                yield word + " "
+            return
+
+        try:
+            stream = self._client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=True,
+            )
+            for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        except Exception as exc:
+            print(f"[OpenAIService] Streaming error: {exc}")
+            # Fall back to mock response
+            mock_text = self._mock_response(messages)
+            for word in mock_text.split():
+                yield word + " "

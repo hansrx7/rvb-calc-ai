@@ -1,22 +1,24 @@
-"""Finance calculator logic mirrored from the TypeScript implementation."""
+from __future__ import annotations
 
+"""Finance calculator logic mirrored from the TypeScript implementation."""
 
 import random
 import numpy as np
-
-from __future__ import annotations
 
 from dataclasses import dataclass
 from math import pow
 from typing import Iterable, List
 
 from ..models import (
+    AnalysisResult,
+    BreakEvenInfo,
     CalculatorOutput,
     CalculatorSummary,
     MonthlyCosts,
     MonthlySnapshot,
     RentingCosts,
     ScenarioInputs,
+    TimelinePoint,
     TotalCostSummary,
 )
 
@@ -255,6 +257,131 @@ def _compute_summary(snapshots: Iterable[MonthlySnapshot]) -> CalculatorSummary:
     )
 
 
+def calculate_unified_analysis(inputs: ScenarioInputs) -> AnalysisResult:
+    """Build unified AnalysisResult with all data in TimelinePoint structure."""
+    down_payment_amount = inputs.homePrice * (inputs.downPaymentPercent / 100)
+    loan_amount = max(0.0, inputs.homePrice - down_payment_amount)
+
+    amortization = generate_amortization_schedule(loan_amount, inputs.interestRate, 30)
+    timeline_months = inputs.timeHorizonYears * 12
+
+    monthly_investment_return = inputs.investmentReturnRate / 100 / 12
+    monthly_home_appreciation = inputs.homeAppreciationRate / 100 / 12
+    monthly_rent_growth = inputs.rentGrowthRate / 100 / 12
+
+    home_value = inputs.homePrice
+    remaining_balance = loan_amount
+    rent = inputs.monthlyRent
+
+    closing_costs_buy = inputs.homePrice * 0.03
+    closing_costs_sell_rate = 0.08
+
+    buyer_cash_account = -down_payment_amount - closing_costs_buy
+    buyer_equity = down_payment_amount
+    renter_portfolio = down_payment_amount
+
+    timeline: List[TimelinePoint] = []
+    total_cost_buy = down_payment_amount + closing_costs_buy
+    total_cost_rent = 0.0
+    breakeven_month_index = None
+    breakeven_year = None
+
+    for month in range(1, timeline_months + 1):
+        amort_month = amortization[month - 1]
+
+        home_value *= 1 + monthly_home_appreciation
+        rent *= 1 + monthly_rent_growth
+
+        interest_paid = remaining_balance * (inputs.interestRate / 100 / 12)
+        principal_paid = amort_month.payment - interest_paid
+        if principal_paid < 0:
+            principal_paid = 0.0
+        remaining_balance = max(0.0, remaining_balance - principal_paid)
+        buyer_equity = home_value - remaining_balance
+
+        property_tax_monthly = (inputs.propertyTaxRate / 100 * home_value) / 12
+        insurance_monthly = inputs.homeInsuranceAnnual / 12
+        maintenance_monthly = (inputs.maintenanceRate / 100 * home_value) / 12
+        hoa_monthly = inputs.hoaMonthly
+
+        has_pmi = remaining_balance / home_value > 0.80 if home_value > 0 else False
+        pmi_monthly = _calculate_pmi(loan_amount) if has_pmi else 0.0
+
+        owner_monthly_cost = (
+            interest_paid
+            + property_tax_monthly
+            + insurance_monthly
+            + maintenance_monthly
+            + hoa_monthly
+            + pmi_monthly
+        )
+
+        renter_monthly_cost = rent
+        cash_flow_diff = renter_monthly_cost - owner_monthly_cost
+
+        if cash_flow_diff > 0:
+            renter_portfolio = (renter_portfolio + cash_flow_diff) * (1 + monthly_investment_return)
+        else:
+            buyer_cash_account = (buyer_cash_account + (-cash_flow_diff)) * (1 + monthly_investment_return)
+
+        is_final_month = month == timeline_months
+        selling_costs = home_value * closing_costs_sell_rate if is_final_month else 0.0
+
+        buyer_net_worth = (buyer_equity - selling_costs) + buyer_cash_account
+        renter_net_worth = renter_portfolio
+        net_worth_delta = buyer_net_worth - renter_net_worth
+
+        # Track cumulative costs
+        total_cost_buy += owner_monthly_cost
+        total_cost_rent += renter_monthly_cost
+        if is_final_month:
+            total_cost_buy += selling_costs
+
+        # Track break-even
+        if breakeven_month_index is None and net_worth_delta >= 0:
+            breakeven_month_index = month
+            breakeven_year = (month - 1) // 12 + 1
+
+        year = (month - 1) // 12 + 1
+
+        timeline.append(
+            TimelinePoint(
+                month_index=month,
+                year=year,
+                net_worth_buy=buyer_net_worth,
+                net_worth_rent=renter_net_worth,
+                total_cost_buy_to_date=total_cost_buy,
+                total_cost_rent_to_date=total_cost_rent,
+                buy_monthly_outflow=owner_monthly_cost,
+                rent_monthly_outflow=renter_monthly_cost,
+                mortgage_payment=amort_month.payment,
+                property_tax_monthly=property_tax_monthly,
+                insurance_monthly=insurance_monthly,
+                maintenance_monthly=maintenance_monthly,
+                hoa_monthly=hoa_monthly,
+                principal_paid=principal_paid,
+                interest_paid=interest_paid,
+                remaining_balance=remaining_balance,
+                home_value=home_value,
+                home_equity=buyer_equity,
+                renter_investment_balance=renter_portfolio,
+                buyer_cash_account=buyer_cash_account,
+            )
+        )
+
+    break_even = BreakEvenInfo(
+        month_index=breakeven_month_index,
+        year=breakeven_year,
+    )
+
+    return AnalysisResult(
+        timeline=timeline,
+        break_even=break_even,
+        total_buy_cost=total_cost_buy,
+        total_rent_cost=total_cost_rent,
+    )
+
+
 def calculate_analysis(inputs: ScenarioInputs) -> CalculatorOutput:
     snapshots = calculate_net_worth_comparison(inputs)
     buying_costs = calculate_buying_costs(inputs)
@@ -368,11 +495,11 @@ def calculate_heatmap(timelines: list[int], downpayments: list[float], base: Sce
     for t in timelines:
         for dp in downpayments:
             inputs = base.copy(update={'timeHorizonYears': t, 'downPaymentPercent': dp})
-            out = calculate_analysis(inputs)
+            out = calculate_unified_analysis(inputs)
             result.append({
                 'timelineYears': t,
                 'downPaymentPercent': dp,
-                'breakevenMonth': out.summary.breakevenMonth
+                'breakevenMonth': out.break_even.month_index
             })
     return result
 

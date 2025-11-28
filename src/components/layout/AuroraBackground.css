@@ -1,0 +1,251 @@
+/* Aurora Background - Modern animated liquid gradient */
+.aurora-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(135deg, #2d1b4e 0%, #1a1d29 50%, #1e2a3a 100%);
+}
+
+.aurora-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.7;
+  mix-blend-mode: screen;
+}
+
+/* Blob 1 - Deep Purple */
+.blob-1 {
+  width: 800px;
+  height: 800px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 1) 0%, rgba(139, 92, 246, 0.7) 30%, rgba(139, 92, 246, 0.4) 60%, transparent 100%);
+  top: -300px;
+  left: -300px;
+  animation-delay: 0s;
+  animation-duration: 15s;
+}
+
+/* Blob 2 - Blue */
+.blob-2 {
+  width: 700px;
+  height: 700px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.95) 0%, rgba(59, 130, 246, 0.65) 30%, rgba(59, 130, 246, 0.4) 60%, transparent 100%);
+  top: 50%;
+  right: -200px;
+  animation-delay: -3s;
+  animation-duration: 18s;
+}
+
+/* Blob 3 - Light Blue/Cyan */
+.blob-3 {
+  width: 750px;
+  height: 750px;
+  background: radial-gradient(circle, rgba(96, 165, 250, 0.9) 0%, rgba(96, 165, 250, 0.6) 30%, rgba(96, 165, 250, 0.35) 60%, transparent 100%);
+  bottom: -200px;
+  left: 20%;
+  animation-delay: -6s;
+  animation-duration: 17s;
+}
+
+/* Blob 4 - Pink/Rose */
+.blob-4 {
+  width: 650px;
+  height: 650px;
+  background: radial-gradient(circle, rgba(244, 63, 94, 0.9) 0%, rgba(244, 63, 94, 0.6) 30%, rgba(244, 63, 94, 0.35) 60%, transparent 100%);
+  top: 20%;
+  left: 50%;
+  animation-delay: -9s;
+  animation-duration: 19s;
+}
+
+/* Blob 5 - Toned Down Yellow/Amber */
+.blob-5 {
+  width: 680px;
+  height: 680px;
+  background: radial-gradient(circle, rgba(234, 179, 8, 0.5) 0%, rgba(234, 179, 8, 0.35) 30%, rgba(234, 179, 8, 0.2) 60%, transparent 100%);
+  top: 60%;
+  right: 30%;
+  animation-delay: -4s;
+  animation-duration: 16s;
+}
+
+/* Blob 6 - Toned Down Green/Emerald */
+.blob-6 {
+  width: 720px;
+  height: 720px;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.5) 0%, rgba(16, 185, 129, 0.35) 30%, rgba(16, 185, 129, 0.2) 60%, transparent 100%);
+  bottom: 10%;
+  right: 10%;
+  animation-delay: -7s;
+  animation-duration: 20s;
+}
+
+/* Blob 7 - Light Pink/Magenta */
+.blob-7 {
+  width: 690px;
+  height: 690px;
+  background: radial-gradient(circle, rgba(236, 72, 153, 0.5) 0%, rgba(236, 72, 153, 0.35) 30%, rgba(236, 72, 153, 0.2) 60%, transparent 100%);
+  top: 10%;
+  left: 30%;
+  animation-delay: -5s;
+  animation-duration: 18s;
+}
+
+/* Blob 8 - Violet/Indigo */
+.blob-8 {
+  width: 640px;
+  height: 640px;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.5) 0%, rgba(124, 58, 237, 0.35) 30%, rgba(124, 58, 237, 0.2) 60%, transparent 100%);
+  bottom: 30%;
+  left: 60%;
+  animation-delay: -11s;
+  animation-duration: 22s;
+}
+
+/* Smooth floating animation with rotation - More dramatic movement */
+@keyframes aurora-float-1 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  25% {
+    transform: translate(200px, -150px) scale(1.2) rotate(90deg);
+  }
+  50% {
+    transform: translate(-150px, 200px) scale(0.8) rotate(180deg);
+  }
+  75% {
+    transform: translate(150px, 100px) scale(1.1) rotate(270deg);
+  }
+}
+
+@keyframes aurora-float-2 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  25% {
+    transform: translate(-180px, 220px) scale(1.3) rotate(-90deg);
+  }
+  50% {
+    transform: translate(250px, -100px) scale(0.7) rotate(-180deg);
+  }
+  75% {
+    transform: translate(-200px, -150px) scale(1.15) rotate(-270deg);
+  }
+}
+
+@keyframes aurora-float-3 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  25% {
+    transform: translate(300px, 150px) scale(0.9) rotate(120deg);
+  }
+  50% {
+    transform: translate(-200px, 250px) scale(1.4) rotate(240deg);
+  }
+  75% {
+    transform: translate(100px, -200px) scale(0.85) rotate(360deg);
+  }
+}
+
+@keyframes aurora-float-4 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  25% {
+    transform: translate(-250px, -120px) scale(1.1) rotate(-120deg);
+  }
+  50% {
+    transform: translate(180px, -220px) scale(0.75) rotate(-240deg);
+  }
+  75% {
+    transform: translate(-150px, 280px) scale(1.25) rotate(-360deg);
+  }
+}
+
+/* Apply unique animations to each blob */
+.blob-1 {
+  animation: aurora-float-1 15s ease-in-out infinite;
+}
+
+.blob-2 {
+  animation: aurora-float-2 18s ease-in-out infinite;
+}
+
+.blob-3 {
+  animation: aurora-float-3 17s ease-in-out infinite;
+}
+
+.blob-4 {
+  animation: aurora-float-4 19s ease-in-out infinite;
+}
+
+.blob-5 {
+  animation: aurora-float-2 16s ease-in-out infinite;
+}
+
+.blob-6 {
+  animation: aurora-float-3 20s ease-in-out infinite;
+}
+
+.blob-7 {
+  animation: aurora-float-1 18s ease-in-out infinite;
+}
+
+.blob-8 {
+  animation: aurora-float-4 22s ease-in-out infinite;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .aurora-blob {
+    filter: blur(50px);
+    opacity: 0.65;
+  }
+  
+  .blob-1 {
+    width: 500px;
+    height: 500px;
+  }
+  
+  .blob-2 {
+    width: 450px;
+    height: 450px;
+  }
+  
+  .blob-3 {
+    width: 480px;
+    height: 480px;
+  }
+  
+  .blob-4 {
+    width: 420px;
+    height: 420px;
+  }
+  
+  .blob-5 {
+    width: 400px;
+    height: 400px;
+  }
+  
+  .blob-6 {
+    width: 430px;
+    height: 430px;
+  }
+  
+  .blob-7 {
+    width: 410px;
+    height: 410px;
+  }
+  
+  .blob-8 {
+    width: 400px;
+    height: 400px;
+  }
+}
+

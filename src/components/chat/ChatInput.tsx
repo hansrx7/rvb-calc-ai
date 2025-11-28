@@ -27,7 +27,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
         placeholder="Type your message..."
         className="chat-input"
       />
-      <button type="submit" className="send-button">
+      <button type="submit" className="send-button" data-tour-id="analyze-button">
         Send
       </button>
     </form>

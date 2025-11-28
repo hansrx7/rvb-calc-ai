@@ -1,13 +1,18 @@
 // src/App.tsx
 
 import { ChatContainer } from './components/chat/ChatContainer';
+import AuroraBackground from './components/layout/AuroraBackground';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import './App.css';
 
 function App() {
   return (
-    <div className="app">
-      <ChatContainer />
-    </div>
+    <ErrorBoundary>
+      <div className="app">
+        <AuroraBackground />
+        <ChatContainer />
+      </div>
+    </ErrorBoundary>
   );
 }
 

@@ -52,14 +52,16 @@ export function getZIPBasedRates(
   // Check if we have valid ZIP-specific rates (explicitly check for null/undefined, allow 0 and negative)
   const hasHomeAppreciation = locationData?.homeAppreciationRate !== null && locationData?.homeAppreciationRate !== undefined;
   const hasRentGrowth = locationData?.rentGrowthRate !== null && locationData?.rentGrowthRate !== undefined;
+  const homeRate = hasHomeAppreciation ? (locationData!.homeAppreciationRate as number) : null;
+  const rentRate = hasRentGrowth ? (locationData!.rentGrowthRate as number) : null;
   
   if (hasHomeAppreciation && hasRentGrowth) {
     // Use ZIP-specific rates with timeline adjustments
     const timelineMultiplier = getTimelineMultiplier(timeHorizonYears);
     
     return {
-      homeAppreciationRate: locationData.homeAppreciationRate * timelineMultiplier, // Allow negative rates
-      rentGrowthRate: Math.max(0, locationData.rentGrowthRate * timelineMultiplier),
+      homeAppreciationRate: (homeRate ?? 0) * timelineMultiplier, // Allow negative rates
+      rentGrowthRate: Math.max(0, (rentRate ?? 0) * timelineMultiplier),
       investmentReturnRate: timelineRates.investmentReturnRate
     };
   }
@@ -68,7 +70,7 @@ export function getZIPBasedRates(
   if (hasHomeAppreciation) {
     const timelineMultiplier = getTimelineMultiplier(timeHorizonYears);
     return {
-      homeAppreciationRate: locationData.homeAppreciationRate * timelineMultiplier,
+      homeAppreciationRate: (homeRate ?? timelineRates.homeAppreciationRate) * timelineMultiplier,
       rentGrowthRate: timelineRates.rentGrowthRate,
       investmentReturnRate: timelineRates.investmentReturnRate
     };
@@ -78,7 +80,7 @@ export function getZIPBasedRates(
     const timelineMultiplier = getTimelineMultiplier(timeHorizonYears);
     return {
       homeAppreciationRate: timelineRates.homeAppreciationRate,
-      rentGrowthRate: Math.max(0, locationData.rentGrowthRate * timelineMultiplier),
+      rentGrowthRate: Math.max(0, (rentRate ?? 0) * timelineMultiplier),
       investmentReturnRate: timelineRates.investmentReturnRate
     };
   }
