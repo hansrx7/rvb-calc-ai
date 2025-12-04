@@ -5,9 +5,10 @@ import Joyride, { type Step, STATUS, EVENTS, ACTIONS } from 'react-joyride';
 
 const STORAGE_KEY_CHAT = 'rentvsbuy_has_seen_chat_tour';
 const STORAGE_KEY_CHARTS = 'rentvsbuy_has_seen_charts_tour';
+const STORAGE_KEY_SUMMARY = 'rentvsbuy_has_seen_summary_tour';
 
 interface OnboardingTourProps {
-  activeTab: 'chat' | 'charts';
+  activeTab: 'chat' | 'charts' | 'summary' | 'exportPreview';
 }
 
 export function OnboardingTour({ activeTab }: OnboardingTourProps) {
@@ -20,26 +21,26 @@ export function OnboardingTour({ activeTab }: OnboardingTourProps) {
     () => [
       {
         target: '[data-tour-id="phase-one-card"]',
-        content: 'Phase 1 shows your local market data. Mention any ZIP or city in the chat to refresh it.',
+        content: 'Phase 1 shows your local market data. Mention any ZIP or city in the chat to refresh it before we run the numbers.',
         disableBeacon: true,
         placement: 'bottom',
       },
       {
         target: '[data-tour-id="basic-inputs-card"]',
-        content: 'Phase 2 captures the basics: home price, monthly rent, down payment %, and how long you plan to stay.',
+        content: 'Phase 2 captures the basics: home price, monthly rent, down payment %, and how long you plan to stay. The chat helps you fill these in.',
       },
       {
         target: '[data-tour-id="advanced-inputs-card"]',
-        content: 'Phase 3 lets you fine-tune assumptions like interest rates, property taxes, and HOA dues.',
+        content: 'Phase 3 lets you fine-tune assumptions like interest rates, property taxes, and HOA dues. Most people can leave these at their defaults.',
       },
       {
         target: '[data-tour-id="analyze-button"]',
-        content: 'When you\'re ready, hit Send to share your details and I\'ll run the full analysis.',
+        content: 'When you\'re ready, hit Send in the chat to share your details and I\'ll run the full analysis behind the scenes.',
         placement: 'top',
       },
       {
         target: '[data-tour-id="charts-tab-button"]',
-        content: 'Switch to the Charts Dashboard anytime to see every chart in one place.',
+        content: 'All visuals live in the Charts Dashboard. Use this tab to see and explore your charts after we collect your info here in the chat.',
         placement: 'bottom',
       },
     ],
@@ -71,7 +72,30 @@ export function OnboardingTour({ activeTab }: OnboardingTourProps) {
     []
   );
 
-  const steps = activeTab === 'chat' ? chatSteps : chartsSteps;
+  // Summary Tab Tour Steps
+  const summarySteps: Step[] = useMemo(
+    () => [
+      {
+        target: '.hero-chart-wrapper',
+        content: 'This is where you can see the chart. The Net Worth chart shows how your wealth changes over time if you buy versus continue renting.',
+        disableBeacon: true,
+        placement: 'top',
+      },
+      {
+        target: '.metrics-panel',
+        content: 'Here are your key metrics. These six cards show important numbers like break-even year, net worth difference, total equity, and more.',
+        placement: 'top',
+      },
+      {
+        target: '.insight-box',
+        content: 'This is the insights summary section. Click "Generate Summary Insight" to get an AI-powered explanation of your scenario.',
+        placement: 'top',
+      },
+    ],
+    []
+  );
+
+  const steps = activeTab === 'chat' ? chatSteps : activeTab === 'charts' ? chartsSteps : summarySteps;
 
   // Auto-start tour for first-time visitors (only for chat tab)
   useEffect(() => {
@@ -139,7 +163,7 @@ export function OnboardingTour({ activeTab }: OnboardingTourProps) {
           }
         }
         
-        if (nextButton && !nextButton.disabled) {
+        if (nextButton && !(nextButton as HTMLButtonElement).disabled) {
           console.log('[OnboardingTour] Clicking next button:', nextButton.textContent);
           e.preventDefault();
           e.stopPropagation();
@@ -270,7 +294,7 @@ export function OnboardingTour({ activeTab }: OnboardingTourProps) {
 
             if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
               console.log(`[Joyride Callback] Tour ${status}`, { stepIndex, action });
-              const storageKey = activeTab === 'chat' ? STORAGE_KEY_CHAT : STORAGE_KEY_CHARTS;
+              const storageKey = activeTab === 'chat' ? STORAGE_KEY_CHAT : activeTab === 'charts' ? STORAGE_KEY_CHARTS : STORAGE_KEY_SUMMARY;
               localStorage.setItem(storageKey, 'true');
               setRun(false);
               setCurrentStepIndex(0);
