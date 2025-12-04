@@ -344,6 +344,13 @@ export function OnboardingTour({ activeTab }: OnboardingTourProps) {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', color: 'rgba(248, 250, 252, 0.85)', lineHeight: '1.7' }}>
+              {/* Creator */}
+              <div style={{ paddingBottom: '20px', borderBottom: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                <p style={{ margin: 0, fontSize: '16px', color: 'rgba(248, 250, 252, 0.9)' }}>
+                  Created by <span style={{ fontWeight: 600, color: 'rgba(248, 250, 252, 0.95)' }}>Mehwish Ahmed</span>
+                </p>
+              </div>
+
               {/* Our Mission */}
               <div>
                 <h3 style={{ fontSize: '20px', color: 'rgba(248, 250, 252, 0.95)', marginBottom: '12px', fontWeight: 600 }}>
