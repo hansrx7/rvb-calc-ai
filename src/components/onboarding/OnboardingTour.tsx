@@ -8,13 +8,14 @@ const STORAGE_KEY_CHARTS = 'rentvsbuy_has_seen_charts_tour';
 const STORAGE_KEY_SUMMARY = 'rentvsbuy_has_seen_summary_tour';
 
 interface OnboardingTourProps {
-  activeTab: 'chat' | 'charts' | 'summary' | 'exportPreview';
+  activeTab: 'chat' | 'charts' | 'summary';
 }
 
 export function OnboardingTour({ activeTab }: OnboardingTourProps) {
   const [run, setRun] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [showAbout, setShowAbout] = useState(false);
 
   // Chat & Setup Tab Tour Steps
   const chatSteps: Step[] = useMemo(
@@ -213,19 +214,194 @@ export function OnboardingTour({ activeTab }: OnboardingTourProps) {
           zIndex: 10003,
           padding: '10px 18px',
           borderRadius: '999px',
-          border: '1px solid rgba(255,255,255,0.18)',
-          background: 'rgba(12, 16, 27, 0.6)',
-          color: '#f8fafc',
+          border: 'none',
+          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%)',
+          color: 'white',
           fontSize: '13px',
           fontWeight: 600,
           letterSpacing: '0.04em',
           textTransform: 'uppercase',
           cursor: 'pointer',
           backdropFilter: 'blur(12px)',
+          boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)',
+          transition: 'all 0.2s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.boxShadow = '0 6px 16px rgba(139, 92, 246, 0.4)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
         }}
       >
         Help
       </button>
+      <button
+        type="button"
+        onClick={() => setShowAbout(true)}
+        title="About RentVsBuy.ai"
+        style={{
+          position: 'fixed',
+          top: '80px',
+          right: '20px',
+          zIndex: 10003,
+          padding: '10px 18px',
+          borderRadius: '999px',
+          border: 'none',
+          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(59, 130, 246, 0.9) 100%)',
+          color: 'white',
+          fontSize: '13px',
+          fontWeight: 600,
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+          cursor: 'pointer',
+          backdropFilter: 'blur(12px)',
+          boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)',
+          transition: 'all 0.2s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.boxShadow = '0 6px 16px rgba(139, 92, 246, 0.4)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
+        }}
+      >
+        About
+      </button>
+
+      {showAbout && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(5, 8, 15, 0.7)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10004,
+            padding: '24px',
+          }}
+          onClick={() => setShowAbout(false)}
+        >
+          <div
+            style={{
+              width: 'min(800px, 90vw)',
+              maxHeight: '90vh',
+              background: 'rgba(6, 10, 18, 0.98)',
+              border: '1px solid rgba(139, 92, 246, 0.35)',
+              borderRadius: '24px',
+              boxShadow: '0 30px 80px rgba(2, 6, 23, 0.7)',
+              padding: '32px 40px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '24px',
+              overflowY: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
+              <div>
+                <div style={{ fontSize: '12px', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(148, 163, 184, 0.8)', marginBottom: '8px' }}>
+                  ✨ Welcome
+                </div>
+                <h2 style={{ margin: 0, fontSize: '28px', color: 'rgba(248, 250, 252, 0.95)', fontWeight: 700 }}>
+                  About RentVsBuy.ai
+                </h2>
+              </div>
+              <button
+                onClick={() => setShowAbout(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'rgba(248, 250, 252, 0.8)',
+                  fontSize: '32px',
+                  cursor: 'pointer',
+                  padding: '0',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '8px',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)';
+                  e.currentTarget.style.color = 'rgba(248, 250, 252, 1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = 'rgba(248, 250, 252, 0.8)';
+                }}
+                aria-label="Close about modal"
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', color: 'rgba(248, 250, 252, 0.85)', lineHeight: '1.7' }}>
+              {/* Our Mission */}
+              <div>
+                <h3 style={{ fontSize: '20px', color: 'rgba(248, 250, 252, 0.95)', marginBottom: '12px', fontWeight: 600 }}>
+                  Our Mission
+                </h3>
+                <p style={{ margin: 0, fontSize: '15px' }}>
+                  RentVsBuy.ai is an AI-powered financial advisor that helps you make informed decisions about whether to buy a house or keep renting. We believe that everyone deserves access to clear, data-driven insights when making one of life's biggest financial decisions.
+                </p>
+                <p style={{ margin: '12px 0 0', fontSize: '15px' }}>
+                  Unlike traditional calculators, we use AI to have natural conversations with you, understand your unique financial situation, and generate visual comparisons tailored to your specific scenario. Our goal is to make complex financial analysis accessible, understandable, and actionable.
+                </p>
+              </div>
+
+              {/* What We Do */}
+              <div>
+                <h3 style={{ fontSize: '20px', color: 'rgba(248, 250, 252, 0.95)', marginBottom: '12px', fontWeight: 600 }}>
+                  What We Do
+                </h3>
+                <p style={{ margin: 0, fontSize: '15px' }}>
+                  We analyze your housing situation and provide comprehensive comparisons between buying a home and continuing to rent. Our platform generates interactive charts, personalized recommendations, and detailed financial breakdowns—all through a friendly, conversational interface.
+                </p>
+              </div>
+
+              {/* Key Features */}
+              <div>
+                <h3 style={{ fontSize: '20px', color: 'rgba(248, 250, 252, 0.95)', marginBottom: '12px', fontWeight: 600 }}>
+                  Key Features
+                </h3>
+                <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '15px' }}>
+                  <li style={{ marginBottom: '8px' }}>💬 Natural language AI conversations powered by OpenAI GPT-4</li>
+                  <li style={{ marginBottom: '8px' }}>📊 Interactive financial charts and visualizations</li>
+                  <li style={{ marginBottom: '8px' }}>📍 Location-based data for 26,000+ ZIP codes</li>
+                  <li style={{ marginBottom: '8px' }}>🎯 Personalized "Buy" or "Rent" recommendations</li>
+                  <li style={{ marginBottom: '8px' }}>💾 Professional PDF export for sharing</li>
+                  <li style={{ marginBottom: '8px' }}>⏰ Custom timeline analysis (3, 5, 10+ years)</li>
+                </ul>
+              </div>
+
+              {/* Tech Stack */}
+              <div>
+                <h3 style={{ fontSize: '20px', color: 'rgba(248, 250, 252, 0.95)', marginBottom: '12px', fontWeight: 600 }}>
+                  Built With
+                </h3>
+                <p style={{ margin: 0, fontSize: '15px' }}>
+                  React 18 + TypeScript, OpenAI GPT-4o-mini, Recharts, FastAPI, and modern web technologies. All calculations use industry-standard financial formulas and have been audited for accuracy.
+                </p>
+              </div>
+
+              {/* Disclaimer */}
+              <div style={{ paddingTop: '12px', borderTop: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                <p style={{ margin: 0, fontSize: '13px', color: 'rgba(148, 163, 184, 0.8)', fontStyle: 'italic' }}>
+                  ⚠️ This tool provides educational estimates and should not be considered financial advice. Consult with a qualified financial advisor before making major financial decisions.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isReady && (
         <Joyride

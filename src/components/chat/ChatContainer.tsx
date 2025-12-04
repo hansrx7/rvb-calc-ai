@@ -18,7 +18,6 @@ import { MonteCarloChart } from '../charts/MonteCarloChart';
 import { SensitivityChart } from '../charts/SensitivityChart';
 import { ChartPlaceholder } from '../charts/ChartPlaceholder';
 import { ChartsGrid } from '../charts/ChartsGrid';
-import { ExportPreviewLab } from '../debug/ExportPreviewLab';
 import { BasicInputsCard } from './BasicInputsCard';
 import { AdvancedInputsCard } from './AdvancedInputsCard';
 import { generateRecommendation, type Recommendation } from '../../types/recommendation';
@@ -49,9 +48,7 @@ import { getAIResponse, createChatCompletion } from '../../lib/ai/openai';
 // import { EquityBuildupChart } from '../charts/EquityBuildupChart';
 // import { RentGrowthChart } from '../charts/RentGrowthChart';
 // import { BreakEvenChart } from '../charts/BreakEvenChart';
-import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { captureElementToCanvas } from '../../lib/export/html2canvasExport';
 import { analyzeScenario, fetchBreakEvenHeatmap, fetchSensitivity, fetchScenarios } from '../../lib/api/finance';
 import { OnboardingTour } from '../onboarding/OnboardingTour';
 import { SummaryTab } from '../summary/SummaryTab';
@@ -333,8 +330,7 @@ const [chartsReady, setChartsReady] = useState(false);
   
   // Advanced charts visibility state
   const [showAdvancedCharts, setShowAdvancedCharts] = useState(false);
-  const isDev = import.meta.env.DEV;
-  const [activeTab, setActiveTab] = useState<'chat' | 'charts' | 'summary' | 'exportPreview'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'charts' | 'summary'>('chat');
   
   // Ref for scrolling to charts
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -614,10 +610,11 @@ const [chartsReady, setChartsReady] = useState(false);
 
   // Handle save chat as PDF
   const handleSaveChat = async () => {
-    console.log('🚀 [PDF EXPORT] Starting PDF export...');
+    console.log('🚀🚀🚀 [PDF EXPORT] ===== STARTING PDF EXPORT =====');
+    console.log('🚀 [PDF EXPORT] Button clicked, function called');
     try {
       setSaveProgress(0); // Start progress
-      console.log('🚀 [PDF EXPORT] Progress set to 0%');
+      console.log('🚀 [PDF EXPORT] Progress set to 0%, creating PDF document...');
       
       // Create new PDF document
       const pdf = new jsPDF('p', 'mm', 'a4');
@@ -766,160 +763,6 @@ const [chartsReady, setChartsReady] = useState(false);
         // Skip individual chart exports - we'll capture all charts from Dashboard at the end
         
         yPosition += 2; // Space between messages
-      }
-      
-      // Capture all visible charts from Charts Dashboard as screenshots
-      setSaveProgress(85);
-      addText('Charts Dashboard:', 14, true);
-      yPosition += 5;
-      
-      try {
-        // Ensure Charts tab is visible
-        const wasOnChartsTab = activeTab === 'charts';
-        if (!wasOnChartsTab) {
-          setActiveTab('charts');
-          // Wait longer for React to fully render the charts tab
-          await new Promise(resolve => setTimeout(resolve, 800));
-        }
-        
-        // Wait for charts to fully render - Recharts needs time
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Find all chart grid items that are actually visible
-        const chartItems = Array.from(document.querySelectorAll('.chart-grid-item')).filter((item) => {
-          const el = item as HTMLElement;
-          const rect = el.getBoundingClientRect();
-          const isVisible = rect.width > 0 && rect.height > 0 && 
-                           rect.top < window.innerHeight && 
-                           rect.bottom > 0 &&
-                           window.getComputedStyle(el).display !== 'none';
-          return isVisible;
-        }) as HTMLElement[];
-        
-        console.log(`[PDF Export] Found ${chartItems.length} visible chart items to capture`);
-        
-        if (chartItems.length === 0) {
-          addText('No charts available to export. Please view the Charts Dashboard first and ensure charts are loaded.', 10);
-        } else {
-          for (let i = 0; i < chartItems.length; i++) {
-            const chartItem = chartItems[i];
-            
-            // Scroll chart into view to ensure it's fully rendered
-            chartItem.scrollIntoView({ behavior: 'instant', block: 'center' });
-            await new Promise(resolve => setTimeout(resolve, 300)); // Wait for scroll
-            
-            // Check if it contains a placeholder
-            const placeholder = chartItem.querySelector('.chart-placeholder');
-            if (placeholder) {
-              console.log(`[PDF Export] Skipping chart ${i + 1} - has placeholder`);
-              continue; // Skip placeholders
-            }
-            
-            // Double-check chart has actual content (Recharts SVG)
-            const hasChart = chartItem.querySelector('svg, .recharts-wrapper');
-            if (!hasChart) {
-              console.log(`[PDF Export] Skipping chart ${i + 1} - no chart content found`);
-              continue;
-            }
-            
-            // Get chart title (outside try block for error handling)
-            const titleElement = chartItem.querySelector('.chart-grid-item-header h3');
-            const chartTitle = titleElement?.textContent?.trim() || `Chart ${i + 1}`;
-            
-            try {
-              addText(chartTitle, 12, true);
-              yPosition += 3;
-              
-              console.log(`[PDF Export] Capturing chart ${i + 1}/${chartItems.length}: ${chartTitle}`, {
-                width: chartItem.offsetWidth,
-                height: chartItem.offsetHeight,
-                hasSVG: !!chartItem.querySelector('svg')
-              });
-              
-              // Capture the entire chart grid item - like a real screenshot
-              const canvas = await html2canvas(chartItem, {
-                backgroundColor: '#ffffff',
-                scale: 2,
-                useCORS: true,
-                allowTaint: true,
-                logging: true, // Enable logging to debug
-                windowWidth: chartItem.offsetWidth,
-                windowHeight: chartItem.offsetHeight,
-                onclone: (_clonedDoc, element) => {
-                  // Force white background on the cloned chart item
-                  if (element instanceof HTMLElement) {
-                    element.style.backgroundColor = '#ffffff';
-                    element.style.background = '#ffffff';
-                    element.style.color = '#000000';
-                    // Force white background on all child containers
-                    const containers = element.querySelectorAll('.chart-container, .chart-wrapper, .chart-grid-item-content, .chart-grid-item');
-                    containers.forEach((container: Element) => {
-                      const el = container as HTMLElement;
-                      el.style.backgroundColor = '#ffffff';
-                      el.style.background = '#ffffff';
-                      el.style.color = '#000000';
-                    });
-                    // Force black text on titles
-                    const titles = element.querySelectorAll('.chart-title, .chart-grid-item-header h3, h3');
-                    titles.forEach((title: Element) => {
-                      const el = title as HTMLElement;
-                      el.style.color = '#000000';
-                    });
-                    // Force black text on captions
-                    const captions = element.querySelectorAll('.chart-caption, p');
-                    captions.forEach((caption: Element) => {
-                      const el = caption as HTMLElement;
-                      if (el.classList.contains('chart-caption') || el.textContent?.includes('shows')) {
-                        el.style.color = '#000000';
-                      }
-                    });
-                    // Force all SVG elements to be visible
-                    const svgs = element.querySelectorAll('svg');
-                    svgs.forEach((svg: Element) => {
-                      const el = svg as HTMLElement;
-                      el.style.opacity = '1';
-                      el.style.visibility = 'visible';
-                    });
-                  }
-                }
-              });
-              
-              if (!canvas || canvas.width === 0 || canvas.height === 0) {
-                throw new Error('Canvas is empty');
-              }
-              
-              const imgData = canvas.toDataURL('image/png');
-              if (!imgData || imgData === 'data:,') {
-                throw new Error('Failed to generate image data');
-              }
-              
-              const imgWidth = pageWidth - 2 * margin;
-              const imgHeight = (canvas.height * imgWidth) / canvas.width;
-              
-              // Check if we need a new page
-              checkNewPage(imgHeight + 5);
-              
-              pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
-              yPosition += imgHeight + 5;
-              
-              console.log(`[PDF Export] ✅ Successfully captured chart ${i + 1}/${chartItems.length}: ${chartTitle}`, {
-                canvasSize: `${canvas.width}x${canvas.height}`,
-                pdfSize: `${imgWidth.toFixed(1)}x${imgHeight.toFixed(1)}mm`
-              });
-            } catch (error) {
-              console.error(`[PDF Export] ❌ Error capturing chart ${i + 1}:`, error);
-              addText(`[Chart ${i + 1} (${chartTitle}) could not be captured: ${error instanceof Error ? error.message : 'Unknown error'}]`, 10);
-            }
-          }
-        }
-        
-        // Switch back to original tab if needed
-        if (!wasOnChartsTab) {
-          setActiveTab('chat');
-        }
-      } catch (error) {
-        console.error('[PDF Export] ❌ Error capturing charts from Dashboard:', error);
-        addText(`[Charts could not be captured from Dashboard: ${error instanceof Error ? error.message : 'Unknown error'}]`, 10);
       }
       
       // Save the PDF
@@ -3546,15 +3389,6 @@ const handleChipClick = (message: string) => {
               >
                 📊 Charts Dashboard
               </button>
-              {isDev && (
-                <button
-                  className={`tab-button ${activeTab === 'exportPreview' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('exportPreview')}
-                  title="Export Preview Lab (Dev only)"
-                >
-                  🔬 Export Preview
-                </button>
-              )}
             </div>
             {/* Toggle Reference Box Button - Always visible */}
           </div>
@@ -3770,32 +3604,6 @@ const handleChipClick = (message: string) => {
               />
             </div>
           </div>
-        </div>
-      ) : activeTab === 'exportPreview' && isDev ? (
-        <div className="charts-tab-container">
-          <ExportPreviewLab
-            analysis={unifiedAnalysisResult}
-            timeline={normalizedTimeline}
-            totalCostData={totalCostData || undefined}
-            monthlyCosts={monthlyCosts || undefined}
-            heatmapData={heatmapData || undefined}
-            monteCarloData={monteCarloData || undefined}
-            sensitivityData={sensitivityData || undefined}
-            scenarioOverlayData={scenarioOverlayData || undefined}
-          />
-        </div>
-      ) : activeTab === 'exportPreview' && isDev ? (
-        <div className="charts-tab-container">
-          <ExportPreviewLab
-            analysis={unifiedAnalysisResult}
-            timeline={normalizedTimeline}
-            totalCostData={totalCostData || undefined}
-            monthlyCosts={monthlyCosts || undefined}
-            heatmapData={heatmapData || undefined}
-            monteCarloData={monteCarloData || undefined}
-            sensitivityData={sensitivityData || undefined}
-            scenarioOverlayData={scenarioOverlayData || undefined}
-          />
         </div>
       ) : (
         <SummaryTab
