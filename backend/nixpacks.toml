@@ -1,0 +1,26 @@
+[phases.setup]
+nixPkgs = ["python311"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[start]
+cmd = "uvicorn main:app --host 0.0.0.0 --port $PORT"
+```
+
+This tells Railway exactly how to build and run your Python app.
+
+---
+
+### **Step 4: Verify Your Backend Structure**
+
+Your project should look like this:
+```
+your-repo/
+├── backend/
+│   ├── main.py (or server.py)
+│   ├── requirements.txt
+│   └── nixpacks.toml (create this)
+├── src/ (frontend React code)
+├── package.json
+└── vite.config.js
