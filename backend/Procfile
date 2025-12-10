@@ -1,1 +1,13 @@
-web: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+# Old cmd: web: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+cd backend
+
+# Update Procfile to use the venv
+cat > Procfile << 'EOF'
+web: /app/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+EOF
+
+cd ..
+
+git add backend/Procfile
+git commit -m "Use venv python in Procfile"
+git push origin main
