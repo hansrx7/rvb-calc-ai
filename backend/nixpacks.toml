@@ -2,10 +2,11 @@
 nixPkgs = ["python311"]
 
 [phases.install]
-cmds = ["pip install -r requirements.txt"]
+cmds = ["pip install --no-cache-dir -r requirements.txt"]
 
 [start]
-cmd = "uvicorn main:app --host 0.0.0.0 --port $PORT"
+cmd = "python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+
 ```
 
 This tells Railway exactly how to build and run your Python app.
@@ -24,3 +25,12 @@ your-repo/
 ├── src/ (frontend React code)
 ├── package.json
 └── vite.config.js
+
+[phases.setup]
+nixPkgs = ["python311"]
+
+[phases.install]
+cmds = ["pip install --no-cache-dir -r requirements.txt"]
+
+[start]
+cmd = "python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT"
