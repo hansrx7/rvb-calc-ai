@@ -6,7 +6,9 @@ export default defineConfig({
   preview: {
     allowedHosts: [
       "*.up.railway.app",
-      "rvb-calc-ai-production-a1cd.up.railway.app"
+      "rvb-calc-ai-production-a1cd.up.railway.app",
+      "rentvsbuy.ai",
+      "www.rentvsbuy.ai"
     ]
   }
 })
